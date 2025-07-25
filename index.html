@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redmine Time Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="dist/css/main.min.css">
+    <link rel="icon" href="src/images/favicon.png" type="image/x-icon">
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container"></div>
+    
+    <div id="app" class="container py-4">
+        <!-- Global Error Container -->
+        <div id="global-error-container"></div>
+        
+        <header class="text-center">
+            <h1 class="text-white mb-3">Redmine Time Tracker</h1>
+            <nav>
+                <div class="d-flex justify-content-center gap-3 position-relative">
+                    <a href="#" id="nav-tracker" class="nav-link active text-decoration-none">
+                        <i class="fa-solid fa-clock me-2"></i>Tracker
+                    </a>
+                    <a href="#" id="nav-settings" class="nav-link text-decoration-none">
+                        <i class="fa-solid fa-cog me-2"></i>Settings
+                    </a>
+                    
+                    <!-- Theme Toggle Button -->
+                    <div class="position-absolute end-0">
+                        <button class="btn btn-sm" type="button" id="theme-toggle" title="Toggle theme">
+                            <i class="fa-solid fa-circle-half-stroke" id="theme-icon"></i>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <div id="tracker-page">
+            <main class="row g-4">
+                <section id="tracker" class="col-lg-8">
+                    <div class="card mb-4" id="task-selection-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fa-solid fa-play text-primary"></i>
+                                Current Task
+                            </h5>
+                            <div id="config-prompt" class="alert alert-info" style="display: none;">
+                                <i class="fa-solid fa-info-circle me-2"></i>
+                                Please configure your Redmine URL and API Key in the <a href="#" id="prompt-link-to-settings" class="alert-link fw-semibold">Settings</a> page, or enable Test Mode.
+                            </div>
+                            <div id="task-selection-form">
+                                <div class="mb-3">
+                                    <label for="project-input" class="form-label fw-medium">Project</label>
+                                    <div class="autocomplete-container">
+                                        <input type="text" id="project-input" placeholder="Search projects..." class="form-control" autocomplete="off" readonly>
+                                        <div id="project-list" class="autocomplete-items"></div>
+                                    </div>
+                                    <select id="project-select" class="form-select" style="display: none;"></select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="task-input" class="form-label fw-medium">Task</label>
+                                     <div class="autocomplete-container">
+                                        <input type="text" id="task-input" placeholder="Select a project first" class="form-control" autocomplete="off" readonly>
+                                         <div id="task-list" class="autocomplete-items"></div>
+                                     </div>
+                                    <select id="task-select" class="form-select" style="display: none;"></select>
+                                </div>
+                                <div class="mb-3" style="display: none;">
+                                    <label for="activity-select" class="form-label fw-medium">Activity</label>
+                                    <select id="activity-select" class="form-select" disabled>
+                                        <option value="">-- Loading activities --</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card mb-4" id="timer-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fa-solid fa-stopwatch text-primary"></i>
+                                Timer
+                            </h5>
+                            <div id="time-display" class="text-center mb-3">00:00:00</div>
+                            <div id="timer-controls" class="d-flex gap-3 justify-content-center">
+                                <button id="start-btn" class="btn btn-primary">
+                                    <i class="fa-solid fa-play"></i>
+                                    Start
+                                </button>
+                                <button id="pause-btn" class="btn btn-secondary" disabled>
+                                    <i class="fa-solid fa-pause"></i>
+                                    Pause
+                                </button>
+                                <button id="stop-btn" class="btn btn-danger" disabled>
+                                    <i class="fa-solid fa-stop"></i>
+                                    Stop
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card" id="activity-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fa-solid fa-list-check text-primary"></i>
+                                Activity Log
+                            </h5>
+                            <div id="activity-form" class="d-flex gap-2 mb-3">
+                                 <input type="text" id="activity-input" placeholder="What are you working on?" class="form-control" disabled>
+                                 <button id="add-activity-btn" class="btn btn-outline-primary" disabled>
+                                     <i class="fa-solid fa-plus"></i>
+                                     Add
+                                 </button>
+                            </div>
+                            <ul id="activity-list" class="list-unstyled" style="max-height: 300px; overflow-y: auto;"></ul>
+                        </div>
+                    </div>
+                </section>
+
+                <aside id="sidebar" class="col-lg-4">
+                    <div class="card" id="work-queue-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fa-solid fa-layer-group text-primary"></i>
+                                Work Queue
+                            </h5>
+                            <div id="todo-form">
+                                <div class="mb-3">
+                                    <label for="todo-project-input" class="form-label fw-medium">Project</label>
+                                    <div class="autocomplete-container">
+                                         <input type="text" id="todo-project-input" placeholder="Search projects..." class="form-control" autocomplete="off">
+                                         <div id="todo-project-list" class="autocomplete-items"></div>
+                                    </div>
+                                    <select id="todo-project-select" class="form-select" style="display: none;">
+                                        <option value="">-- Select a project --</option>
+                                    </select>
+                                </div>
+                                 <div class="mb-3">
+                                    <label for="todo-task-input" class="form-label fw-medium">Task</label>
+                                    <div class="autocomplete-container">
+                                        <input type="text" id="todo-task-input" placeholder="Select a project first" class="form-control" autocomplete="off" disabled>
+                                        <div id="todo-task-list" class="autocomplete-items"></div>
+                                    </div>
+                                    <select id="todo-task-select" class="form-select" style="display: none;" disabled>
+                                        <option value="">-- Select a task --</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="todo-note-input" class="form-label fw-medium">Note (optional)</label>
+                                    <input type="text" id="todo-note-input" placeholder="Add a personal note..." class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="todo-activity-select" class="form-label fw-medium">Activity</label>
+                                    <select id="todo-activity-select" class="form-select">
+                                        <option value="">-- Loading activities --</option>
+                                    </select>
+                                </div>
+                                <button id="add-to-queue-btn" class="btn btn-primary w-100">
+                                    <i class="fa-solid fa-plus"></i>
+                                    Add to Queue
+                                </button>
+                            </div>
+                            <ul id="todo-list" class="list-unstyled mt-3"></ul>
+                        </div>
+                    </div>
+                </aside>
+            </main>
+        </div>
+
+        <div id="settings-page" class="container" style="display: none;">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fa-solid fa-gears text-primary"></i>
+                        Redmine Configuration
+                    </h5>
+                     <div class="d-flex align-items-center gap-3 p-3 bg-light rounded mb-4">
+                        <label for="test-mode-toggle" class="fw-semibold">Enable Test Mode</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="test-mode-toggle">
+                        </div>
+                        <span class="text-muted small">Bypasses Redmine connection for UI testing.</span>
+                    </div>
+                    <hr class="my-4"/>
+                    <div class="mb-3">
+                        <label for="redmine-url" class="form-label">Redmine URL</label>
+                        <input type="url" id="redmine-url" class="form-control" placeholder="https://your.redmine.com">
+                    </div>
+                     <div class="mb-3">
+                        <label for="redmine-api-key" class="form-label">API Key</label>
+                        <input type="password" id="redmine-api-key" class="form-control" placeholder="Enter your Redmine API key">
+                    </div>
+                    <div class="mb-3" style="display: none;">
+                        <label for="billable-field-id" class="form-label">"Billable" Custom Field ID (Auto-detected)</label>
+                        <input type="number" id="billable-field-id" class="form-control" placeholder="Auto-detected from your Redmine custom fields" readonly>
+                    </div>
+                    <div id="settings-controls" class="d-flex gap-3 mb-3">
+                        <button id="save-settings-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-save"></i>
+                            Save Settings
+                        </button>
+                        <button id="test-connection-btn" class="btn btn-secondary">
+                            <i class="fa-solid fa-plug"></i>
+                            Test Connection
+                        </button>
+                    </div>
+                    <div id="connection-status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary-modal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Submit Time Entry</h5>
+                    <button type="button" id="close-modal" class="btn-close" aria-label="Close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Total Time:</strong> <span id="summary-time"></span></p>
+                    <div class="mb-3">
+                        <label for="summary-details" class="form-label fw-medium">Comments</label>
+                        <textarea id="summary-details" rows="4" class="form-control"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="summary-activity-select" class="form-label fw-medium">Activity</label>
+                        <select id="summary-activity-select" class="form-select">
+                            <option value="">-- Loading activities --</option>
+                        </select>
+                    </div>
+                    
+                    <hr/>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="billable-checkbox-simple" checked>
+                            <label class="form-check-label fw-medium" for="billable-checkbox-simple">
+                                Billable
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="change-status-checkbox">
+                            <label class="form-check-label fw-medium" for="change-status-checkbox">
+                                Change issue status after submission
+                            </label>
+                        </div>
+                        <div id="status-change-container" class="mt-2" style="display: none;">
+                            <select id="issue-status-select" class="form-select"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="submit-btn" class="btn btn-primary">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        Submit to Redmine
+                    </button>
+                </div>
+                <div id="modal-status" class="mx-3 mb-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="first-activity-modal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">What is your first activity?</h5>
+                    <button type="button" id="close-first-activity-modal" class="btn-close" aria-label="Close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="first-activity-input" class="form-label fw-medium">Activity Description</label>
+                        <input type="text" id="first-activity-input" class="form-control" placeholder="e.g., Kicking off feature X">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="start-with-activity-btn" class="btn btn-primary">
+                        <i class="fa-solid fa-play"></i>
+                        Start Tracking
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="src/main.ts" type="module"></script>
+</body>
+</html>

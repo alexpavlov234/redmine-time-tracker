@@ -1,0 +1,6 @@
+{
+  "name": "Redmine Time Tracker",
+  "description": "A client for Redmine that tracks time, logs activities, and submits time entries directly to Redmine issues via the API.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

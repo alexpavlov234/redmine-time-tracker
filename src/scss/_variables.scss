@@ -1,0 +1,47 @@
+// Custom CSS Properties that extend Bootstrap's system
+// This file only contains CSS custom properties (CSS variables) for runtime use
+:root {
+    // Application colors using Bootstrap variables
+    --primary-color: #{$primary};
+    --primary-hover: #{shade-color($primary, 15%)};
+    --primary-light: #{tint-color($primary, 85%)};
+    --accent-color: #{$info};
+    --success-color: #{$success};
+    --warning-color: #{$warning};
+    --danger-color: #{$danger};
+    --secondary-color: #{$secondary};
+    
+    // Custom shadows that complement Bootstrap
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-subtle: var(--bs-box-shadow-sm);
+    --shadow-prominent: var(--bs-box-shadow);
+    --shadow-dramatic: var(--bs-box-shadow-lg);
+    
+    // Custom transitions
+    --transition-fast: 150ms ease;
+    --transition-normal: 250ms ease;
+    --transition-slow: 350ms ease;
+    
+    // Application-specific surface colors using Bootstrap's system
+    --surface-bg: var(--bs-body-bg);
+    --surface-color: var(--bs-body-color);
+    --surface-border: var(--bs-border-color);
+    --surface-hover: var(--bs-secondary-bg);
+    
+    // Custom font weights
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    
+    // Font family reference
+    --font-family: #{$font-family-sans-serif};
+    
+    // Border radius references
+    --border-radius: #{$border-radius};
+    --border-radius-sm: #{$border-radius-sm};
+    --border-radius-lg: #{$border-radius-lg};
+    --border-radius-xl: #{$border-radius-xl};
+}
+
+

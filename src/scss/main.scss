@@ -1,0 +1,9 @@
+// Import Bootstrap with custom variables
+@import "bootstrap-config";
+@import "../../node_modules/bootstrap/scss/bootstrap";
+
+// Import custom styles
+@import "variables";
+@import "base";
+@import "components";
+@import "themes";
