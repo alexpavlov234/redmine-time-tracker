@@ -180,26 +180,28 @@
         <div id="logged-time-page" class="container" style="display: none;">
             <div class="row">
                 <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Yesterday</h5>
-                        <ul id="yesterday-log" class="list-group list-group-flush"></ul>
-                        <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title" id="last-logged-day-title">Last Logged Day</h5>
+                            <div id="last-day-projects-summary" class="mb-3"></div>
+                            <ul id="last-log" class="list-group list-group-flush"></ul>
+                        </div>
+                        <div class="card-footer d-flex justify-content-between align-items-center">
                             <strong>Total:</strong>
-                            <span id="yesterday-total-time" class="fw-bold">0h 0m</span>
+                            <span id="last-log-total-time" class="fw-bold">0h 0m</span>
                         </div>
                     </div>
                 </div>
-            </div>
                 <div class="col-md-6">
-                    <div class="card">
+                    <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title">Today</h5>
+                            <div id="today-projects-summary" class="mb-3"></div>
                             <ul id="today-log" class="list-group list-group-flush"></ul>
-                            <div class="d-flex justify-content-between align-items-center mt-3">
-                                <strong>Total:</strong>
-                                <span id="today-total-time" class="fw-bold">0h 0m</span>
-                            </div>
+                        </div>
+                        <div class="card-footer d-flex justify-content-between align-items-center">
+                            <strong>Total:</strong>
+                            <span id="today-total-time" class="fw-bold">0h 0m</span>
                         </div>
                     </div>
                 </div>

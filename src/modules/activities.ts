@@ -11,16 +11,11 @@ export function addActivityToState(newActivity?: Activity) {
         if (state.activities.length > 0) {
             const lastActivity = state.activities[state.activities.length - 1];
 
-            let currentTotalElapsedTime = state.totalElapsedTime;
-            if (state.timerInterval) {
-                currentTotalElapsedTime = (now.getTime() - (state.startTime ?? now.getTime()) + state.pausedTime) / 1000;
-            }
-
             const previousActivitiesDuration = state.activities
                 .slice(0, -1)
                 .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
 
-            const newDuration = currentTotalElapsedTime - previousActivitiesDuration;
+            const newDuration = state.totalElapsedTime - previousActivitiesDuration;
             lastActivity.durationSeconds = Math.max(0, newDuration);
         }
 

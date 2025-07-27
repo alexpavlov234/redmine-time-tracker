@@ -49,9 +49,9 @@ export const elements = {
 
     // Logged Time
     todayLog: document.getElementById('today-log') as HTMLUListElement,
-    yesterdayLog: document.getElementById('yesterday-log') as HTMLUListElement,
+    yesterdayLog: document.getElementById('last-log') as HTMLUListElement,
     todayTotalTime: document.getElementById('today-total-time') as HTMLSpanElement,
-    yesterdayTotalTime: document.getElementById('yesterday-total-time') as HTMLSpanElement,
+    yesterdayTotalTime: document.getElementById('last-log-total-time') as HTMLSpanElement,
 
     // Summary Modal
     summaryModal: document.getElementById('summary-modal') as HTMLDivElement,

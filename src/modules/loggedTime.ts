@@ -5,9 +5,12 @@ import { formatDate } from '../utils/helpers.js';
 import { showError, showConfirm, showSuccess } from '../utils/ui.js';
 
 const todayLog = document.getElementById('today-log') as HTMLUListElement;
-const yesterdayLog = document.getElementById('yesterday-log') as HTMLUListElement;
+const lastLog = document.getElementById('last-log') as HTMLUListElement;
 const todayTotalTime = document.getElementById('today-total-time') as HTMLSpanElement;
-const yesterdayTotalTime = document.getElementById('yesterday-total-time') as HTMLSpanElement;
+const lastLogTotalTime = document.getElementById('last-log-total-time') as HTMLSpanElement;
+const lastLoggedDayTitle = document.getElementById('last-logged-day-title') as HTMLHeadingElement;
+const todayProjectsSummary = document.getElementById('today-projects-summary') as HTMLDivElement;
+const lastDayProjectsSummary = document.getElementById('last-day-projects-summary') as HTMLDivElement;
 
 function renderTimeEntries(entries: TimeEntry[], element: HTMLUListElement, issuesMap: Map<number, RedmineIssue>) {
     element.innerHTML = '';
@@ -18,7 +21,7 @@ function renderTimeEntries(entries: TimeEntry[], element: HTMLUListElement, issu
 
     entries.forEach(entry => {
         const listItem = document.createElement('li');
-        listItem.className = 'list-group-item py-2'; // Reduced padding
+        listItem.className = 'list-group-item py-2';
 
         let taskName = 'No task';
         if (entry.issue && entry.issue.subject) {
@@ -30,79 +33,110 @@ function renderTimeEntries(entries: TimeEntry[], element: HTMLUListElement, issu
             }
         }
 
-        // Create a more compact layout
         const rowDiv = document.createElement('div');
-        rowDiv.className = 'd-flex align-items-center justify-content-between';
+        rowDiv.className = 'd-flex align-items-start justify-content-between';
 
-        // Left side: Project and task info
         const infoDiv = document.createElement('div');
-        infoDiv.className = 'text-truncate me-2';
-        infoDiv.style.maxWidth = '60%';
+        infoDiv.className = 'me-2';
+        infoDiv.style.flex = '1';
+        infoDiv.style.minWidth = '0';
 
-        // Task name with tooltip for long names
-        const taskNameDiv = document.createElement('div');
-        taskNameDiv.className = 'fw-semibold text-truncate';
-        taskNameDiv.title = taskName; // Add tooltip
-        taskNameDiv.textContent = taskName;
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'fw-semibold';
+        commentDiv.style.whiteSpace = 'pre-wrap';
+        commentDiv.style.wordBreak = 'break-word';
+        commentDiv.textContent = entry.comments || taskName;
+        infoDiv.appendChild(commentDiv);
 
-        // Project name on the same line as comments
         const detailsDiv = document.createElement('div');
-        detailsDiv.className = 'small text-muted d-flex';
+        detailsDiv.className = 'small text-muted';
 
         const projectSpan = document.createElement('span');
-        projectSpan.className = 'text-truncate';
+        projectSpan.className = 'd-block text-truncate';
         projectSpan.title = entry.project.name;
-        projectSpan.textContent = entry.project.name;
+        projectSpan.textContent = `Project: ${entry.project.name}`;
         detailsDiv.appendChild(projectSpan);
 
-        // Add comments if they exist
         if (entry.comments) {
-            const commentsSpan = document.createElement('span');
-            commentsSpan.className = 'text-secondary ms-2 text-truncate';
-            commentsSpan.title = entry.comments;
-            commentsSpan.textContent = `• ${entry.comments}`;
-            detailsDiv.appendChild(commentsSpan);
+            const taskSpan = document.createElement('span');
+            taskSpan.className = 'd-block text-truncate';
+            taskSpan.title = taskName;
+            taskSpan.textContent = `Task: ${taskName}`;
+            detailsDiv.appendChild(taskSpan);
         }
 
-        infoDiv.appendChild(taskNameDiv);
         infoDiv.appendChild(detailsDiv);
 
-        // Hours badge
-        const hoursSpan = document.createElement('span');
-        hoursSpan.className = 'badge bg-primary rounded-pill mx-2';
-        hoursSpan.textContent = `${entry.hours.toFixed(2)}h`;
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'd-flex flex-column align-items-end';
 
-        // Actions container
+        const hoursSpan = document.createElement('span');
+        hoursSpan.className = 'badge bg-primary rounded-pill mb-2';
+        hoursSpan.textContent = `${entry.hours.toFixed(2)}h`;
+        controlsDiv.appendChild(hoursSpan);
+
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'btn-group btn-group-sm';
 
-        // Edit button
         const editBtn = document.createElement('button');
         editBtn.className = 'btn btn-sm btn-outline-secondary';
         editBtn.innerHTML = '<i class="fa-solid fa-edit"></i>';
         editBtn.title = 'Edit time entry';
         editBtn.style.padding = '0.25rem 0.5rem';
         editBtn.addEventListener('click', () => editTimeEntry(entry));
+        actionsDiv.appendChild(editBtn);
 
-        // Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'btn btn-sm btn-outline-danger';
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
         deleteBtn.title = 'Delete time entry';
         deleteBtn.style.padding = '0.25rem 0.5rem';
         deleteBtn.addEventListener('click', () => deleteTimeEntryHandler(entry.id));
-
-        // Assemble the components
-        actionsDiv.appendChild(editBtn);
         actionsDiv.appendChild(deleteBtn);
 
+        controlsDiv.appendChild(actionsDiv);
+
         rowDiv.appendChild(infoDiv);
-        rowDiv.appendChild(hoursSpan);
-        rowDiv.appendChild(actionsDiv);
+        rowDiv.appendChild(controlsDiv);
 
         listItem.appendChild(rowDiv);
         element.appendChild(listItem);
     });
+}
+
+function renderDailyProjectsSummary(entries: TimeEntry[], container: HTMLDivElement) {
+    if (!container) return;
+
+    if (entries.length === 0) {
+        container.innerHTML = ''; // No summary if no entries
+        return;
+    }
+
+    const projectHours = new Map<string, number>();
+
+    entries.forEach(entry => {
+        const projectName = entry.project.name;
+        const currentHours = projectHours.get(projectName) || 0;
+        projectHours.set(projectName, currentHours + entry.hours);
+    });
+
+    const sortedProjects = [...projectHours.entries()].sort((a, b) => b[1] - a[1]);
+
+    if (sortedProjects.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const summaryHtml = sortedProjects.map(([projectName, totalHours]) => {
+        return `
+            <div class="d-flex justify-content-between align-items-center py-1 small">
+                <span class="text-truncate text-muted" title="${projectName}">${projectName}</span>
+                <span class="fw-bold text-muted">${totalHours.toFixed(2)}h</span>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = summaryHtml;
 }
 
 function calculateTotal(entries: TimeEntry[]): number {
@@ -255,16 +289,18 @@ export async function initLoggedTimePage() {
     try {
         // Show loading spinners
         const todaySection = document.getElementById('today-log') as HTMLElement;
-        const yesterdaySection = document.getElementById('yesterday-log') as HTMLElement;
+        const yesterdaySection = document.getElementById('last-log') as HTMLElement;
         if (todaySection) showSpinner(todaySection);
         if (yesterdaySection) showSpinner(yesterdaySection);
+        if (todayProjectsSummary) todayProjectsSummary.innerHTML = '<p class="text-muted small">Loading summary...</p>';
+        if (lastDayProjectsSummary) lastDayProjectsSummary.innerHTML = '<p class="text-muted small">Loading summary...</p>';
 
         const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-
-        const from = formatDate(yesterday);
         const to = formatDate(today);
+
+        const fromDate = new Date();
+        fromDate.setDate(today.getDate() - 30); // Look back 30 days
+        const from = formatDate(fromDate);
 
         const timeEntries = await getTimeEntries({ from, to, user_id: state.user.id });
 
@@ -288,25 +324,45 @@ export async function initLoggedTimePage() {
         }
 
         const todayEntries = timeEntries.filter(entry => formatDate(new Date(entry.spent_on)) === to);
-        const yesterdayEntries = timeEntries.filter(entry => formatDate(new Date(entry.spent_on)) === from);
+        const otherEntries = timeEntries.filter(entry => formatDate(new Date(entry.spent_on)) !== to);
+
+        let lastLoggedDayEntries: TimeEntry[] = [];
+        if (otherEntries.length > 0) {
+            const lastLoggedDate = otherEntries.reduce((max, entry) => entry.spent_on > max ? entry.spent_on : max, otherEntries[0].spent_on);
+            lastLoggedDayEntries = otherEntries.filter(entry => entry.spent_on === lastLoggedDate);
+
+            if (lastLoggedDayTitle) {
+                const date = new Date(lastLoggedDate);
+                const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+                const adjustedDate = new Date(date.getTime() + userTimezoneOffset);
+                lastLoggedDayTitle.textContent = adjustedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+            }
+        } else {
+            if (lastLoggedDayTitle) {
+                lastLoggedDayTitle.textContent = 'Older Entries';
+            }
+        }
 
         // Hide loading spinners
         if (todaySection) hideSpinner(todaySection);
         if (yesterdaySection) hideSpinner(yesterdaySection);
 
+        renderDailyProjectsSummary(todayEntries, todayProjectsSummary);
+        renderDailyProjectsSummary(lastLoggedDayEntries, lastDayProjectsSummary);
+
         renderTimeEntries(todayEntries, todayLog, issuesMap);
-        renderTimeEntries(yesterdayEntries, yesterdayLog, issuesMap);
+        renderTimeEntries(lastLoggedDayEntries, lastLog, issuesMap);
 
         const todayTotal = calculateTotal(todayEntries);
-        const yesterdayTotal = calculateTotal(yesterdayEntries);
+        const yesterdayTotal = calculateTotal(lastLoggedDayEntries);
 
         todayTotalTime.textContent = `${todayTotal.toFixed(2)} h`;
-        yesterdayTotalTime.textContent = `${yesterdayTotal.toFixed(2)} h`;
+        lastLogTotalTime.textContent = `${yesterdayTotal.toFixed(2)} h`;
 
     } catch (error) {
         // Hide loading spinners in case of error
         const todaySection = document.getElementById('today-log') as HTMLElement;
-        const yesterdaySection = document.getElementById('yesterday-log') as HTMLElement;
+        const yesterdaySection = document.getElementById('last-log') as HTMLElement;
         if (todaySection) hideSpinner(todaySection);
         if (yesterdaySection) hideSpinner(yesterdaySection);
 

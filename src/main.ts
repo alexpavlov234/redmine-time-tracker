@@ -23,7 +23,7 @@ import { saveSettings, testConnection, loadSettings } from './modules/settings.j
 import { initializeActivities } from './modules/activitySelector.js';
 import { initializeCustomFields } from './modules/customFields.js';
 import { initLoggedTimePage } from './modules/loggedTime.js';
-import { setUser } from './state/index.js';
+import { setUser } from './state';
 import { getCurrentUser } from './services/redmine.js';
 
 async function init() {
@@ -90,7 +90,7 @@ function initializeEventListeners() {
     elements.stopBtn.addEventListener('click', stopTimer);
 
     // Activity log
-    elements.addActivityBtn.addEventListener('click', addActivityToState);
+    elements.addActivityBtn.addEventListener('click', () => addActivityToState());
     elements.activityInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();

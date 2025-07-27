@@ -48,7 +48,7 @@ export function showSummary() {
     const detailsText = state.activities
         .map(act => act.text.trim())
         .filter(text => text)
-        .join(', ');
+        .join(' ');
     elements.summaryDetails.value = detailsText;
     
     elements.modalStatus.textContent = '';
