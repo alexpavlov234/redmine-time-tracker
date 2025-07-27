@@ -1,4 +1,5 @@
 import { elements } from './dom.js';
+import { showError } from './ui.js';
 
 export function formatTime(seconds: number): string {
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -27,65 +28,25 @@ export function setButtonLoading(button: HTMLButtonElement, isLoading: boolean, 
 }
 
 export function showGlobalError(message: string, details?: any) {
-    // Safety check for global error container
-    if (!elements.globalErrorContainer) {
-        console.error('Global error container not found, falling back to console:');
-        console.error(message, details);
-        return;
-    }
-    
-    const errorId = `error-${Date.now()}`;
-    const banner = document.createElement('div');
-    banner.className = 'error-banner';
-    banner.id = errorId;
-    
-    let detailsHtml = '';
     let detailString = '';
-    const detailsId = `details-${errorId}`;
-
     if (details) {
         try {
             if (typeof details === 'string') {
                 detailString = details;
             } else if (details instanceof Error) {
-                detailString = `${details.message}\n${details.stack || ''}`;
+                detailString = details.message; // Just the message for brevity in a toast
             } else {
-                detailString = JSON.stringify(details, null, 2);
+                detailString = JSON.stringify(details);
             }
         } catch (e) {
             detailString = "Could not serialize error details."
         }
-        detailsHtml = `
-            <a href="#" class="error-banner-details-toggle" id="toggle-${detailsId}">Show Details</a>
-            <div class="error-banner-details" id="${detailsId}" style="display: none;"></div>
-        `;
     }
 
-    banner.innerHTML = `
-        <div class="error-banner-header">
-            <span><i class="fa-solid fa-circle-exclamation"></i> An error occurred</span>
-            <button class="close-error-btn">&times;</button>
-        </div>
-        <p>${message}</p>
-        ${detailsHtml}
-    `;
-    
-    banner.querySelector('.close-error-btn')?.addEventListener('click', () => banner.remove());
+    const fullMessage = detailString ? `${message} - ${detailString}` : message;
 
-    if (details) {
-        const toggle = banner.querySelector(`#toggle-${detailsId}`);
-        const detailsDiv = banner.querySelector(`#details-${detailsId}`) as HTMLDivElement;
-        if(toggle && detailsDiv) {
-            detailsDiv.textContent = detailString;
-            toggle.addEventListener('click', (e) => {
-                e.preventDefault();
-                detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
-                (e.target as HTMLElement).textContent = detailsDiv.style.display === 'none' ? 'Show Details' : 'Hide Details';
-            })
-        }
-    }
-
-    elements.globalErrorContainer.appendChild(banner);
+    // Use the toast component to show the error
+    showError(fullMessage, 'An Error Occurred', 10000); // 10-second duration
 }
 
 export function showPage(page: 'tracker' | 'settings' | 'logged-time') {

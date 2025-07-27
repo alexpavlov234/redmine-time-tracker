@@ -165,11 +165,11 @@ class ToastManager {
             info: 'fa-circle-info'
         };
 
-        const bgMap: Record<string, string> = {
-            success: 'text-bg-success',
-            error: 'text-bg-danger',
-            warning: 'text-bg-warning',
-            info: 'text-bg-info'
+        const colorMap: Record<string, string> = {
+            success: 'var(--success-color)',
+            error: 'var(--danger-color)',
+            warning: 'var(--warning-color)',
+            info: 'var(--info-color)'
         };
 
         const defaultTitles: Record<string, string> = {
@@ -181,19 +181,20 @@ class ToastManager {
 
         const toastTitle = title || defaultTitles[type] || 'Notification';
         const icon = iconMap[type] || iconMap.info;
-        const bgClass = bgMap[type] || bgMap.info;
+        const iconColor = colorMap[type] || colorMap.info;
 
         const toastHtml = `
             <div id="${id}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="toast-header ${bgClass}">
-                    <i class="fa-solid ${icon} me-2"></i>
-                    <strong class="me-auto">${toastTitle}</strong>
-                    <small class="text-body-secondary">${this.getTimeString()}</small>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
                 <div class="toast-body">
-                    ${message}
+                    <div class="toast-icon" style="color: ${iconColor};">
+                        <i class="fa-solid ${icon} fa-lg"></i>
+                    </div>
+                    <div class="toast-content">
+                        <strong class="toast-title">${toastTitle}</strong>
+                        <div class="toast-message">${message}</div>
+                    </div>
                 </div>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         `;
 

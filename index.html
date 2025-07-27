@@ -119,7 +119,7 @@
                                 Activity Log
                             </h5>
                             <div id="activity-form" class="d-flex gap-2 mb-3">
-                                 <input type="text" id="activity-input" placeholder="What are you working on?" class="form-control" disabled>
+                                 <input type="text" id="activity-input" placeholder="What are you working on?" class="form-control form-control-sm" disabled>
                                  <button id="add-activity-btn" class="btn btn-outline-primary" disabled>
                                      <i class="fa-solid fa-plus"></i>
                                      Add
@@ -141,30 +141,30 @@
                                 <div class="mb-3">
                                     <label for="todo-project-input" class="form-label fw-medium">Project</label>
                                     <div class="autocomplete-container">
-                                         <input type="text" id="todo-project-input" placeholder="Search projects..." class="form-control" autocomplete="off">
+                                         <input type="text" id="todo-project-input" placeholder="Search projects..." class="form-control form-control-sm" autocomplete="off">
                                          <div id="todo-project-list" class="autocomplete-items"></div>
                                     </div>
-                                    <select id="todo-project-select" class="form-select" style="display: none;">
+                                    <select id="todo-project-select" class="form-select form-select-sm" style="display: none;">
                                         <option value="">-- Select a project --</option>
                                     </select>
                                 </div>
                                  <div class="mb-3">
                                     <label for="todo-task-input" class="form-label fw-medium">Task</label>
                                     <div class="autocomplete-container">
-                                        <input type="text" id="todo-task-input" placeholder="Select a project first" class="form-control" autocomplete="off" disabled>
+                                        <input type="text" id="todo-task-input" placeholder="Select a project first" class="form-control form-control-sm" autocomplete="off" disabled>
                                         <div id="todo-task-list" class="autocomplete-items"></div>
                                     </div>
-                                    <select id="todo-task-select" class="form-select" style="display: none;" disabled>
+                                    <select id="todo-task-select" class="form-select form-select-sm" style="display: none;" disabled>
                                         <option value="">-- Select a task --</option>
                                     </select>
                                 </div>
                                 <div class="mb-3">
                                     <label for="todo-note-input" class="form-label fw-medium">Note (optional)</label>
-                                    <input type="text" id="todo-note-input" placeholder="Add a personal note..." class="form-control">
+                                    <input type="text" id="todo-note-input" placeholder="Add a personal note..." class="form-control form-control-sm">
                                 </div>
                                 <div class="mb-3">
                                     <label for="todo-activity-select" class="form-label fw-medium">Activity</label>
-                                    <select id="todo-activity-select" class="form-select">
+                                    <select id="todo-activity-select" class="form-select form-select-sm">
                                         <option value="">-- Loading activities --</option>
                                     </select>
                                 </div>
@@ -222,15 +222,15 @@
                     <form id="settings-form">
                         <div class="mb-3">
                             <label for="redmine-url" class="form-label">Redmine URL</label>
-                            <input type="url" id="redmine-url" class="form-control" placeholder="https://your.redmine.com">
+                            <input type="url" id="redmine-url" class="form-control form-control-sm" placeholder="https://your.redmine.com">
                         </div>
                          <div class="mb-3">
                             <label for="redmine-api-key" class="form-label">API Key</label>
-                            <input type="password" id="redmine-api-key" class="form-control" placeholder="Enter your Redmine API key">
+                            <input type="password" id="redmine-api-key" class="form-control form-control-sm" placeholder="Enter your Redmine API key">
                         </div>
                         <div class="mb-3" style="display: none;">
                             <label for="billable-field-id" class="form-label">"Billable" Custom Field ID (Auto-detected)</label>
-                            <input type="number" id="billable-field-id" class="form-control" placeholder="Auto-detected from your Redmine custom fields" readonly>
+                            <input type="number" id="billable-field-id" class="form-control form-control-sm" placeholder="Auto-detected from your Redmine custom fields" readonly>
                         </div>
                         <div id="settings-controls" class="d-flex gap-3 mb-3">
                             <button id="save-settings-btn" class="btn btn-primary">
@@ -261,11 +261,11 @@
                         <p><strong>Total Time:</strong> <span id="summary-time"></span></p>
                         <div class="mb-3">
                             <label for="summary-details" class="form-label fw-medium">Comments</label>
-                            <textarea id="summary-details" rows="4" class="form-control"></textarea>
+                            <textarea id="summary-details" rows="4" class="form-control form-control-sm"></textarea>
                         </div>
                         <div class="mb-3">
                             <label for="summary-activity-select" class="form-label fw-medium">Activity</label>
-                            <select id="summary-activity-select" class="form-select">
+                            <select id="summary-activity-select" class="form-select form-select-sm">
                                 <option value="">-- Loading activities --</option>
                             </select>
                         </div>
@@ -289,7 +289,7 @@
                                 </label>
                             </div>
                             <div id="status-change-container" class="mt-2" style="display: none;">
-                                <select id="issue-status-select" class="form-select"></select>
+                                <select id="issue-status-select" class="form-select form-select-sm"></select>
                             </div>
                         </div>
                     </div>
@@ -315,7 +315,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="first-activity-input" class="form-label fw-medium">Activity Description</label>
-                        <input type="text" id="first-activity-input" class="form-control" placeholder="e.g., Kicking off feature X">
+                        <input type="text" id="first-activity-input" class="form-control form-control-sm" placeholder="e.g., Kicking off feature X">
                     </div>
                 </div>
                 <div class="modal-footer">

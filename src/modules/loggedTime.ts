@@ -158,15 +158,15 @@ async function editTimeEntry(entry: TimeEntry) {
                         <form id="edit-time-entry-form">
                             <div class="mb-3">
                                 <label for="edit-hours" class="form-label">Hours</label>
-                                <input type="number" class="form-control" id="edit-hours" value="${entry.hours}" step="0.01" min="0.01" max="24" required>
+                                <input type="number" class="form-control form-control-sm" id="edit-hours" value="${entry.hours}" step="0.01" min="0.01" max="24" required>
                             </div>
                             <div class="mb-3">
                                 <label for="edit-comments" class="form-label">Comments</label>
-                                <textarea class="form-control" id="edit-comments" rows="3">${entry.comments || ''}</textarea>
+                                <textarea class="form-control form-control-sm" id="edit-comments" rows="3">${entry.comments || ''}</textarea>
                             </div>
                             <div class="mb-3">
                                 <label for="edit-spent-on" class="form-label">Date</label>
-                                <input type="date" class="form-control" id="edit-spent-on" value="${entry.spent_on}" required>
+                                <input type="date" class="form-control form-control-sm" id="edit-spent-on" value="${entry.spent_on}" required>
                             </div>
                         </form>
                     </div>
