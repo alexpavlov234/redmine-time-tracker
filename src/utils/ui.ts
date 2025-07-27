@@ -203,11 +203,6 @@ class ToastManager {
         return tempDiv.firstElementChild as HTMLElement;
     }
 
-    private getTimeString(): string {
-        const now = new Date();
-        return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
     success(message: string, title: string | null = null, duration: number = 5000) {
         return this.show(message, 'success', title, duration);
     }

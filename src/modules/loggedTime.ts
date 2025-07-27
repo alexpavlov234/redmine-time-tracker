@@ -316,7 +316,7 @@ export async function initLoggedTimePage() {
         if (issueIdsToFetch.length > 0) {
             try {
                 const issues = await getIssues(issueIdsToFetch);
-                issues.forEach(issue => issuesMap.set(issue.id, issue));
+                issues.forEach((issue: RedmineIssue) => issuesMap.set(issue.id, issue));
             } catch (error) {
                 showError('Failed to load some task details.');
                 console.error(error);
