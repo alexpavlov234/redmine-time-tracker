@@ -19,7 +19,7 @@ import { addActivityToState, renderActivities } from './modules/activities.js';
 import { addToQueue, loadTodos, initializeDragAndDrop } from './modules/queue.js';
 import { hideSummary, submitTimeToRedmine } from './modules/summary.js';
 import { populateTasks, populateTasksForTodoForm } from './modules/projects.js';
-import { saveSettings, testConnection, loadSettings, setTestModeState } from './modules/settings.js';
+import { saveSettings, testConnection, loadSettings } from './modules/settings.js';
 import { initializeActivities } from './modules/activitySelector.js';
 import { initializeCustomFields } from './modules/customFields.js';
 import { initLoggedTimePage } from './modules/loggedTime.js';
@@ -135,10 +135,6 @@ function initializeEventListeners() {
     });
 
     elements.testConnectionBtn.addEventListener('click', testConnection);
-
-    elements.testModeCheckbox.addEventListener('change', (e) => {
-        setTestModeState((e.target as HTMLInputElement).checked);
-    });
 }
 
 // Initialize the application

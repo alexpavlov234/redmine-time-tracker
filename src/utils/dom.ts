@@ -75,10 +75,8 @@ export const elements = {
 
     // Settings
     settingsForm: document.getElementById('settings-form') as HTMLFormElement,
-    testModeCheckbox: document.getElementById('test-mode-toggle') as HTMLInputElement,
     redmineUrlInput: document.getElementById('redmine-url') as HTMLInputElement,
     redmineApiKeyInput: document.getElementById('redmine-api-key') as HTMLInputElement,
-    billableFieldIdInput: document.getElementById('billable-field-id') as HTMLInputElement,
     saveSettingsBtn: document.getElementById('save-settings-btn') as HTMLButtonElement,
     testConnectionBtn: document.getElementById('test-connection-btn') as HTMLButtonElement,
     connectionStatus: document.getElementById('connection-status') as HTMLDivElement,

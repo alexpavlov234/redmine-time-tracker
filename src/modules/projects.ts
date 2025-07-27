@@ -193,7 +193,7 @@ export async function populateTasksForTodoForm() {
 }
 
 export function checkConfiguration() {
-    const isConfigured = (localStorage.getItem('redmineUrl') && localStorage.getItem('redmineApiKey')) || localStorage.getItem('isTestMode') === 'true';
+    const isConfigured = (localStorage.getItem('redmineUrl') && localStorage.getItem('redmineApiKey'));
 
     if (isConfigured) {
         elements.configPrompt.style.display = 'none';

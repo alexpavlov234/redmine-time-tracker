@@ -7,15 +7,9 @@ import { checkConfiguration } from './projects.js';
 export function saveSettings() {
     const url = elements.redmineUrlInput.value.trim();
     const apiKey = elements.redmineApiKeyInput.value.trim();
-    const billableId = elements.billableFieldIdInput.value.trim();
 
     localStorage.setItem('redmineUrl', url);
     localStorage.setItem('redmineApiKey', apiKey);
-    if (billableId) {
-        localStorage.setItem('billableFieldId', billableId);
-    } else {
-        localStorage.removeItem('billableFieldId');
-    }
     
     // Invalidate caches
     setIssueStatuses([]);
@@ -30,34 +24,14 @@ export function saveSettings() {
     checkConfiguration();
 }
 
-export function setTestModeState(enabled: boolean) {
-    elements.redmineUrlInput.disabled = enabled;
-    elements.redmineApiKeyInput.disabled = enabled;
-    elements.billableFieldIdInput.disabled = enabled;
-    elements.testConnectionBtn.disabled = enabled;
-
-    if (enabled) {
-        elements.connectionStatus.textContent = 'Test Mode is active. Connection to Redmine is bypassed.';
-        elements.connectionStatus.className = 'status-message info';
-    } else {
-        elements.connectionStatus.textContent = '';
-        elements.connectionStatus.className = 'status-message';
-    }
-    checkConfiguration();
-}
-
 export function loadSettings() {
-    const isTestMode = localStorage.getItem('isTestMode') === 'true';
     const url = localStorage.getItem('redmineUrl');
     const apiKey = localStorage.getItem('redmineApiKey');
-    const billableId = localStorage.getItem('billableFieldId');
     
-    elements.testModeCheckbox.checked = isTestMode;
     if (url) elements.redmineUrlInput.value = url;
     if (apiKey) elements.redmineApiKeyInput.value = apiKey;
-    if (billableId) elements.billableFieldIdInput.value = billableId;
     
-    setTestModeState(isTestMode);
+    checkConfiguration();
 }
 
 export async function testConnection() {

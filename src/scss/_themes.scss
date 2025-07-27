@@ -72,6 +72,11 @@
     }
 }
 
+// Primary button with white text
+.btn-primary {
+    color: #ffffff !important;
+}
+
 // Interactive elements with theme-aware states
 .interactive-element {
     color: var(--bs-body-color);
