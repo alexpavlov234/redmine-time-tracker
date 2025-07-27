@@ -180,6 +180,19 @@ header {
   }
 }
 
+@include media-breakpoint-down(md) {
+  header nav .d-flex {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  header nav .position-absolute.end-0 {
+    position: static !important;
+    transform: none !important;
+    margin-top: 1rem;
+  }
+}
+
 /* Toast Enhancements */
 .toast-container {
   z-index: 1055;
@@ -271,23 +284,23 @@ header {
 }
 
 @include color-mode(dark) {
-    .toast {
-        background-color: $body-bg-dark;
-        border-color: $border-color-dark;
-        color: $body-color-dark;
+  .toast {
+    background-color: $body-bg-dark;
+    border-color: $border-color-dark;
+    color: $body-color-dark;
 
-        .toast-title {
-        color: $primary;
-        }
-
-        .toast-message {
-        color: $body-color-dark;
-        }
-
-        .btn-close {
-        --bs-btn-close-color: $body-color-dark;
-        }
+    .toast-title {
+      color: $primary;
     }
+
+    .toast-message {
+      color: $body-color-dark;
+    }
+
+    .btn-close {
+      --bs-btn-close-color: $body-color-dark;
+    }
+  }
 }
 
 /* Autocomplete Styling */
@@ -297,7 +310,7 @@ header {
 
 .autocomplete-items {
   position: absolute;
-  border: 1px solid $border-color;
+  border: 1px solid $secondary-bg-subtle;
   border-top: none;
   z-index: 99;
   top: 100%;
@@ -315,7 +328,7 @@ header {
   }
 
   &::-webkit-scrollbar-track {
-    background: $secondary;
+    background: $body-tertiary-bg;
     border-radius: 3px;
   }
 
@@ -325,16 +338,16 @@ header {
     opacity: 0.7;
 
     &:hover {
-      background: $primary-bg-subtle-dark;
+      background: $body-tertiary-bg;
     }
   }
 
   div {
-    padding: 0.875rem 1rem;
+    padding: 0.5rem 0.8rem;
     cursor: pointer;
-    border-bottom: 1px solid $border-color;
+    border-bottom: 1px solid $secondary-bg-subtle;
     font-size: 0.875rem;
-    color: $body-bg;
+    color: $body-color;
     transition: background-color $transition-fast;
 
     &:last-child {
@@ -343,7 +356,7 @@ header {
 
     &:hover,
     &.autocomplete-active {
-      background-color: $secondary;
+      background-color: $secondary-bg-subtle;
       color: $primary;
     }
   }
@@ -355,9 +368,28 @@ header {
     border-color: $border-color-dark;
     color: $body-color-dark;
 
-    div:hover,
-    .autocomplete-active {
-      background-color: $secondary;
+    &::-webkit-scrollbar-track {
+      background: $secondary-bg-subtle-dark;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: $primary-bg-subtle-dark;
+      opacity: 0.7;
+
+      &:hover {
+        background: $primary-bg-subtle-dark;
+      }
+    }
+
+    div {
+      color: $body-color-dark;
+      border-bottom: 1px solid $border-color-dark;
+
+      &:hover,
+      &.autocomplete-active {
+        background-color: $primary-bg-subtle;
+        color: $primary;
+      }
     }
   }
 }
@@ -380,14 +412,14 @@ header {
     }
 
     &:hover {
-      background-color: $secondary;
+      background-color: $primary-bg-subtle;
     }
 
     .timestamp {
       font-size: 0.75rem;
-      color: $secondary;
+      color: $white;
       margin-right: 0.75rem;
-      background-color: $secondary;
+      background-color: $primary;
       padding: 0.25rem 0.5rem;
       border-radius: $border-radius-sm;
       font-weight: $font-weight-medium;
@@ -412,7 +444,8 @@ header {
     color: $body-color-dark;
 
     &:hover {
-      background-color: $secondary;
+      background-color: $primary-bg-subtle;
+      color: $body-color;
     }
 
     .timestamp {
@@ -434,7 +467,7 @@ header {
   }
 
   &::-webkit-scrollbar-track {
-    background: $secondary;
+    background: $gray-200;
     border-radius: 3px;
   }
 
@@ -444,7 +477,7 @@ header {
     opacity: 0.7;
 
     &:hover {
-      background: $primary-bg-subtle-dark;
+      background: $primary-bg-subtle;
     }
   }
 
@@ -462,7 +495,7 @@ header {
     box-shadow: $box-shadow-sm;
 
     &:hover {
-      background-color: $secondary;
+      background-color: $gray-100;
       box-shadow: $box-shadow-sm;
       transform: translateY(-2px);
 
@@ -498,24 +531,42 @@ header {
 }
 
 @include color-mode(dark) {
-  #todo-list li {
-    background-color: $body-bg-dark;
-    border-color: $border-color-dark;
-    color: $body-color-dark;
-
-    &:hover {
-      background-color: $secondary;
+  #todo-list {
+    &::-webkit-scrollbar-track {
+      background: $gray-800;
     }
-  }
 
-  .todo-project,
-  .todo-activity {
-    background: $primary-bg-subtle;
-    color: $primary;
-  }
+    &::-webkit-scrollbar-thumb:hover {
+      background: $primary-bg-subtle-dark;
+    }
 
-  .todo-activity {
-    background: rgba(34, 211, 238, 0.15);
+    li {
+      background-color: $body-bg-dark;
+      border-color: $border-color-dark;
+      color: $body-color-dark;
+
+      &:hover {
+        background-color: $gray-800;
+      }
+
+      &.dragging {
+        background-color: $primary-bg-subtle-dark;
+      }
+
+      &:active {
+        background-color: $primary-bg-subtle-dark;
+      }
+    }
+
+    .todo-task {
+      color: $body-color-dark;
+    }
+
+    .todo-project,
+    .todo-activity {
+      background: $primary-bg-subtle;
+      color: $primary;
+    }
   }
 }
 
@@ -564,7 +615,7 @@ header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: $body-bg;
+  color: $body-color;
   font-size: 0.875rem;
 }
 
@@ -580,7 +631,7 @@ header {
 .todo-activity {
   font-size: 0.75rem;
   color: $primary;
-  background: rgba(6, 182, 212, 0.1);
+  background: $primary-bg-subtle;
   padding: 0.25rem 0.5rem;
   border-radius: $border-radius-sm;
   white-space: nowrap;
@@ -653,28 +704,6 @@ header {
     border-color: rgba($primary, 0.3);
     color: $primary;
   }
-}
-
-
-/* Checkbox and Switch Styling */
-.form-check-input {
-  border-radius: $border-radius-sm;
-  border: 2px solid $border-color;
-  transition: all $transition-fast;
-
-  &:checked {
-    background-color: $primary;
-    border-color: $primary;
-  }
-
-  &:focus {
-    border-color: $primary;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-  }
-}
-
-.form-switch .form-check-input {
-  border-radius: 2rem;
 }
 
 /* Enhanced Background and Layout */
