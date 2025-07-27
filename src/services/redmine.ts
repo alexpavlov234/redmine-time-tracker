@@ -1,3 +1,5 @@
+import { TimeEntry } from '../types/index.js';
+
 // Configuration for proxy URL
 const PROXY_BASE_URL = 'http://localhost:3000/api';
 
@@ -44,8 +46,25 @@ async function handleTestModeRequest(endpoint: string, method: string, body: any
          }
         return { issues: [] };
     }
-    if (endpoint === '/time_entries.json' && method === 'POST') {
-        return {}; // Success
+    if (endpoint.startsWith('/time_entries.json')) {
+        if (method === 'POST') {
+            return {}; // Success
+        }
+        if (method === 'GET') {
+            // Get today's and yesterday's dates for realistic test data
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+            return {
+                time_entries: [
+                    { id: 1, project: { id: 1, name: 'Project Alpha (Test)' }, issue: { id: 101, subject: 'Fix login button' }, hours: 1.5, spent_on: formatDate(today), comments: 'Worked on the login flow.' },
+                    { id: 2, project: { id: 2, name: 'Project Bravo (Test)' }, issue: { id: 205, subject: 'Update branding assets' }, hours: 2.0, spent_on: formatDate(today), comments: 'Updated logos.' },
+                    { id: 3, project: { id: 1, name: 'Project Alpha (Test)' }, issue: { id: 102, subject: 'Implement new dashboard widget' }, hours: 3.0, spent_on: formatDate(yesterday), comments: 'Initial implementation.' },
+                ]
+            };
+        }
     }
     if (endpoint.startsWith('/issues/') && method === 'PUT') {
         return {}; // Success
@@ -164,6 +183,52 @@ export async function redmineApiRequest(endpoint: string, method: string = 'GET'
     return response.json();
 }
 
+export async function getCurrentUser() {
+    try {
+        const response = await redmineApiRequest('/users/current.json');
+        return response.user;
+    } catch (error) {
+        console.error('Could not fetch user information', error);
+        throw error;
+    }
+}
+
+export async function getTimeEntries(params: { from: string, to: string, user_id: number }): Promise<TimeEntry[]> {
+    const { from, to, user_id } = params;
+    // Note: Redmine API `to` and `from` are inclusive.
+    const endpoint = `/time_entries.json?user_id=${user_id}&from=${from}&to=${to}&limit=100&include=issue`;
+    try {
+        const response = await redmineApiRequest(endpoint);
+        return response.time_entries || [];
+    } catch (error) {
+        console.error('Failed to fetch time entries:', error);
+        throw error; // Re-throw to be handled by the caller
+    }
+}
+
+export async function getIssues(ids: number[]) {
+    if (ids.length === 0) {
+        return [];
+    }
+    try {
+        const response = await redmineApiRequest(`/issues.json?issue_id=${ids.join(',')}&limit=${ids.length}`);
+        return response.issues;
+    } catch (error) {
+        console.error(`Could not fetch issues`, error);
+        throw error;
+    }
+}
+
+export async function getIssue(id: number) {
+    try {
+        const response = await redmineApiRequest(`/issues/${id}.json`);
+        return response.issue;
+    } catch (error) {
+        console.error(`Could not fetch issue #${id}`, error);
+        throw error;
+    }
+}
+
 export async function getTimeEntryActivities() {
     try {
         const response = await redmineApiRequest('/enumerations/time_entry_activities.json');
@@ -171,6 +236,35 @@ export async function getTimeEntryActivities() {
     } catch (error) {
         console.error('Failed to fetch time entry activities:', error);
         return [];
+    }
+}
+
+export async function updateTimeEntry(id: number, data: {
+    hours?: number;
+    comments?: string;
+    activity_id?: number;
+    spent_on?: string;
+    issue_id?: number;
+    project_id?: number;
+    custom_fields?: Array<{id: number, value: any}>;
+}) {
+    try {
+        const body = { time_entry: data };
+        await redmineApiRequest(`/time_entries/${id}.json`, 'PUT', body);
+        return true;
+    } catch (error) {
+        console.error(`Failed to update time entry #${id}:`, error);
+        throw error;
+    }
+}
+
+export async function deleteTimeEntry(id: number) {
+    try {
+        await redmineApiRequest(`/time_entries/${id}.json`, 'DELETE');
+        return true;
+    } catch (error) {
+        console.error(`Failed to delete time entry #${id}:`, error);
+        throw error;
     }
 }
 

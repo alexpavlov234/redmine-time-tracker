@@ -1,11 +1,8 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
     return {
-      define: {
-      },
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
@@ -17,7 +14,7 @@ export default defineConfig(({ mode }) => {
             // Include paths for @import resolution
             includePaths: ['node_modules'],
             // Modern Sass API
-            api: 'modern-compiler'
+            api: 'modern-compiler' as 'modern-compiler'
           }
         },
         // Enable CSS minification

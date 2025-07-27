@@ -239,13 +239,104 @@ declare global {
 window.toastManager = new ToastManager();
 
 // Helper functions for easy access
-window.showToast = (message: string, type?: string, title?: string | null, duration?: number) => 
+export const showToast = (message: string, type?: string, title?: string | null, duration?: number) =>
     window.toastManager.show(message, type, title, duration);
-window.showSuccess = (message: string, title?: string | null, duration?: number) => 
+export const showSuccess = (message: string, title?: string | null, duration?: number) =>
     window.toastManager.success(message, title, duration);
-window.showError = (message: string, title?: string | null, duration?: number) => 
+export const showError = (message: string, title?: string | null, duration?: number) =>
     window.toastManager.error(message, title, duration);
-window.showWarning = (message: string, title?: string | null, duration?: number) => 
+export const showWarning = (message: string, title?: string | null, duration?: number) =>
     window.toastManager.warning(message, title, duration);
-window.showInfo = (message: string, title?: string | null, duration?: number) => 
+export const showInfo = (message: string, title?: string | null, duration?: number) =>
     window.toastManager.info(message, title, duration);
+
+window.showToast = showToast;
+window.showSuccess = showSuccess;
+window.showError = showError;
+window.showWarning = showWarning;
+window.showInfo = showInfo;
+
+/**
+ * Confirmation Dialog System
+ */
+export const showConfirm = (message: string, subtitle: string = ''): Promise<boolean> => {
+    return new Promise((resolve) => {
+        const modalId = `confirm-modal-${Date.now()}`;
+        const modalHtml = `
+            <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="confirmModalLabel">Confirm Action</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>${message}</p>
+                            ${subtitle ? `<p class="text-muted small">${subtitle}</p>` : ''}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="${modalId}-cancel">Cancel</button>
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="${modalId}-confirm">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Create and append the modal
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalHtml;
+        document.body.appendChild(modalContainer);
+
+        // Get the modal element
+        const modalElement = document.getElementById(modalId);
+        if (!modalElement) {
+            console.error('Failed to create confirmation modal');
+            resolve(false);
+            return;
+        }
+
+        // Initialize Bootstrap modal
+        const modal = new window.bootstrap.Modal(modalElement);
+
+        // Set up event listeners for the buttons
+        const confirmButton = document.getElementById(`${modalId}-confirm`);
+        const cancelButton = document.getElementById(`${modalId}-cancel`);
+
+        confirmButton?.addEventListener('click', () => {
+            resolve(true);
+            cleanupModal();
+        });
+
+        cancelButton?.addEventListener('click', () => {
+            resolve(false);
+            cleanupModal();
+        });
+
+        // Handle modal dismissal
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            resolve(false);
+            cleanupModal();
+        });
+
+        // Cleanup function
+        const cleanupModal = () => {
+            setTimeout(() => {
+                modalContainer.remove();
+            }, 300);
+        };
+
+        // Show the modal
+        modal.show();
+    });
+};
+
+// Add to window for global access
+declare global {
+    interface Window {
+        // ...existing declarations...
+        showConfirm: (message: string, subtitle?: string) => Promise<boolean>;
+    }
+}
+
+window.showConfirm = showConfirm;

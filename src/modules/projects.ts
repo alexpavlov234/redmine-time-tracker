@@ -1,5 +1,5 @@
 import { 
-    allProjects, allTasks, todoFormTasks,
+    state,
     setAllProjects, setAllTasks, setTodoFormTasks
 } from '../state/index.js';
 import { RedmineIssue } from '../types/index.js';
@@ -26,7 +26,7 @@ export async function populateProjects() {
         const projects = [myIssuesOption, ...data.projects];
         setAllProjects(projects);
         
-        allProjects.forEach(proj => {
+        state.allProjects.forEach(proj => {
             const option = document.createElement('option');
             option.value = String(proj.id);
             option.textContent = proj.name;
@@ -42,7 +42,7 @@ export async function populateProjects() {
         initAutocomplete({
             inputEl: elements.projectInput,
             listEl: elements.projectList,
-            sourceData: allProjects,
+            sourceData: state.allProjects,
             renderItem: (item) => item.name,
             filterItem: (item, query) => item.name.toLowerCase().includes(query),
             onSelect: (item) => {
@@ -55,7 +55,7 @@ export async function populateProjects() {
         initAutocomplete({
             inputEl: elements.todoProjectInput,
             listEl: elements.todoProjectList,
-            sourceData: allProjects,
+            sourceData: state.allProjects,
             renderItem: (item) => item.name,
             filterItem: (item, query) => item.name.toLowerCase().includes(query),
             onSelect: (item) => {
@@ -115,7 +115,7 @@ export async function populateTasks() {
         const tasks = await populateTasksForSelect(elements.taskSelect, selectedProjectValue);
         setAllTasks(tasks);
         
-        if (allTasks.length === 0) {
+        if (state.allTasks.length === 0) {
             elements.taskInput.placeholder = 'No open tasks found';
             elements.taskInput.value = '';
             elements.taskInput.disabled = true;
@@ -130,7 +130,7 @@ export async function populateTasks() {
             initAutocomplete({
                 inputEl: elements.taskInput,
                 listEl: elements.taskList,
-                sourceData: allTasks,
+                sourceData: state.allTasks,
                 renderItem: (item) => `#${item.id} - ${item.subject}`,
                 filterItem: (item, query) => {
                     const searchString = `#${item.id} ${item.subject}`.toLowerCase();
@@ -163,13 +163,13 @@ export async function populateTasksForTodoForm() {
         try {
             const tasks = await populateTasksForSelect(elements.todoTaskSelect, projectId);
             setTodoFormTasks(tasks);
-            if (todoFormTasks.length > 0) {
+            if (state.todoFormTasks.length > 0) {
                 elements.todoTaskInput.disabled = false;
                 elements.todoTaskInput.placeholder = 'Search tasks...';
                 initAutocomplete({
                     inputEl: elements.todoTaskInput,
                     listEl: elements.todoTaskList,
-                    sourceData: todoFormTasks,
+                    sourceData: state.todoFormTasks,
                     renderItem: (item) => `#${item.id} - ${item.subject}`,
                     filterItem: (item, query) => {
                         const searchString = `#${item.id} ${item.subject}`.toLowerCase();
@@ -198,7 +198,7 @@ export function checkConfiguration() {
     if (isConfigured) {
         elements.configPrompt.style.display = 'none';
         elements.taskSelectionForm.style.display = 'block';
-        if (allProjects.length === 0) {
+        if (state.allProjects.length === 0) {
             populateProjects();
         }
     } else {

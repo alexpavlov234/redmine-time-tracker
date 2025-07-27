@@ -1,5 +1,5 @@
 import { 
-    totalElapsedTime, activities, issueStatuses,
+    state,
     setIssueStatuses
 } from '../state/index.js';
 import { elements } from '../utils/dom.js';
@@ -10,12 +10,12 @@ import { getCustomFieldValues, resetCustomFields } from './customFields.js';
 import { resetState } from './timer.js';
 
 export async function populateIssueStatuses() {
-    if (issueStatuses.length > 0) return; 
+    if (state.issueStatuses.length > 0) return;
 
     try {
         const data = await redmineApiRequest('/issue_statuses.json');
         setIssueStatuses(data.issue_statuses);
-        elements.issueStatusSelect.innerHTML = issueStatuses
+        elements.issueStatusSelect.innerHTML = state.issueStatuses
             .map(status => `<option value="${status.id}">${status.name}</option>`)
             .join('');
     } catch (error) {
@@ -29,15 +29,15 @@ export async function populateIssueStatuses() {
 export function showSummary() {
     const modal = new (window as any).bootstrap.Modal(elements.summaryModal);
     modal.show();
-    elements.summaryTime.textContent = formatTime(totalElapsedTime);
-    
+    elements.summaryTime.textContent = formatTime(state.totalElapsedTime);
+
     // Debug task selection
     console.log('Summary opened - Task selection debug:', {
         taskSelectValue: elements.taskSelect.value,
         taskSelectOptions: Array.from(elements.taskSelect.options).map(opt => ({ value: opt.value, text: opt.text })),
         activitySelectValue: elements.activitySelect.value,
-        totalElapsedTime,
-        totalElapsedTimeFormatted: formatTime(totalElapsedTime)
+        totalElapsedTime: state.totalElapsedTime,
+        totalElapsedTimeFormatted: formatTime(state.totalElapsedTime)
     });
     
     // Copy current activity selection to summary modal
@@ -45,7 +45,7 @@ export function showSummary() {
         elements.summaryActivitySelect.value = elements.activitySelect.value;
     }
     
-    const detailsText = activities
+    const detailsText = state.activities
         .map(act => act.text.trim())
         .filter(text => text)
         .join(', ');
@@ -79,8 +79,8 @@ export function hideSummary() {
 
 export async function submitTimeToRedmine() {
     const issueId = elements.taskSelect.value;
-    const rawHours = totalElapsedTime / 3600;
-    
+    const rawHours = state.totalElapsedTime / 3600;
+
     // Special formatting logic for hours - always round UP to next 0.05
     let hours: number;
     if (rawHours <= 0) {
@@ -99,12 +99,12 @@ export async function submitTimeToRedmine() {
 
     console.log('Submit validation:', { 
         issueId, 
-        totalElapsedTime, 
-        totalElapsedTimeInMinutes: totalElapsedTime / 60,
+        totalElapsedTime: state.totalElapsedTime,
+        totalElapsedTimeInMinutes: state.totalElapsedTime / 60,
         rawHours,
         hours: hoursFormatted,
         hoursType: typeof hoursFormatted,
-        totalElapsedTimeFormatted: formatTime(totalElapsedTime) 
+        totalElapsedTimeFormatted: formatTime(state.totalElapsedTime)
     });
     
     if (!issueId) {

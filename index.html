@@ -23,10 +23,13 @@
                     <a href="#" id="nav-tracker" class="nav-link active text-decoration-none">
                         <i class="fa-solid fa-clock me-2"></i>Tracker
                     </a>
+                    <a href="#" id="nav-logged-time" class="nav-link text-decoration-none">
+                        <i class="fa-solid fa-history me-2"></i>Logged Time
+                    </a>
                     <a href="#" id="nav-settings" class="nav-link text-decoration-none">
                         <i class="fa-solid fa-cog me-2"></i>Settings
                     </a>
-                    
+
                     <!-- Theme Toggle Button -->
                     <div class="position-absolute end-0">
                         <button class="btn btn-sm" type="button" id="theme-toggle" title="Toggle theme">
@@ -51,27 +54,33 @@
                                 Please configure your Redmine URL and API Key in the <a href="#" id="prompt-link-to-settings" class="alert-link fw-semibold">Settings</a> page, or enable Test Mode.
                             </div>
                             <div id="task-selection-form">
-                                <div class="mb-3">
-                                    <label for="project-input" class="form-label fw-medium">Project</label>
-                                    <div class="autocomplete-container">
-                                        <input type="text" id="project-input" placeholder="Search projects..." class="form-control" autocomplete="off" readonly>
-                                        <div id="project-list" class="autocomplete-items"></div>
+                                <div class="current-task-container p-2">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="fw-medium me-2" style="min-width: 70px;">Project:</span>
+                                        <span id="project-display" class="text-truncate"></span>
+                                        <!-- Keep hidden select for data storage -->
+                                        <select id="project-select" style="display: none;"></select>
                                     </div>
-                                    <select id="project-select" class="form-select" style="display: none;"></select>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="task-input" class="form-label fw-medium">Task</label>
-                                     <div class="autocomplete-container">
-                                        <input type="text" id="task-input" placeholder="Select a project first" class="form-control" autocomplete="off" readonly>
-                                         <div id="task-list" class="autocomplete-items"></div>
-                                     </div>
-                                    <select id="task-select" class="form-select" style="display: none;"></select>
-                                </div>
-                                <div class="mb-3" style="display: none;">
-                                    <label for="activity-select" class="form-label fw-medium">Activity</label>
-                                    <select id="activity-select" class="form-select" disabled>
-                                        <option value="">-- Loading activities --</option>
-                                    </select>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="fw-medium me-2" style="min-width: 70px;">Task:</span>
+                                        <span id="task-display" class="text-truncate"></span>
+                                        <!-- Keep hidden select for data storage -->
+                                        <select id="task-select" style="display: none;"></select>
+                                    </div>
+                                    <div class="d-flex align-items-center" id="activity-display-container" style="display: none;">
+                                        <span class="fw-medium me-2" style="min-width: 70px;">Activity:</span>
+                                        <span id="activity-display" class="text-truncate"></span>
+                                        <!-- Keep hidden select for data storage -->
+                                        <select id="activity-select" style="display: none;">
+                                            <option value="">-- Loading activities --</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Keep hidden inputs for compatibility -->
+                                    <input type="hidden" id="project-input">
+                                    <input type="hidden" id="task-input">
+                                    <div id="project-list" class="autocomplete-items" style="display: none;"></div>
+                                    <div id="task-list" class="autocomplete-items" style="display: none;"></div>
                                 </div>
                             </div>
                         </div>
@@ -125,7 +134,7 @@
                                 <i class="fa-solid fa-layer-group text-primary"></i>
                                 Work Queue
                             </h5>
-                            <div id="todo-form">
+                            <form id="todo-form">
                                 <div class="mb-3">
                                     <label for="todo-project-input" class="form-label fw-medium">Project</label>
                                     <div class="autocomplete-container">
@@ -160,12 +169,42 @@
                                     <i class="fa-solid fa-plus"></i>
                                     Add to Queue
                                 </button>
-                            </div>
+                            </form>
                             <ul id="todo-list" class="list-unstyled mt-3"></ul>
                         </div>
                     </div>
                 </aside>
             </main>
+        </div>
+
+        <div id="logged-time-page" class="container" style="display: none;">
+            <div class="row">
+                <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Yesterday</h5>
+                        <ul id="yesterday-log" class="list-group list-group-flush"></ul>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <strong>Total:</strong>
+                            <span id="yesterday-total-time" class="fw-bold">0h 0m</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Today</h5>
+                            <ul id="today-log" class="list-group list-group-flush"></ul>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <strong>Total:</strong>
+                                <span id="today-total-time" class="fw-bold">0h 0m</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
 
         <div id="settings-page" class="container" style="display: none;">
@@ -175,37 +214,39 @@
                         <i class="fa-solid fa-gears text-primary"></i>
                         Redmine Configuration
                     </h5>
-                     <div class="d-flex align-items-center gap-3 p-3 bg-light rounded mb-4">
-                        <label for="test-mode-toggle" class="fw-semibold">Enable Test Mode</label>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="test-mode-toggle">
+                    <form id="settings-form">
+                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded mb-4">
+                            <label for="test-mode-toggle" class="fw-semibold">Enable Test Mode</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="test-mode-toggle">
+                            </div>
+                            <span class="text-muted small">Bypasses Redmine connection for UI testing.</span>
                         </div>
-                        <span class="text-muted small">Bypasses Redmine connection for UI testing.</span>
-                    </div>
-                    <hr class="my-4"/>
-                    <div class="mb-3">
-                        <label for="redmine-url" class="form-label">Redmine URL</label>
-                        <input type="url" id="redmine-url" class="form-control" placeholder="https://your.redmine.com">
-                    </div>
-                     <div class="mb-3">
-                        <label for="redmine-api-key" class="form-label">API Key</label>
-                        <input type="password" id="redmine-api-key" class="form-control" placeholder="Enter your Redmine API key">
-                    </div>
-                    <div class="mb-3" style="display: none;">
-                        <label for="billable-field-id" class="form-label">"Billable" Custom Field ID (Auto-detected)</label>
-                        <input type="number" id="billable-field-id" class="form-control" placeholder="Auto-detected from your Redmine custom fields" readonly>
-                    </div>
-                    <div id="settings-controls" class="d-flex gap-3 mb-3">
-                        <button id="save-settings-btn" class="btn btn-primary">
-                            <i class="fa-solid fa-save"></i>
-                            Save Settings
-                        </button>
-                        <button id="test-connection-btn" class="btn btn-secondary">
-                            <i class="fa-solid fa-plug"></i>
-                            Test Connection
-                        </button>
-                    </div>
-                    <div id="connection-status"></div>
+                        <hr class="my-4"/>
+                        <div class="mb-3">
+                            <label for="redmine-url" class="form-label">Redmine URL</label>
+                            <input type="url" id="redmine-url" class="form-control" placeholder="https://your.redmine.com">
+                        </div>
+                         <div class="mb-3">
+                            <label for="redmine-api-key" class="form-label">API Key</label>
+                            <input type="password" id="redmine-api-key" class="form-control" placeholder="Enter your Redmine API key">
+                        </div>
+                        <div class="mb-3" style="display: none;">
+                            <label for="billable-field-id" class="form-label">"Billable" Custom Field ID (Auto-detected)</label>
+                            <input type="number" id="billable-field-id" class="form-control" placeholder="Auto-detected from your Redmine custom fields" readonly>
+                        </div>
+                        <div id="settings-controls" class="d-flex gap-3 mb-3">
+                            <button id="save-settings-btn" class="btn btn-primary">
+                                <i class="fa-solid fa-save"></i>
+                                Save Settings
+                            </button>
+                            <button id="test-connection-btn" class="btn btn-secondary">
+                                <i class="fa-solid fa-plug"></i>
+                                Test Connection
+                            </button>
+                        </div>
+                        <div id="connection-status"></div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -214,53 +255,55 @@
     <div id="summary-modal" class="modal fade" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Submit Time Entry</h5>
-                    <button type="button" id="close-modal" class="btn-close" aria-label="Close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p><strong>Total Time:</strong> <span id="summary-time"></span></p>
-                    <div class="mb-3">
-                        <label for="summary-details" class="form-label fw-medium">Comments</label>
-                        <textarea id="summary-details" rows="4" class="form-control"></textarea>
+                <form id="summary-form">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Submit Time Entry</h5>
+                        <button type="button" id="close-modal" class="btn-close" aria-label="Close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="mb-3">
-                        <label for="summary-activity-select" class="form-label fw-medium">Activity</label>
-                        <select id="summary-activity-select" class="form-select">
-                            <option value="">-- Loading activities --</option>
-                        </select>
-                    </div>
-                    
-                    <hr/>
-                    
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="billable-checkbox-simple" checked>
-                            <label class="form-check-label fw-medium" for="billable-checkbox-simple">
-                                Billable
-                            </label>
+                    <div class="modal-body">
+                        <p><strong>Total Time:</strong> <span id="summary-time"></span></p>
+                        <div class="mb-3">
+                            <label for="summary-details" class="form-label fw-medium">Comments</label>
+                            <textarea id="summary-details" rows="4" class="form-control"></textarea>
                         </div>
-                    </div>
+                        <div class="mb-3">
+                            <label for="summary-activity-select" class="form-label fw-medium">Activity</label>
+                            <select id="summary-activity-select" class="form-select">
+                                <option value="">-- Loading activities --</option>
+                            </select>
+                        </div>
 
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="change-status-checkbox">
-                            <label class="form-check-label fw-medium" for="change-status-checkbox">
-                                Change issue status after submission
-                            </label>
+                        <hr/>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="billable-checkbox-simple" checked>
+                                <label class="form-check-label fw-medium" for="billable-checkbox-simple">
+                                    Billable
+                                </label>
+                            </div>
                         </div>
-                        <div id="status-change-container" class="mt-2" style="display: none;">
-                            <select id="issue-status-select" class="form-select"></select>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="change-status-checkbox">
+                                <label class="form-check-label fw-medium" for="change-status-checkbox">
+                                    Change issue status after submission
+                                </label>
+                            </div>
+                            <div id="status-change-container" class="mt-2" style="display: none;">
+                                <select id="issue-status-select" class="form-select"></select>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button id="submit-btn" class="btn btn-primary">
-                        <i class="fa-solid fa-paper-plane"></i>
-                        Submit to Redmine
-                    </button>
-                </div>
-                <div id="modal-status" class="mx-3 mb-3"></div>
+                    <div class="modal-footer">
+                        <button id="submit-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-paper-plane"></i>
+                            Submit to Redmine
+                        </button>
+                    </div>
+                    <div id="modal-status" class="mx-3 mb-3"></div>
+                </form>
             </div>
         </div>
     </div>

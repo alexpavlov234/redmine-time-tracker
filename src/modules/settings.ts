@@ -52,7 +52,7 @@ export function loadSettings() {
     const apiKey = localStorage.getItem('redmineApiKey');
     const billableId = localStorage.getItem('billableFieldId');
     
-    elements.testModeToggle.checked = isTestMode;
+    elements.testModeCheckbox.checked = isTestMode;
     if (url) elements.redmineUrlInput.value = url;
     if (apiKey) elements.redmineApiKeyInput.value = apiKey;
     if (billableId) elements.billableFieldIdInput.value = billableId;

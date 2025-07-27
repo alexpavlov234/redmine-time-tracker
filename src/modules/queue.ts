@@ -1,4 +1,4 @@
-import { todos, timerInterval, setTodos, todoFormTasks } from '../state/index.js';
+import { state, setTodos } from '../state/index.js';
 import { Todo } from '../types/index.js';
 import { elements } from '../utils/dom.js';
 import { showGlobalError } from '../utils/helpers.js';
@@ -7,12 +7,42 @@ import { getSelectedActivityId } from './activitySelector.js';
 export function loadTodos() {
     const storedTodos = localStorage.getItem('todos');
     if (storedTodos) {
-        setTodos(JSON.parse(storedTodos));
+        try {
+            const parsedTodos = JSON.parse(storedTodos);
+            // Ensure we're loading an array
+            if (Array.isArray(parsedTodos)) {
+                setTodos(parsedTodos);
+            } else {
+                setTodos([]);
+                localStorage.removeItem('todos');
+            }
+        } catch (e) {
+            console.error('Error parsing stored todos:', e);
+            setTodos([]);
+            localStorage.removeItem('todos');
+        }
+    }
+
+    // First prepare the next task to load into Current Task section if needed
+    if (!state.timerInterval && state.todos.length > 0) {
+        prepareNextTask();
+    }
+
+    // Then render the todos list
+    renderTodos();
+
+    // Finally ensure the start button is enabled if we have tasks
+    if (state.todos.length > 0 && !state.timerInterval) {
+        setTimeout(() => {
+            if (elements.startBtn) {
+                elements.startBtn.disabled = false;
+            }
+        }, 100);
     }
 }
 
 export function saveTodos() {
-    localStorage.setItem('todos', JSON.stringify(todos));
+    localStorage.setItem('todos', JSON.stringify(state.todos));
 }
 
 export function addToQueue() {
@@ -25,7 +55,7 @@ export function addToQueue() {
         return;
     }
     
-    const selectedTask = todoFormTasks.find(t => t.id.toString() === taskId);
+    const selectedTask = state.todoFormTasks.find(t => t.id.toString() === taskId);
     if (!selectedTask) {
         showGlobalError('Could not find selected task details. Please refresh and try again.');
         return;
@@ -52,57 +82,74 @@ export function addToQueue() {
         activityName
     };
 
-    todos.push(newTodo);
+    // Create a fresh copy of the current todos and add the new one
+    const updatedTodos = [...state.todos, newTodo];
+
+    // Update state
+    setTodos(updatedTodos);
+
+    // Immediately save to localStorage
     saveTodos();
+
+    // Update UI
     renderTodos();
     
-    // Reset form
-    elements.todoProjectInput.value = '';
-    elements.todoProjectSelect.value = '';
-    elements.todoTaskInput.value = '';
-    elements.todoTaskSelect.value = '';
-    elements.todoTaskInput.disabled = true;
-    elements.todoTaskInput.placeholder = 'Select a project first';
-    elements.todoTaskList.innerHTML = '';
-    elements.todoNoteInput.value = '';
-    elements.todoActivitySelect.value = '';
-    elements.todoProjectInput.focus();
+    // Reset form - using setTimeout to prevent validation being triggered during reset
+    setTimeout(() => {
+        elements.todoProjectInput.value = '';
+        elements.todoProjectSelect.value = '';
+        elements.todoTaskInput.value = '';
+        elements.todoTaskSelect.value = '';
+        elements.todoTaskInput.disabled = true;
+        elements.todoTaskInput.placeholder = 'Select a project first';
+        elements.todoTaskList.innerHTML = '';
+        elements.todoNoteInput.value = '';
+        elements.todoActivitySelect.value = '';
+        elements.todoProjectInput.focus();
+    }, 0);
 
     // Prepare next task if this is the first one in the queue and timer isn't running
-    if (todos.length === 1 && !timerInterval) {
+    if (updatedTodos.length === 1 && !state.timerInterval) {
         prepareNextTask();
     }
 }
 
 export function deleteTodo(id: number) {
-    const isFirstItem = todos.length > 0 && todos[0].id === id;
-    const wasTimerRunningForThis = timerInterval && isFirstItem;
+    const isFirstItem = state.todos.length > 0 && state.todos[0].id === id;
+    const wasTimerRunningForThis = state.timerInterval && isFirstItem;
 
     if (wasTimerRunningForThis) {
         (window as any).showWarning("You cannot remove the currently active task. Please stop the timer first.", 'Active Task Warning');
         return;
     }
 
-    const newTodos = todos.filter(t => t.id !== id);
+    // Make sure we're actually removing the item from the array
+    const newTodos = state.todos.filter(t => t.id !== id);
+
+    // Update state with the filtered todos
     setTodos(newTodos);
+
+    // Save immediately to localStorage to ensure persistence
     saveTodos();
+
+    // Refresh the UI
     renderTodos();
     
     // If the deleted item was the 'next' one and timer wasn't running, update the main tracker
-    if (isFirstItem && !timerInterval) {
+    if (isFirstItem && !state.timerInterval) {
         prepareNextTask();
     }
 }
 
 export function renderTodos() {
     elements.todoList.innerHTML = '';
-    if (todos.length === 0) {
+    if (state.todos.length === 0) {
         elements.todoList.innerHTML = `<li class="empty-state">Add tasks to your queue!</li>`;
-        if (!timerInterval) {
+        if (!state.timerInterval) {
             prepareNextTask(); // This will reset the main form to editable
         }
     } else {
-        todos.forEach((todo) => {
+        state.todos.forEach((todo) => {
             const li = document.createElement('li');
             li.dataset.id = todo.id.toString();
             li.draggable = true;
@@ -133,18 +180,33 @@ export function renderTodos() {
 }
 
 export function prepareNextTask() {
-    if (todos.length > 0 && !timerInterval) {
-        const nextTodo = todos[0];
+    if (state.todos.length > 0 && !state.timerInterval) {
+        const nextTodo = state.todos[0];
+
+        // Set the hidden inputs for backward compatibility
         elements.projectInput.value = nextTodo.projectName;
         elements.taskInput.value = `#${nextTodo.taskId} - ${nextTodo.taskSubject}`;
+
+        // Update the display elements
+        const projectDisplay = document.getElementById('project-display');
+        const taskDisplay = document.getElementById('task-display');
+        const activityDisplay = document.getElementById('activity-display');
+        const activityContainer = document.getElementById('activity-display-container');
+
+        if (projectDisplay) projectDisplay.textContent = nextTodo.projectName;
+        if (taskDisplay) taskDisplay.textContent = `#${nextTodo.taskId} - ${nextTodo.taskSubject}`;
 
         // Set the hidden selects' values for submission
         elements.projectSelect.value = nextTodo.projectId;
         elements.taskSelect.value = nextTodo.taskId;
         
         // Set activity if available
-        if (nextTodo.activityId) {
+        if (nextTodo.activityId && activityDisplay) {
             elements.activitySelect.value = nextTodo.activityId.toString();
+            activityDisplay.textContent = nextTodo.activityName || '';
+            if (activityContainer) activityContainer.style.display = 'flex';
+        } else {
+            if (activityContainer) activityContainer.style.display = 'none';
         }
 
         // Disable main selectors and enable start
@@ -154,13 +216,24 @@ export function prepareNextTask() {
         
         elements.configPrompt.style.display = 'none';
         elements.taskSelectionForm.style.display = 'block';
-    } else if (todos.length === 0 && !timerInterval) {
+    } else if (state.todos.length === 0 && !state.timerInterval) {
         // No more tasks in queue, reset the form to be editable
         elements.projectInput.value = '';
         elements.taskInput.value = '';
         elements.projectSelect.value = '';
         elements.taskSelect.value = '';
         elements.activitySelect.value = '';
+
+        // Clear the display elements
+        const projectDisplay = document.getElementById('project-display');
+        const taskDisplay = document.getElementById('task-display');
+        const activityDisplay = document.getElementById('activity-display');
+        const activityContainer = document.getElementById('activity-display-container');
+
+        if (projectDisplay) projectDisplay.textContent = '';
+        if (taskDisplay) taskDisplay.textContent = '';
+        if (activityDisplay) activityDisplay.textContent = '';
+        if (activityContainer) activityContainer.style.display = 'none';
 
         elements.projectInput.disabled = false;
         elements.taskInput.disabled = true;
@@ -174,8 +247,8 @@ let draggedItem: HTMLElement | null = null;
 
 export function initializeDragAndDrop() {
     elements.todoList.addEventListener('dragstart', (e) => {
-        if (timerInterval || !(e.target instanceof HTMLElement)) return;
-        
+        if (state.timerInterval || !(e.target instanceof HTMLElement)) return;
+
         draggedItem = e.target as HTMLElement;
         // Use a timeout to allow the browser to render the drag image before hiding the element
         setTimeout(() => { 
@@ -190,13 +263,13 @@ export function initializeDragAndDrop() {
                 .map(child => Number((child as HTMLElement).dataset.id))
                 .filter(id => !isNaN(id));
 
-            if (newOrderedIds.length === todos.length) {
-                const reorderedTodos = [...todos];
+            if (newOrderedIds.length === state.todos.length) {
+                const reorderedTodos = [...state.todos];
                 reorderedTodos.sort((a, b) => newOrderedIds.indexOf(a.id) - newOrderedIds.indexOf(b.id));
                 setTodos(reorderedTodos);
                 saveTodos();
                 // Update the main tracker to show the new top task if timer isn't running
-                if (!timerInterval) {
+                if (!state.timerInterval) {
                     prepareNextTask();
                 }
             }
@@ -206,7 +279,7 @@ export function initializeDragAndDrop() {
 
     elements.todoList.addEventListener('dragover', (e) => {
         e.preventDefault();
-        if (timerInterval || !draggedItem) return;
+        if (state.timerInterval || !draggedItem) return;
 
         const target = e.target as HTMLElement;
         const container = target.closest('li');

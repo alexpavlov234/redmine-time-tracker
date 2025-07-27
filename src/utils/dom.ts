@@ -6,8 +6,10 @@ export const elements = {
     // Navigation
     navTracker: document.getElementById('nav-tracker') as HTMLAnchorElement,
     navSettings: document.getElementById('nav-settings') as HTMLAnchorElement,
+    navLoggedTime: document.getElementById('nav-logged-time') as HTMLAnchorElement,
     trackerPage: document.getElementById('tracker-page') as HTMLDivElement,
     settingsPage: document.getElementById('settings-page') as HTMLDivElement,
+    loggedTimePage: document.getElementById('logged-time-page') as HTMLDivElement,
 
     // Task Selection
     projectInput: document.getElementById('project-input') as HTMLInputElement,
@@ -43,6 +45,13 @@ export const elements = {
     todoActivitySelect: document.getElementById('todo-activity-select') as HTMLSelectElement,
     addToQueueBtn: document.getElementById('add-to-queue-btn') as HTMLButtonElement,
     todoList: document.getElementById('todo-list') as HTMLUListElement,
+    todoForm: document.getElementById('todo-form') as HTMLFormElement,
+
+    // Logged Time
+    todayLog: document.getElementById('today-log') as HTMLUListElement,
+    yesterdayLog: document.getElementById('yesterday-log') as HTMLUListElement,
+    todayTotalTime: document.getElementById('today-total-time') as HTMLSpanElement,
+    yesterdayTotalTime: document.getElementById('yesterday-total-time') as HTMLSpanElement,
 
     // Summary Modal
     summaryModal: document.getElementById('summary-modal') as HTMLDivElement,
@@ -56,6 +65,7 @@ export const elements = {
     submitBtn: document.getElementById('submit-btn') as HTMLButtonElement,
     closeModalBtn: document.getElementById('close-modal') as HTMLSpanElement,
     modalStatus: document.getElementById('modal-status') as HTMLDivElement,
+    summaryForm: document.getElementById('summary-form') as HTMLFormElement,
 
     // First Activity Modal
     firstActivityModal: document.getElementById('first-activity-modal') as HTMLDivElement,
@@ -64,7 +74,8 @@ export const elements = {
     closeFirstActivityModalBtn: document.getElementById('close-first-activity-modal') as HTMLSpanElement,
 
     // Settings
-    testModeToggle: document.getElementById('test-mode-toggle') as HTMLInputElement,
+    settingsForm: document.getElementById('settings-form') as HTMLFormElement,
+    testModeCheckbox: document.getElementById('test-mode-toggle') as HTMLInputElement,
     redmineUrlInput: document.getElementById('redmine-url') as HTMLInputElement,
     redmineApiKeyInput: document.getElementById('redmine-api-key') as HTMLInputElement,
     billableFieldIdInput: document.getElementById('billable-field-id') as HTMLInputElement,

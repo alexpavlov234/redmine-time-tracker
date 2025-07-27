@@ -1,6 +1,6 @@
 import { 
-    timerInterval, startTime, pausedTime, totalElapsedTime, activities, todos,
-    setTimerInterval, setStartTime, setPausedTime, setTotalElapsedTime, 
+    state,
+    setTimerInterval, setStartTime, setPausedTime, setTotalElapsedTime,
     addActivity, setActivities
 } from '../state/index.js';
 import { Activity } from '../types/index.js';
@@ -9,33 +9,33 @@ import { formatTime } from '../utils/helpers.js';
 import { showSummary } from './summary.js';
 import { renderActivities } from './activities.js';
 import { renderTodos, prepareNextTask } from './queue.js';
-import { checkConfiguration } from './projects';
+import { checkConfiguration } from './projects.js';
 
 export function updateTime() {
-    if (!startTime) return;
+    if (!state.startTime) return;
     const now = Date.now();
-    const newTotalElapsedTime = (now - startTime + pausedTime) / 1000;
+    const newTotalElapsedTime = (now - state.startTime + state.pausedTime) / 1000;
     setTotalElapsedTime(newTotalElapsedTime);
-    elements.timeDisplay.textContent = formatTime(totalElapsedTime);
-    
+    elements.timeDisplay.textContent = formatTime(state.totalElapsedTime);
+
     // Debug: Log time every 10 seconds
-    if (Math.floor(totalElapsedTime) % 10 === 0 && Math.floor(totalElapsedTime) !== Math.floor((newTotalElapsedTime - 1))) {
+    if (Math.floor(state.totalElapsedTime) % 10 === 0 && Math.floor(state.totalElapsedTime) !== Math.floor((newTotalElapsedTime - 1))) {
         console.log('Timer update:', {
-            startTime: new Date(startTime),
+            startTime: new Date(state.startTime),
             now: new Date(now),
-            pausedTime,
-            totalElapsedTimeSeconds: totalElapsedTime,
-            totalElapsedTimeFormatted: formatTime(totalElapsedTime)
+            pausedTime: state.pausedTime,
+            totalElapsedTimeSeconds: state.totalElapsedTime,
+            totalElapsedTimeFormatted: formatTime(state.totalElapsedTime)
         });
     }
 
-    if (activities.length > 0) {
+    if (state.activities.length > 0) {
         const durationEl = document.getElementById('current-activity-duration');
         if (durationEl) {
-            const previousActivitiesDuration = activities
+            const previousActivitiesDuration = state.activities
                 .slice(0, -1)
                 .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
-            const currentActivityDuration = totalElapsedTime - previousActivitiesDuration;
+            const currentActivityDuration = state.totalElapsedTime - previousActivitiesDuration;
             durationEl.textContent = `(${formatTime(Math.max(0, currentActivityDuration))})`;
         }
     }
@@ -92,13 +92,13 @@ export function promptForFirstActivity(): Promise<string | null> {
 
 export async function startTimer() {
     try {
-        if (timerInterval) return; // Already running
-        
+        if (state.timerInterval) return; // Already running
+
         // If we're not resuming, check if we can start
-        const isResuming = startTime === null && pausedTime > 0;
+        const isResuming = state.startTime === null && state.pausedTime > 0;
         if (!isResuming) {
             // Check if we have a task either from queue or manual selection
-            const hasQueueTask = todos.length > 0;
+            const hasQueueTask = state.todos.length > 0;
             const hasManualTask = elements.taskSelect.value && elements.projectSelect.value;
             
             if (!hasQueueTask && !hasManualTask) {
@@ -116,12 +116,12 @@ export async function startTimer() {
         
         if (!isResuming) { // First start of a task
             // Check if we have a task from queue or manual selection
-            const hasQueueTask = todos.length > 0;
-            
+            const hasQueueTask = state.todos.length > 0;
+
             if (hasQueueTask) {
                 // Use task from queue
-                const nextTodo = todos[0];
-                
+                const nextTodo = state.todos[0];
+
                 // Set the values directly since we already have the task info from the queue
                 elements.projectSelect.value = nextTodo.projectId;
                 elements.projectInput.value = nextTodo.projectName;
@@ -164,7 +164,7 @@ export async function startTimer() {
             // Remove the started task from the queue if it came from the queue
             if (hasQueueTask) {
                 const { setTodos } = await import('../state/index.js');
-                const newTodos = [...todos];
+                const newTodos = [...state.todos];
                 newTodos.shift(); // Remove the first item (the one we just started)
                 setTodos(newTodos);
                 localStorage.setItem('todos', JSON.stringify(newTodos));
@@ -206,12 +206,12 @@ export async function startTimer() {
 }
 
 export function pauseTimer() {
-    if (!timerInterval) return; // Not running
-    clearInterval(timerInterval);
+    if (!state.timerInterval) return; // Not running
+    clearInterval(state.timerInterval);
     setTimerInterval(null);
     
     const now = new Date();
-    const newPausedTime = pausedTime + now.getTime() - (startTime ?? now.getTime());
+    const newPausedTime = state.pausedTime + now.getTime() - (state.startTime ?? now.getTime());
     setPausedTime(newPausedTime);
     setStartTime(null);
 
@@ -223,24 +223,24 @@ export function pauseTimer() {
 }
 
 export function stopTimer() {
-    if (timerInterval) {
-        clearInterval(timerInterval);
+    if (state.timerInterval) {
+        clearInterval(state.timerInterval);
     }
     const now = new Date();
     
     // Final update to totalElapsedTime if timer was running
-    if (startTime) {
-        const newTotalElapsedTime = (now.getTime() - startTime + pausedTime) / 1000;
+    if (state.startTime) {
+        const newTotalElapsedTime = (now.getTime() - state.startTime + state.pausedTime) / 1000;
         setTotalElapsedTime(newTotalElapsedTime);
     }
 
-     if (activities.length > 0) {
-        const lastActivity = activities[activities.length - 1];
+     if (state.activities.length > 0) {
+        const lastActivity = state.activities[state.activities.length - 1];
         if(!lastActivity.durationSeconds) { // Only update if not already set by adding another activity
-            const previousActivitiesDuration = activities
+            const previousActivitiesDuration = state.activities
                 .slice(0, -1)
                 .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
-            const newDuration = totalElapsedTime - previousActivitiesDuration;
+            const newDuration = state.totalElapsedTime - previousActivitiesDuration;
             // Ensure duration is not negative due to floating point issues
             lastActivity.durationSeconds = Math.max(0, newDuration);
         }
@@ -249,7 +249,7 @@ export function stopTimer() {
 }
 
 export function resetState(advanceQueue: boolean = false) {
-    if (timerInterval) clearInterval(timerInterval);
+    if (state.timerInterval) clearInterval(state.timerInterval);
     setTimerInterval(null);
     setStartTime(null);
     setPausedTime(0);
@@ -274,7 +274,7 @@ export function resetState(advanceQueue: boolean = false) {
     }
 
     // If there's no queue, check configuration to repopulate the main form selectors
-    if (todos.length === 0) {
+    if (state.todos.length === 0) {
         // Import and call checkConfiguration when needed
         checkConfiguration();
     }

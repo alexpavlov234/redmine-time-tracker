@@ -16,22 +16,73 @@ import { elements } from './utils/dom.js';
 import { showPage, showGlobalError } from './utils/helpers.js';
 import { startTimer, pauseTimer, stopTimer } from './modules/timer.js';
 import { addActivityToState, renderActivities } from './modules/activities.js';
-import { addToQueue, loadTodos, renderTodos, prepareNextTask, initializeDragAndDrop } from './modules/queue.js';
+import { addToQueue, loadTodos, initializeDragAndDrop } from './modules/queue.js';
 import { hideSummary, submitTimeToRedmine } from './modules/summary.js';
 import { populateTasks, populateTasksForTodoForm } from './modules/projects.js';
 import { saveSettings, testConnection, loadSettings, setTestModeState } from './modules/settings.js';
 import { initializeActivities } from './modules/activitySelector.js';
 import { initializeCustomFields } from './modules/customFields.js';
-import * as stateFunctions from './state/index.js';
+import { initLoggedTimePage } from './modules/loggedTime.js';
+import { setUser } from './state/index.js';
+import { getCurrentUser } from './services/redmine.js';
 
-function init() {
-    // Bootstrap is now directly imported and available
-    console.log('Bootstrap loaded:', typeof window.bootstrap !== 'undefined');
-    
+async function init() {
+    try {
+        // Load user settings first
+        loadSettings();
+
+        // Set up event listeners
+        initializeEventListeners();
+
+        // Initialize the UI
+        showPage('tracker');
+
+        // Load data and initialize components
+        renderActivities();
+        loadTodos(); // This also handles preparing next task and rendering todos
+        initializeDragAndDrop();
+        populateTasks();
+        populateTasksForTodoForm();
+        initializeActivities();
+        initializeCustomFields();
+
+        // Fetch user data after everything else is loaded
+        try {
+            const user = await getCurrentUser();
+            if (user) {
+                setUser(user);
+            }
+        } catch (error) {
+            console.error('Failed to fetch user on init:', error);
+            // Silent failure - app can still work without user data
+        }
+    } catch (error) {
+        showGlobalError(error instanceof Error ? error.message : 'Failed to initialize application');
+    }
+}
+
+function initializeEventListeners() {
     // Navigation
-    elements.navTracker.addEventListener('click', (e) => { e.preventDefault(); showPage('tracker'); });
-    elements.navSettings.addEventListener('click', (e) => { e.preventDefault(); showPage('settings'); });
-    elements.promptLinkToSettings.addEventListener('click', (e) => { e.preventDefault(); showPage('settings'); });
+    elements.navTracker.addEventListener('click', (e) => {
+        e.preventDefault();
+        showPage('tracker');
+    });
+
+    elements.navSettings.addEventListener('click', (e) => {
+        e.preventDefault();
+        showPage('settings');
+    });
+
+    elements.navLoggedTime.addEventListener('click', (e) => {
+        e.preventDefault();
+        showPage('logged-time');
+        initLoggedTimePage();
+    });
+
+    elements.promptLinkToSettings.addEventListener('click', (e) => {
+        e.preventDefault();
+        showPage('settings');
+    });
 
     // Timer controls
     elements.startBtn.addEventListener('click', startTimer);
@@ -39,7 +90,7 @@ function init() {
     elements.stopBtn.addEventListener('click', stopTimer);
 
     // Activity log
-    elements.addActivityBtn.addEventListener('click', () => addActivityToState());
+    elements.addActivityBtn.addEventListener('click', addActivityToState);
     elements.activityInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -47,85 +98,48 @@ function init() {
         }
     });
 
-    // Work Queue
-    elements.addToQueueBtn.addEventListener('click', addToQueue);
+    // Todo list - using only button click handler to prevent double submission
+    elements.addToQueueBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        addToQueue();
+    });
+
     elements.todoProjectSelect.addEventListener('change', populateTasksForTodoForm);
 
-    // Summary Modal
+    // Summary modal
     elements.closeModalBtn.addEventListener('click', hideSummary);
     elements.submitBtn.addEventListener('click', submitTimeToRedmine);
+
     elements.summaryModal.addEventListener('click', (e) => {
-        if (e.target === elements.summaryModal) hideSummary();
+        if (e.target === elements.summaryModal) {
+            hideSummary();
+        }
     });
+
     elements.changeStatusCheckbox.addEventListener('change', () => {
-        elements.statusChangeContainer.style.display = elements.changeStatusCheckbox.checked ? 'block' : 'none';
+        if (elements.statusChangeContainer) {
+            elements.statusChangeContainer.style.display =
+                elements.changeStatusCheckbox.checked ? 'block' : 'none';
+        }
     });
-    
+
+    elements.summaryForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitTimeToRedmine();
+    });
+
     // Settings
-    elements.saveSettingsBtn.addEventListener('click', saveSettings);
+    elements.settingsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await saveSettings();
+    });
+
     elements.testConnectionBtn.addEventListener('click', testConnection);
-    elements.testModeToggle.addEventListener('change', (e) => {
-        const isEnabled = (e.target as HTMLInputElement).checked;
-        localStorage.setItem('isTestMode', String(isEnabled));
-        // Reset caches
-        stateFunctions.setIssueStatuses([]);
-        stateFunctions.setAllProjects([]);
-        stateFunctions.setAllTasks([]);
-        setTestModeState(isEnabled);
-    });
 
-    // Main task selection
-    elements.projectSelect.addEventListener('change', populateTasks);
-    elements.taskSelect.addEventListener('change', () => {
-        // This button state is primarily managed by prepareNextTask when using the queue.
-        // This event listener handles the case where the user is manually selecting a task without the queue.
-        import('./state/index.js').then(({ todos }) => {
-            elements.startBtn.disabled = !elements.taskSelect.value || todos.length > 0;
-        });
+    elements.testModeCheckbox.addEventListener('change', (e) => {
+        setTestModeState((e.target as HTMLInputElement).checked);
     });
-
-    // Initialize drag and drop for todos
-    initializeDragAndDrop();
-    initializeActivities(); // Initialize activities selector
-
-    // Global error handling
-    window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled Promise Rejection:', event.reason);
-        showGlobalError('An unexpected promise rejection occurred.', event.reason);
-    });
-
-    window.addEventListener('error', function(event) {
-        console.error('Global Error:', event.error);
-        showGlobalError('A script error occurred on the page.', event.error || event.message);
-    });
-
-    // Initial Load
-    loadSettings(); // This calls setTestModeState, which calls checkConfiguration
-    loadTodos();
-    renderTodos();
-    prepareNextTask();
-    
-    // Initialize activities
-    initializeActivities().catch(error => {
-        console.warn('Failed to initialize activities:', error);
-    });
-    
-    // Initialize custom fields
-    initializeCustomFields().catch(error => {
-        console.warn('Failed to initialize custom fields:', error);
-    });
-    
-    // Try to auto-detect billable field if not configured
-    if (!localStorage.getItem('billableFieldId')) {
-        import('./services/redmine.js').then(({ detectBillableField }) => {
-            detectBillableField().catch(error => {
-                console.warn('Failed to auto-detect billable field:', error);
-            });
-        });
-    }
-
-    
-    renderActivities();
 }
 
-init();
+// Initialize the application
+init().catch(showGlobalError);

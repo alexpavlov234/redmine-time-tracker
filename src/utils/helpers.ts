@@ -7,6 +7,13 @@ export function formatTime(seconds: number): string {
     return `${h}:${m}:${s}`;
 }
 
+export function formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export function setButtonLoading(button: HTMLButtonElement, isLoading: boolean, newHtml?: string) {
     const originalHtml = button.dataset.originalHtml || button.innerHTML;
     if (isLoading) {
@@ -81,17 +88,22 @@ export function showGlobalError(message: string, details?: any) {
     elements.globalErrorContainer.appendChild(banner);
 }
 
-export function showPage(page: 'tracker' | 'settings') {
+export function showPage(page: 'tracker' | 'settings' | 'logged-time') {
     elements.trackerPage.style.display = 'none';
     elements.settingsPage.style.display = 'none';
+    elements.loggedTimePage.style.display = 'none';
     elements.navTracker.classList.remove('active');
     elements.navSettings.classList.remove('active');
+    elements.navLoggedTime.classList.remove('active');
 
     if (page === 'tracker') {
         elements.trackerPage.style.display = 'block';
         elements.navTracker.classList.add('active');
-    } else {
+    } else if (page === 'settings') {
         elements.settingsPage.style.display = 'block';
         elements.navSettings.classList.add('active');
+    } else if (page === 'logged-time') {
+        elements.loggedTimePage.style.display = 'block';
+        elements.navLoggedTime.classList.add('active');
     }
 }
