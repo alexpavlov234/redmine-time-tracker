@@ -60,7 +60,7 @@
 
 /* Header Styling */
 header {
-  background: linear-gradient(135deg, $primary 0%, $red-600 100%);
+  background: $primary;
   color: white;
   border-radius: $border-radius-xl;
   padding: 2rem;
@@ -77,6 +77,19 @@ header {
   nav {
     border: none;
     margin-top: 1rem;
+  }
+}
+
+@include color-mode(dark) {
+  header {
+    background: $primary;
+    color: $body-color-dark;
+    box-shadow: $box-shadow-lg;
+
+    h1 {
+      color: $primary;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
   }
 }
 
@@ -213,7 +226,7 @@ header {
 
 .toast-icon {
   flex-shrink: 0;
-  padding-top: 0.25rem;
+  padding-top: 0.10rem;
 }
 
 .toast-content {
@@ -223,7 +236,7 @@ header {
 
 .toast-title {
   font-weight: $font-weight-semibold;
-  color: $body-bg;
+  color: $body-color;
   margin-bottom: 0.125rem;
 }
 
@@ -232,6 +245,7 @@ header {
   color: $secondary;
   white-space: pre-wrap;
   word-break: break-word;
+  margin-top: 0.25rem;
 }
 
 .btn-close {
@@ -254,6 +268,26 @@ header {
   100% {
     transform: rotate(360deg);
   }
+}
+
+@include color-mode(dark) {
+    .toast {
+        background-color: $body-bg-dark;
+        border-color: $border-color-dark;
+        color: $body-color-dark;
+
+        .toast-title {
+        color: $primary;
+        }
+
+        .toast-message {
+        color: $body-color-dark;
+        }
+
+        .btn-close {
+        --bs-btn-close-color: $body-color-dark;
+        }
+    }
 }
 
 /* Autocomplete Styling */
