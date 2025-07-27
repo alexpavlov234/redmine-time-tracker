@@ -20,6 +20,7 @@ export const elements = {
     taskSelect: document.getElementById('task-select') as HTMLSelectElement,
     activitySelect: document.getElementById('activity-select') as HTMLSelectElement,
     configPrompt: document.getElementById('config-prompt') as HTMLDivElement,
+    noTaskPrompt: document.getElementById('no-task-prompt') as HTMLDivElement,
     taskSelectionForm: document.getElementById('task-selection-form') as HTMLDivElement,
     promptLinkToSettings: document.getElementById('prompt-link-to-settings') as HTMLAnchorElement,
 

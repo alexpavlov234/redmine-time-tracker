@@ -1,5 +1,5 @@
-import { state, setTodos } from '../state/index.js';
-import { Todo } from '../types/index.js';
+import { state, setTodos } from '../state';
+import { Todo } from '../types';
 import { elements } from '../utils/dom.js';
 import { showGlobalError } from '../utils/helpers.js';
 import { getSelectedActivityId } from './activitySelector.js';
@@ -180,6 +180,8 @@ export function renderTodos() {
 }
 
 export function prepareNextTask() {
+    const hasConfig = localStorage.getItem('redmineUrl') && localStorage.getItem('redmineApiKey');
+
     if (state.todos.length > 0 && !state.timerInterval) {
         const nextTodo = state.todos[0];
 
@@ -213,9 +215,12 @@ export function prepareNextTask() {
         elements.projectInput.disabled = true;
         elements.taskInput.disabled = true;
         elements.startBtn.disabled = false;
-        
+
+        // UI visibility
         elements.configPrompt.style.display = 'none';
+        elements.noTaskPrompt.style.display = 'none';
         elements.taskSelectionForm.style.display = 'block';
+
     } else if (state.todos.length === 0 && !state.timerInterval) {
         // No more tasks in queue, reset the form to be editable
         elements.projectInput.value = '';
@@ -239,6 +244,11 @@ export function prepareNextTask() {
         elements.taskInput.disabled = true;
         elements.taskInput.placeholder = 'Select a project first';
         elements.startBtn.disabled = true;
+
+        // UI visibility
+        elements.configPrompt.style.display = hasConfig ? 'none' : 'block';
+        elements.noTaskPrompt.style.display = hasConfig ? 'block' : 'none';
+        elements.taskSelectionForm.style.display = 'none';
     }
 }
 
