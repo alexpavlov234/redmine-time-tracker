@@ -190,7 +190,7 @@ export async function getTimeEntryCustomFields() {
             }
         }
         
-        // If no time entries exist, return empty array
+        // If no time entries exist, return an empty array
         return [];
     } catch (error) {
         console.error('Failed to fetch time entry custom fields:', error);

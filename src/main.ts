@@ -18,11 +18,11 @@ import { startTimer, pauseTimer, stopTimer } from './modules/timer.js';
 import { addActivityToState, renderActivities } from './modules/activities.js';
 import { addToQueue, loadTodos, renderTodos, prepareNextTask, initializeDragAndDrop } from './modules/queue.js';
 import { hideSummary, submitTimeToRedmine } from './modules/summary.js';
-import { populateTasks, populateTasksForTodoForm, checkConfiguration } from './modules/projects.js';
+import { populateTasks, populateTasksForTodoForm } from './modules/projects.js';
 import { saveSettings, testConnection, loadSettings, setTestModeState } from './modules/settings.js';
 import { initializeActivities } from './modules/activitySelector.js';
 import { initializeCustomFields } from './modules/customFields.js';
-import { setIssueStatuses, setAllProjects, setAllTasks } from './state/index.js';
+import * as stateFunctions from './state/index.js';
 
 function init() {
     // Bootstrap is now directly imported and available
@@ -68,9 +68,9 @@ function init() {
         const isEnabled = (e.target as HTMLInputElement).checked;
         localStorage.setItem('isTestMode', String(isEnabled));
         // Reset caches
-        setIssueStatuses([]);
-        setAllProjects([]);
-        setAllTasks([]);
+        stateFunctions.setIssueStatuses([]);
+        stateFunctions.setAllProjects([]);
+        stateFunctions.setAllTasks([]);
         setTestModeState(isEnabled);
     });
 
