@@ -24,6 +24,7 @@ function renderTimeEntries(entries: TimeEntry[], element: HTMLUListElement, issu
         listItem.className = 'list-group-item py-2';
 
         let taskName = 'No task';
+        let taskId = entry.issue ? entry.issue.id : null;
         if (entry.issue && entry.issue.subject) {
             taskName = entry.issue.subject;
         } else if (entry.issue && entry.issue.id) {
@@ -61,7 +62,7 @@ function renderTimeEntries(entries: TimeEntry[], element: HTMLUListElement, issu
             const taskSpan = document.createElement('span');
             taskSpan.className = 'd-block text-truncate';
             taskSpan.title = taskName;
-            taskSpan.textContent = `Task: ${taskName}`;
+            taskSpan.textContent = `Task: #${taskId} ${taskName}`;
             detailsDiv.appendChild(taskSpan);
         }
 
