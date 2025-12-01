@@ -1,4 +1,4 @@
-import { 
+import {
     state,
     setAllProjects, setAllTasks, setTodoFormTasks
 } from '../state/index.js';
@@ -18,14 +18,28 @@ export async function populateProjects() {
     elements.taskSelect.innerHTML = '';
 
     try {
-        const data = await redmineApiRequest('/projects.json');
-        elements.projectSelect.innerHTML = ''; 
+        // Fetch ALL projects (handle Redmine pagination)
+        const collected: { id: number; name: string }[] = [];
+        let offset = 0;
+        const limit = 100; // Redmine max is typically 100
+        let totalCount = Infinity;
+
+        while (collected.length < totalCount) {
+            const page = await redmineApiRequest(`/projects.json?limit=${limit}&offset=${offset}`);
+            const pageProjects = Array.isArray(page.projects) ? page.projects : [];
+            totalCount = typeof page.total_count === 'number' ? page.total_count : pageProjects.length;
+            collected.push(...pageProjects);
+            if (pageProjects.length === 0) break; // safety to avoid infinite loop
+            offset += pageProjects.length;
+        }
+
+        elements.projectSelect.innerHTML = '';
         elements.todoProjectSelect.innerHTML = '<option value="">-- Select a project --</option>';
-        
+
         const myIssuesOption = { id: "my_issues", name: "--- My Assigned Issues ---" };
-        const projects = [myIssuesOption, ...data.projects];
+        const projects = [myIssuesOption, ...collected];
         setAllProjects(projects);
-        
+
         state.allProjects.forEach(proj => {
             const option = document.createElement('option');
             option.value = String(proj.id);
@@ -80,7 +94,7 @@ export async function populateTasksForSelect(selectElement: HTMLSelectElement, p
     } else {
         endpoint = `/issues.json?project_id=${projectId}&status_id=open&limit=100`;
     }
-    
+
     const data = await redmineApiRequest(endpoint);
     selectElement.innerHTML = `<option value="">-- Select a task --</option>`;
     if (data.issues.length > 0) {
@@ -110,11 +124,11 @@ export async function populateTasks() {
     elements.taskInput.placeholder = 'Loading tasks...';
     elements.taskInput.disabled = true;
     elements.startBtn.disabled = true;
-    
+
     try {
         const tasks = await populateTasksForSelect(elements.taskSelect, selectedProjectValue);
         setAllTasks(tasks);
-        
+
         if (state.allTasks.length === 0) {
             elements.taskInput.placeholder = 'No open tasks found';
             elements.taskInput.value = '';
@@ -126,7 +140,7 @@ export async function populateTasks() {
             elements.taskInput.placeholder = 'Search tasks...';
             elements.taskInput.value = '';
             elements.taskSelect.value = '';
-            
+
             initAutocomplete({
                 inputEl: elements.taskInput,
                 listEl: elements.taskList,
