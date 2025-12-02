@@ -1,4 +1,4 @@
-import { Activity, Todo, RedmineProject, RedmineIssue, IssueStatus, User } from '../types/index.js';
+import { Activity, Todo, RedmineProject, RedmineIssue, IssueStatus, User } from '@/src/types';
 
 // Timer state
 let timerInterval: number | null = null;
@@ -9,6 +9,7 @@ let totalElapsedTime = 0;
 // Data state
 let activities: Activity[] = [];
 let todos: Todo[] = [];
+let activeTodoId: number | null = null;
 let allProjects: (RedmineProject | { id: string; name: string })[] = [];
 let allTasks: RedmineIssue[] = [];
 let todoFormTasks: RedmineIssue[] = [];
@@ -22,6 +23,7 @@ export const state = {
   get totalElapsedTime() { return totalElapsedTime; },
   get activities() { return activities; },
   get todos() { return todos; },
+  get activeTodoId() { return activeTodoId; },
   get allProjects() { return allProjects; },
   get allTasks() { return allTasks; },
   get todoFormTasks() { return todoFormTasks; },
@@ -58,6 +60,15 @@ export function setTodos(newTodos: Todo[]) {
     todos = newTodos;
 }
 
+export function setActiveTodoId(id: number | null) {
+    activeTodoId = id;
+    if (id === null) {
+        localStorage.removeItem('activeTodoId');
+    } else {
+        localStorage.setItem('activeTodoId', String(id));
+    }
+}
+
 export function setAllProjects(projects: (RedmineProject | { id: string; name: string })[]) {
     allProjects = projects;
 }
@@ -76,12 +87,4 @@ export function setIssueStatuses(statuses: IssueStatus[]) {
 
 export function setUser(newUser: User | null) {
     user = newUser;
-}
-
-export function resetTimerState() {
-    timerInterval = null;
-    startTime = null;
-    pausedTime = 0;
-    totalElapsedTime = 0;
-    activities = [];
 }

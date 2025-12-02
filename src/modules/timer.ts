@@ -1,27 +1,51 @@
 import { 
     state,
     setTimerInterval, setStartTime, setPausedTime, setTotalElapsedTime,
-    addActivity, setActivities
-} from '../state/index.js';
-import { Activity } from '../types/index.js';
+    addActivity, setActivities, setActiveTodoId, setTodos
+} from '@/src/state';
+import { Activity } from '@/src/types';
 import { elements } from '../utils/dom.js';
 import { formatTime } from '../utils/helpers.js';
 import { showSummary } from './summary.js';
 import { renderActivities } from './activities.js';
-import { renderTodos, prepareNextTask } from './queue.js';
+import { renderTodos, prepareNextTask, saveTodos } from './queue.js';
 import { checkConfiguration } from './projects.js';
 
 export function updateTime() {
-    if (!state.startTime) return;
     const now = Date.now();
-    const newTotalElapsedTime = (now - state.startTime + state.pausedTime) / 1000;
-    setTotalElapsedTime(newTotalElapsedTime);
-    elements.timeDisplay.textContent = formatTime(state.totalElapsedTime);
+
+    // If a specific todo is active, the main (big) timer should reflect that todo's elapsed time
+    if (state.activeTodoId != null) {
+        const idx = state.todos.findIndex(t => t.id === state.activeTodoId);
+        if (idx >= 0) {
+            const todo = state.todos[idx];
+            const baseElapsed = todo.elapsedMs || 0;
+            const runningStart = todo.startTime ? (now - todo.startTime) : 0;
+            const elapsedMs = baseElapsed + Math.max(0, runningStart);
+            const elapsedSec = Math.floor(elapsedMs / 1000);
+            setTotalElapsedTime(elapsedSec);
+            elements.timeDisplay.textContent = formatTime(state.totalElapsedTime);
+
+            // Update the badge on the active todo as well
+            const badge = document.getElementById(`todo-time-${todo.id}`);
+            if (badge) {
+                (badge as HTMLElement).textContent = formatTime(elapsedSec);
+            }
+        }
+    } else if (state.startTime) {
+        // Fallback to session-based timer for manual sessions (no active todo)
+        const newTotalElapsedTime = (now - state.startTime + state.pausedTime) / 1000;
+        setTotalElapsedTime(newTotalElapsedTime);
+        elements.timeDisplay.textContent = formatTime(state.totalElapsedTime);
+    } else {
+        // Nothing to update
+        return;
+    }
 
     // Debug: Log time every 10 seconds
-    if (Math.floor(state.totalElapsedTime) % 10 === 0 && Math.floor(state.totalElapsedTime) !== Math.floor((newTotalElapsedTime - 1))) {
+    if (Math.floor(state.totalElapsedTime) % 10 === 0) {
         console.log('Timer update:', {
-            startTime: new Date(state.startTime),
+            startTime: state.startTime ? new Date(state.startTime) : null,
             now: new Date(now),
             pausedTime: state.pausedTime,
             totalElapsedTimeSeconds: state.totalElapsedTime,
@@ -46,7 +70,7 @@ export function promptForFirstActivity(): Promise<string | null> {
         // Check if Bootstrap is available
         if (typeof window.bootstrap === 'undefined') {
             console.error('Bootstrap is not loaded');
-            resolve(prompt('What are you working on?')); // Fallback to native prompt
+            resolve(prompt('What task are you performing?')); // Fallback to native prompt
             return;
         }
         
@@ -92,6 +116,12 @@ export function promptForFirstActivity(): Promise<string | null> {
 
 export async function startTimer() {
     try {
+        // Prefer starting the first item in the queue
+        if (state.todos.length > 0) {
+            await startTimerForTodo(state.todos[0].id);
+            return;
+        }
+
         if (state.timerInterval) return; // Already running
 
         // If we're not resuming, check if we can start
@@ -118,32 +148,7 @@ export async function startTimer() {
             // Check if we have a task from queue or manual selection
             const hasQueueTask = state.todos.length > 0;
 
-            if (hasQueueTask) {
-                // Use task from queue
-                const nextTodo = state.todos[0];
-
-                // Set the values directly since we already have the task info from the queue
-                elements.projectSelect.value = nextTodo.projectId;
-                elements.projectInput.value = nextTodo.projectName;
-                elements.taskInput.value = `#${nextTodo.taskId} - ${nextTodo.taskSubject}`;
-                
-                // Ensure the task option exists in the select dropdown
-                const existingOption = Array.from(elements.taskSelect.options).find(opt => opt.value === nextTodo.taskId);
-                if (!existingOption) {
-                    const option = document.createElement('option');
-                    option.value = nextTodo.taskId;
-                    option.textContent = `#${nextTodo.taskId} - ${nextTodo.taskSubject}`;
-                    elements.taskSelect.appendChild(option);
-                }
-                elements.taskSelect.value = nextTodo.taskId;
-                
-                console.log('Timer starting with queue task:', {
-                    projectId: nextTodo.projectId,
-                    taskId: nextTodo.taskId,
-                    projectSelectValue: elements.projectSelect.value,
-                    taskSelectValue: elements.taskSelect.value
-                });
-            } else {
+            if (!hasQueueTask) {
                 // Use manually selected task
                 console.log('Timer starting with manual task selection:', {
                     projectSelectValue: elements.projectSelect.value,
@@ -161,15 +166,6 @@ export async function startTimer() {
                 return;
             }
 
-            // Remove the started task from the queue if it came from the queue
-            if (hasQueueTask) {
-                const { setTodos } = await import('../state/index.js');
-                const newTodos = [...state.todos];
-                newTodos.shift(); // Remove the first item (the one we just started)
-                setTodos(newTodos);
-                localStorage.setItem('todos', JSON.stringify(newTodos));
-            }
-            
             // Clear previous session's activities
             setActivities([]);
             const newStartTime = Date.now();
@@ -191,7 +187,7 @@ export async function startTimer() {
         elements.addActivityBtn.disabled = false;
         elements.projectInput.disabled = true;
         elements.taskInput.disabled = true;
-        elements.todoList.classList.add('disabled'); // Visually disable queue while tracking
+        // Do not disable queue; user can switch timers which will auto‑pause current
         document.title = "▶️ Tracking...";
         renderActivities();
         renderTodos(); // Update the todos display to show the updated queue
@@ -209,17 +205,31 @@ export function pauseTimer() {
     if (!state.timerInterval) return; // Not running
     clearInterval(state.timerInterval);
     setTimerInterval(null);
-    
-    const now = new Date();
-    const newPausedTime = state.pausedTime + now.getTime() - (state.startTime ?? now.getTime());
-    setPausedTime(newPausedTime);
+
+    const now = Date.now();
+    // Sync active todo elapsed
+    if (state.activeTodoId != null) {
+        const idx = state.todos.findIndex(t => t.id === state.activeTodoId);
+        if (idx >= 0) {
+            const todo = state.todos[idx];
+            const startedAt = todo.startTime || state.startTime || now;
+            const sessionMs = Math.max(0, now - startedAt);
+            const newElapsedMs = (todo.elapsedMs || 0) + sessionMs;
+            // Mutate in place (state.todos is mutable array)
+            (state.todos as any)[idx] = { ...todo, elapsedMs: newElapsedMs, startTime: null, isRunning: false, activities: [...state.activities] };
+            localStorage.setItem('todos', JSON.stringify(state.todos));
+        }
+    }
+
     setStartTime(null);
+    setPausedTime(0);
 
     elements.startBtn.disabled = false;
-    elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume';
+    elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
     elements.pauseBtn.disabled = true;
     document.title = "⏸️ Paused | Time Tracker";
     renderActivities();
+    renderTodos();
 }
 
 export function stopTimer() {
@@ -245,6 +255,28 @@ export function stopTimer() {
             lastActivity.durationSeconds = Math.max(0, newDuration);
         }
     }
+    // Mark active todo as not running and accumulate elapsed
+    if (state.activeTodoId != null) {
+        const idx = state.todos.findIndex(t => t.id === state.activeTodoId);
+        if (idx >= 0) {
+            const todo = state.todos[idx];
+            const startedAt = todo.startTime || state.startTime || now.getTime();
+            const sessionMs = Math.max(0, now.getTime() - startedAt);
+            const newElapsedMs = (todo.elapsedMs || 0) + sessionMs;
+            (state.todos as any)[idx] = { ...todo, elapsedMs: newElapsedMs, startTime: null, isRunning: false, activities: [...state.activities] };
+            localStorage.setItem('todos', JSON.stringify(state.todos));
+        }
+    }
+    // Remove the active task from the Work Queue when stopping
+    if (state.activeTodoId != null) {
+        const removeId = state.activeTodoId;
+        const newTodos = state.todos.filter(t => t.id !== removeId);
+        setTodos(newTodos);
+        saveTodos();
+        setActiveTodoId(null);
+        renderTodos();
+    }
+
     showSummary();
 }
 
@@ -264,10 +296,12 @@ export function resetState(advanceQueue: boolean = false) {
     elements.activityInput.value = '';
     elements.activityList.innerHTML = '';
     setActivities([]);
-    elements.todoList.classList.remove('disabled');
+    // Keep queue interactive
 
     if (advanceQueue) {
         prepareNextTask();
+        // Ensure the queue UI reflects the removal immediately
+        renderTodos();
     } else {
         // If not advancing, just re-render to re-enable buttons etc.
         renderTodos();
@@ -279,4 +313,76 @@ export function resetState(advanceQueue: boolean = false) {
         checkConfiguration();
     }
     document.title = "Redmine Time Tracker";
+}
+
+// Start a timer for a specific todo (by id); auto‑pauses any active running timer
+export async function startTimerForTodo(todoId: number) {
+    const todoIdx = state.todos.findIndex(t => t.id === todoId);
+    if (todoIdx < 0) {
+        (window as any).showError('Task not found in queue.', 'Start Timer');
+        return;
+    }
+
+    // Auto‑pause current running timer if different
+    if (state.timerInterval && state.activeTodoId !== null && state.activeTodoId !== todoId) {
+        pauseTimer();
+    }
+
+    setActiveTodoId(todoId);
+
+    // Populate current task display from the todo
+    const todo = state.todos[todoIdx];
+
+    // Load this todo's performed tasks into working state
+    setActivities((todo.activities && Array.isArray(todo.activities)) ? todo.activities : []);
+
+    const isFirstSession = (state.startTime === null) && (state.pausedTime === 0) && (state.activities.length === 0);
+    const isResuming = !isFirstSession;
+    elements.projectSelect.value = todo.projectId;
+    elements.projectInput.value = todo.projectName;
+    elements.taskInput.value = `#${todo.taskId} - ${todo.taskSubject}`;
+    const existingOption = Array.from(elements.taskSelect.options).find(opt => opt.value === todo.taskId);
+    if (!existingOption) {
+        const option = document.createElement('option');
+        option.value = todo.taskId;
+        option.textContent = `#${todo.taskId} - ${todo.taskSubject}`;
+        elements.taskSelect.appendChild(option);
+    }
+    elements.taskSelect.value = todo.taskId;
+    if (todo.activityId) {
+        elements.activitySelect.value = String(todo.activityId);
+    }
+
+    if (!isResuming) {
+        const firstActivityText = await promptForFirstActivity();
+        if (!firstActivityText) {
+            return;
+        }
+        // Clear previous activities and start a new session
+        setActivities([]);
+        const newStartTime = Date.now();
+        setStartTime(newStartTime);
+        setPausedTime(0);
+        const initialActivity: Activity = { text: firstActivityText, timestamp: new Date(newStartTime) };
+        addActivity(initialActivity);
+        // Also seed todo's activities and persist
+        (state.todos as any)[todoIdx] = { ...todo, activities: [...state.activities] };
+        localStorage.setItem('todos', JSON.stringify(state.todos));
+    } else {
+        setStartTime(Date.now());
+    }
+
+    // Mark this todo as running and set its startTime
+    (state.todos as any)[todoIdx] = { ...todo, isRunning: true, startTime: Date.now() };
+    localStorage.setItem('todos', JSON.stringify(state.todos));
+
+    setTimerInterval(window.setInterval(updateTime, 1000));
+    elements.startBtn.disabled = true;
+    elements.pauseBtn.disabled = false;
+    elements.stopBtn.disabled = false;
+    elements.activityInput.disabled = false;
+    elements.addActivityBtn.disabled = false;
+    document.title = '▶️ Tracking...';
+    renderActivities();
+    renderTodos();
 }

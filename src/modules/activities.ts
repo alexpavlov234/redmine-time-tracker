@@ -1,5 +1,6 @@
 import { state, addActivity as addActivityToStateArray } from '../state/index.js';
-import { Activity } from '../types/index.js';
+import { saveTodos } from './queue.js';
+import { Activity } from '@/src/types';
 import { elements } from '../utils/dom.js';
 import { formatTime } from '../utils/helpers.js';
 
@@ -21,6 +22,18 @@ export function addActivityToState(newActivity?: Activity) {
 
         const activityToAdd = newActivity || { text, timestamp: now };
         addActivityToStateArray(activityToAdd);
+
+        // Write-through to active todo's activities if a todo is active
+        if (state.activeTodoId != null) {
+            const idx = state.todos.findIndex(t => t.id === state.activeTodoId);
+            if (idx >= 0) {
+                const todo = state.todos[idx];
+                (state.todos as any)[idx] = { ...todo, activities: [...state.activities] };
+                localStorage.setItem('todos', JSON.stringify(state.todos));
+                // Also call helper for consistency
+                saveTodos();
+            }
+        }
         renderActivities();
         elements.activityInput.value = '';
         elements.activityInput.focus();
@@ -31,7 +44,7 @@ export function renderActivities() {
     elements.activityList.innerHTML = '';
 
     if( state.activities.length === 0) {
-        elements.activityList.innerHTML = '<li class="text-muted">No activities recorded yet.</li>';
+        elements.activityList.innerHTML = '<li class="text-muted">No performed tasks recorded yet.</li>';
         return; 
     } else {
         elements.activityList.innerHTML = '';
