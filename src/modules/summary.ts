@@ -56,10 +56,8 @@ export function showSummary() {
     elements.submitBtn.disabled = false;
     elements.submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit to Redmine';
 
-    // Always show the simple billable checkbox, default to checked
-    if (elements.billableCheckboxSimple) {
-        elements.billableCheckboxSimple.checked = true; // Default to billable
-    }
+    // Ensure Billable checkbox exists; do not force a tri-state – unchecked means false
+    // Keep the current state if user toggled it previously in this session.
 
     elements.changeStatusCheckbox.disabled = false;
     elements.changeStatusCheckbox.checked = false;
@@ -96,6 +94,8 @@ export async function submitTimeToRedmine() {
     const hoursFormatted = parseFloat(hours.toFixed(2));
     const comments = elements.summaryDetails.value.trim();
     const billableFieldId = localStorage.getItem('billableFieldId');
+    // Billable is non-nullable: derive a boolean, unchecked => false
+    const billableChecked: boolean = !!(elements.billableCheckboxSimple && elements.billableCheckboxSimple.checked);
 
     console.log('Submit validation:', { 
         issueId, 
@@ -146,12 +146,12 @@ export async function submitTimeToRedmine() {
     
     // Check if we have a specific billable field ID configured
     if (billableFieldId) {
-        // Use the configured billable field with simple checkbox
-        const billableValue = elements.billableCheckboxSimple.checked ? "1" : "0";
+        // Always include billable custom field; unchecked maps to "0"
+        const billableValue = billableChecked ? "1" : "0";
         customFields.push({ id: parseInt(billableFieldId, 10), value: billableValue });
     } else {
-        // Just log that we don't have a billable field ID
-        console.log('No billable field ID configured. Billable value:', elements.billableCheckboxSimple.checked);
+        // Log the resolved non-nullable boolean for diagnostics
+        console.log('No billable field ID configured. Billable (boolean):', billableChecked);
     }
     
     // Add other custom fields
@@ -198,7 +198,7 @@ export async function submitTimeToRedmine() {
         setTimeout(() => {
             hideSummary();
             resetState(true); // Advance the queue
-        }, 1500);
+        }, 500);
 
     } catch (error) {
         let errorMessage = '';
