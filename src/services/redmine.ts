@@ -2,67 +2,145 @@ import { TimeEntry } from '../types/index.js';
 
 // Configuration for proxy URL
 const PROXY_BASE_URL = 'http://localhost:3000/api';
+const TIMEOUT_MS = 15000; // 15s default timeout
+
+function withTimeout(controller: AbortController, ms: number) {
+    const timer = setTimeout(() => controller.abort(), ms);
+    return () => clearTimeout(timer);
+}
+
+function normalizeUrl(url: string): string {
+    if (!url) return url;
+    return url.replace(/\/$/, '');
+}
+
+function buildBody(body: object | null | undefined) {
+    return body ? JSON.stringify(body) : undefined;
+}
+
+function buildHeaders(base: Record<string, string>) {
+    const h = new Headers(base);
+    // Do NOT log or expose API key in console logs
+    return h;
+}
+
+function mapHttpError(status: number, statusText: string, errorText: string) {
+    let readable = `API Error: ${status} ${statusText}`;
+    try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson && Array.isArray(errorJson.errors)) {
+            readable = `Error: ${errorJson.errors.join(', ')}`;
+        } else if (errorJson?.error) {
+            readable = `Error: ${errorJson.error}`;
+        } else {
+            readable += ` - ${errorText}`;
+        }
+    } catch {
+        if (errorText) readable += ` - ${errorText}`;
+    }
+    if (status === 401) readable += ' (Unauthorized: check your API key)';
+    if (status === 403) readable += ' (Forbidden: your API key might not have permissions)';
+    if (status === 404) readable += ' (Not found: verify the Redmine URL or endpoint)';
+    return new Error(readable);
+}
+
+function mapNetworkError(e: unknown, context: 'proxy' | 'direct', redmineUrl: string) {
+    const msg = e instanceof Error ? e.message : String(e);
+    let hint = '';
+    if (context === 'proxy') {
+        hint = 'Ensure the local proxy is running (npm run dev:full) and reachable at http://localhost:3000/health.';
+    } else {
+        // direct
+        hint = 'Direct connection failed. Many Redmine servers do not allow CORS; use the local proxy.';
+    }
+    if (/ENOTFOUND|getaddrinfo|DNS/i.test(msg)) {
+        hint = 'DNS resolution failed. Check that the Redmine URL/hostname is correct and reachable.';
+    } else if (/self-signed|certificate|SSL/i.test(msg)) {
+        hint = 'SSL issue detected. Use the local proxy which ignores self-signed certificates.';
+    } else if (/aborted|timeout|The user aborted a request|AbortError/i.test(msg)) {
+        hint = 'The request timed out. Check connectivity/VPN and try again.';
+    } else if (/Failed to fetch|NetworkError|TypeError/i.test(msg)) {
+        // keep default hint per context
+    }
+    return new Error(`Network error (${context}): ${msg}${hint ? ' — ' + hint : ''}`);
+}
 
 export async function redmineApiRequest(endpoint: string, method: string = 'GET', body: object | null = null) {
     const apiKey = localStorage.getItem('redmineApiKey');
-    const redmineUrl = localStorage.getItem('redmineUrl');
+    let redmineUrl = localStorage.getItem('redmineUrl') || '';
 
     if (!apiKey) {
         throw new Error('Redmine API Key not configured.');
     }
-    
     if (!redmineUrl) {
         throw new Error('Redmine URL not configured.');
     }
 
-    const headers = new Headers({
+    redmineUrl = normalizeUrl(redmineUrl);
+
+    // First attempt: via local proxy (recommended path)
+    const proxyHeaders = buildHeaders({
         'X-Redmine-API-Key': apiKey,
-        'X-Redmine-URL': redmineUrl, // Send the URL to the proxy
+        'X-Redmine-URL': redmineUrl,
         'Content-Type': 'application/json'
     });
-
-    const config: RequestInit = {
-        method,
-        headers,
-    };
-
-    if (body) {
-        config.body = JSON.stringify(body);
-    }
-
-    // Use proxy instead of direct URL
-    const finalUrl = `${PROXY_BASE_URL}${endpoint}`;
-    const response = await fetch(finalUrl, config);
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        let readableError = `API Error: ${response.status} ${response.statusText}`;
-        console.error('Redmine API Error Details:', {
-            status: response.status,
-            statusText: response.statusText,
-            responseText: errorText,
-            endpoint,
+    const proxyController = new AbortController();
+    const clearProxyTimeout = withTimeout(proxyController, TIMEOUT_MS);
+    try {
+        const proxyResp = await fetch(`${PROXY_BASE_URL}${endpoint}`, {
             method,
-            body
+            headers: proxyHeaders,
+            body: buildBody(body),
+            signal: proxyController.signal,
         });
-        try {
-            const errorJson = JSON.parse(errorText);
-            if (errorJson && Array.isArray(errorJson.errors)) {
-                readableError = `Error: ${errorJson.errors.join(', ')}`;
-            } else {
-                readableError += ` - ${errorText}`;
-            }
-        } catch(e) {
-            readableError += ` - ${errorText}`;
+        clearProxyTimeout();
+        if (!proxyResp.ok) {
+            const errorText = await proxyResp.text();
+            throw mapHttpError(proxyResp.status, proxyResp.statusText, errorText);
         }
-        throw new Error(readableError);
-    }
+        if (proxyResp.status === 204 || proxyResp.status === 201) return {};
+        return proxyResp.json();
+    } catch (e) {
+        clearProxyTimeout();
+        // Only consider direct fallback for HTTPS Redmine to avoid mixed-content and to give a chance if CORS is enabled
+        const isHttps = /^https:\/\//i.test(redmineUrl);
+        const shouldTryDirect = isHttps;
+        // If we shouldn't try direct, rethrow mapped proxy error
+        if (!shouldTryDirect) {
+            throw mapNetworkError(e, 'proxy', redmineUrl);
+        }
 
-    if (response.status === 204 || response.status === 201) {
-        return {};
+        // Try direct HTTPS call (may be blocked by CORS depending on Redmine server)
+        const directHeaders = buildHeaders({
+            'X-Redmine-API-Key': apiKey,
+            'Content-Type': 'application/json'
+        });
+        const directController = new AbortController();
+        const clearDirectTimeout = withTimeout(directController, TIMEOUT_MS);
+        try {
+            const directUrl = `${redmineUrl}${endpoint}`;
+            const directResp = await fetch(directUrl, {
+                method,
+                headers: directHeaders,
+                body: buildBody(body),
+                signal: directController.signal,
+                // No mode: 'no-cors' because we need JSON; if CORS is blocked, this will throw
+            });
+            clearDirectTimeout();
+            if (!directResp.ok) {
+                const errorText = await directResp.text();
+                throw mapHttpError(directResp.status, directResp.statusText, errorText);
+            }
+            if (directResp.status === 204 || directResp.status === 201) return {};
+            return directResp.json();
+        } catch (e2) {
+            clearDirectTimeout();
+            // Provide a combined error indicating proxy and direct both failed
+            const proxyErr = mapNetworkError(e, 'proxy', redmineUrl).message;
+            const directErr = mapNetworkError(e2, 'direct', redmineUrl).message;
+            throw new Error(`${proxyErr}\n${directErr}`);
+        }
     }
-
-    return response.json();
 }
 
 export async function getCurrentUser() {

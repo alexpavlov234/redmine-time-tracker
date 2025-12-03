@@ -80,9 +80,36 @@ export async function populateProjects() {
         });
 
     } catch (error) {
-        const errorMessage = 'Error loading projects';
-        elements.projectInput.placeholder = errorMessage;
-        elements.todoProjectInput.placeholder = errorMessage;
+        // Surface the precise error coming from redmineApiRequest (includes proxy/direct hints)
+        const errMsg = (error as Error)?.message || String(error);
+        const placeholder = `Failed to load projects. ${errMsg}`;
+
+        // Show inline hints in the inputs
+        elements.projectInput.placeholder = placeholder;
+        elements.todoProjectInput.placeholder = placeholder;
+
+        // Re-enable inputs so the user can retry without reloading the page
+        elements.projectInput.disabled = false;
+        elements.todoProjectInput.disabled = false;
+
+        // Provide a quick retry on focus/click (one-time)
+        const retry = () => {
+            // Clear placeholders to normal loading state and try again
+            elements.projectInput.placeholder = 'Loading projects...';
+            elements.todoProjectInput.placeholder = 'Loading projects...';
+            // Detach one-time listeners then retry
+            elements.projectInput.removeEventListener('focus', retry);
+            elements.projectInput.removeEventListener('click', retry);
+            elements.todoProjectInput.removeEventListener('focus', retry);
+            elements.todoProjectInput.removeEventListener('click', retry);
+            populateProjects();
+        };
+        elements.projectInput.addEventListener('focus', retry, { once: true } as any);
+        elements.projectInput.addEventListener('click', retry, { once: true } as any);
+        elements.todoProjectInput.addEventListener('focus', retry, { once: true } as any);
+        elements.todoProjectInput.addEventListener('click', retry, { once: true } as any);
+
+        // Global status banner/modal
         showGlobalError('Failed to load projects.', error);
     }
 }
