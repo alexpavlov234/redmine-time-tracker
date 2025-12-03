@@ -267,16 +267,6 @@ export function stopTimer() {
             localStorage.setItem('todos', JSON.stringify(state.todos));
         }
     }
-    // Remove the active task from the Work Queue when stopping
-    if (state.activeTodoId != null) {
-        const removeId = state.activeTodoId;
-        const newTodos = state.todos.filter(t => t.id !== removeId);
-        setTodos(newTodos);
-        saveTodos();
-        setActiveTodoId(null);
-        renderTodos();
-    }
-
     showSummary();
 }
 

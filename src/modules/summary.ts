@@ -8,6 +8,7 @@ import { redmineApiRequest } from '../services/redmine.js';
 import { getSelectedOrDefaultActivityId } from './activitySelector.js';
 import { getCustomFieldValues, resetCustomFields } from './customFields.js';
 import { resetState } from './timer.js';
+import { deleteTodo } from './queue.js';
 
 export async function populateIssueStatuses() {
     if (state.issueStatuses.length > 0) return;
@@ -194,10 +195,28 @@ export async function submitTimeToRedmine() {
         elements.modalStatus.classList.add('success');
         setButtonLoading(elements.submitBtn, false, '<i class="fa-solid fa-check"></i> Success!');
         
-        // Task was already removed from queue when timer started, so just advance to next
+        // Remove the task from the queue only AFTER successful submission, then advance
         setTimeout(() => {
             hideSummary();
-            resetState(true); // Advance the queue
+            try {
+                // Prefer removing the currently active todo if present
+                if (state.activeTodoId != null) {
+                    deleteTodo(state.activeTodoId);
+                } else {
+                    // Fallback: remove by matching Redmine issue id in queue
+                    const issueNumericId = parseInt(String(issueId), 10);
+                    const matching = state.todos.find(t => (t as any).taskId === issueNumericId);
+                    if (matching) {
+                        deleteTodo(matching.id);
+                    } else {
+                        // If nothing matched, just reset and advance UI
+                        resetState(true);
+                    }
+                }
+            } catch (e) {
+                // As a last resort, reset and advance UI
+                resetState(true);
+            }
         }, 500);
 
     } catch (error) {
