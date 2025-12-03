@@ -75,4 +75,10 @@ export interface Todo {
   taskSubject: string;
   activityId?: number;
   activityName?: string;
+  // Timer fields (persisted)
+  elapsedMs?: number; // total accumulated elapsed milliseconds
+  startTime?: number | null; // when running, the epoch ms when started/resumed
+  isRunning?: boolean; // whether this todo's timer is currently running
+  // Per‑todo performed tasks (persisted)
+  activities?: Activity[];
 }
