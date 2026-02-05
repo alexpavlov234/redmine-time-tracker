@@ -22,10 +22,13 @@ import { populateTasks, populateTasksForTodoForm } from './modules/projects.js';
 import { saveSettings, testConnection, loadSettings } from './modules/settings.js';
 import { initializeActivities } from './modules/activitySelector.js';
 import { initializeCustomFields } from './modules/customFields.js';
-import { initLoggedTimePage } from './modules/loggedTime.js';
+import { initLoggedTimePage, initCalendarListeners } from './modules/loggedTime.js';
 import { setUser } from './state';
 import { getCurrentUser } from './services/redmine.js';
 import { initWatchedIssues } from './modules/watchedIssues.js';
+
+// Initialize calendar listeners (for logged time page)
+initCalendarListeners();
 
 async function init() {
     try {

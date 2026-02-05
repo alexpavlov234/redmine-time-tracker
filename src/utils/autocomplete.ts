@@ -1,13 +1,18 @@
 export function initAutocomplete<T extends { id: number | string }>(options: {
     inputEl: HTMLInputElement,
     listEl: HTMLDivElement,
-    sourceData: T[],
+    sourceData: T[] | (() => T[]),
     renderItem: (item: T) => string,
     filterItem: (item: T, query: string) => boolean,
     onSelect: (item: T) => void
 }) {
     const { inputEl, listEl, sourceData, renderItem, filterItem, onSelect } = options;
     let activeIndex = -1;
+
+    const getSource = (): T[] => {
+        if (Array.isArray(sourceData)) return sourceData;
+        return sourceData();
+    };
 
     const renderList = (items: T[]) => {
         listEl.innerHTML = '';
@@ -29,10 +34,10 @@ export function initAutocomplete<T extends { id: number | string }>(options: {
         listEl.style.display = 'block';
         activeIndex = -1;
     };
-    
+
     inputEl.addEventListener('input', () => {
         const query = inputEl.value.toLowerCase();
-        const filtered = sourceData.filter(item => filterItem(item, query));
+        const filtered = getSource().filter(item => filterItem(item, query));
         renderList(filtered);
     });
 
@@ -65,9 +70,9 @@ export function initAutocomplete<T extends { id: number | string }>(options: {
             default:
                 return;
         }
-        
+
         items.forEach(item => item.classList.remove('autocomplete-active'));
-        if(activeIndex > -1) {
+        if (activeIndex > -1) {
             items[activeIndex].classList.add('autocomplete-active');
             items[activeIndex].scrollIntoView({ block: 'nearest' });
         }

@@ -218,6 +218,25 @@ export async function updateTimeEntry(id: number, data: {
     }
 }
 
+export async function createTimeEntry(data: {
+    hours: number;
+    comments?: string;
+    activity_id?: number;
+    spent_on?: string;
+    issue_id?: number;
+    project_id?: number;
+    custom_fields?: Array<{ id: number, value: any }>;
+}) {
+    try {
+        const body = { time_entry: data };
+        await redmineApiRequest('/time_entries.json', 'POST', body);
+        return true;
+    } catch (error) {
+        console.error('Failed to create time entry:', error);
+        throw error;
+    }
+}
+
 export async function deleteTimeEntry(id: number) {
     try {
         await redmineApiRequest(`/time_entries/${id}.json`, 'DELETE');

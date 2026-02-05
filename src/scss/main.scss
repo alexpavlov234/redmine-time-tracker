@@ -1142,3 +1142,299 @@ header {
     min-width: auto;
   }
 }
+
+/* ================================================
+   CALENDAR VIEW STYLES
+   ================================================ */
+
+.calendar-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.calendar-month-label {
+  font-size: 1.125rem;
+  font-weight: $font-weight-semibold;
+  min-width: 180px;
+  text-align: center;
+  color: $body-color;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+}
+
+.calendar-placeholder {
+  grid-column: 1 / -1;
+}
+
+.calendar-header-cell {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: $font-weight-semibold;
+  color: $secondary;
+  padding: 0.5rem;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  min-height: 42px;
+  border: 1px solid $border-color;
+  border-radius: $border-radius;
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all $transition-fast;
+  background-color: $body-bg;
+
+  &:hover:not(.empty) {
+    background-color: $primary-bg-subtle;
+    border-color: $primary;
+    transform: translateY(-1px);
+  }
+
+  &.empty {
+    background-color: transparent;
+    border-color: transparent;
+    cursor: default;
+  }
+
+  &.today {
+    border-color: $primary;
+    border-width: 2px;
+  }
+
+  &.has-entries {
+    background-color: rgba($success, 0.08);
+
+    &:hover {
+      background-color: rgba($success, 0.15);
+    }
+  }
+
+  &.selected {
+    background-color: $primary-bg-subtle;
+    border-color: $primary;
+    box-shadow: 0 0 0 2px rgba($primary, 0.2);
+  }
+}
+
+.calendar-day-number {
+  font-size: 0.75rem;
+  font-weight: $font-weight-medium;
+  color: $body-color;
+}
+
+.calendar-day-hours {
+  font-size: 0.625rem;
+  font-weight: $font-weight-bold;
+  color: $success;
+  margin-top: auto;
+  text-align: center;
+  background: rgba($success, 0.15);
+  border-radius: $border-radius-sm;
+  padding: 0.125rem 0.25rem;
+}
+
+.day-details-panel {
+  border-top: 1px solid $border-color;
+  padding-top: 1rem;
+
+  h6 {
+    font-weight: $font-weight-semibold;
+    color: $body-color;
+  }
+}
+
+.day-details-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  .badge {
+    font-size: 0.75rem;
+    font-weight: $font-weight-medium;
+  }
+}
+
+/* Calendar - Dark mode support */
+@include color-mode(dark) {
+  .calendar-month-label {
+    color: $body-color-dark;
+  }
+
+  .calendar-day {
+    background-color: $body-bg-dark;
+    border-color: $border-color-dark;
+
+    &.has-entries {
+      background-color: rgba($success, 0.12);
+
+      &:hover {
+        background-color: rgba($success, 0.2);
+      }
+    }
+
+    &:hover:not(.empty) {
+      background-color: $primary-bg-subtle-dark;
+    }
+  }
+
+  .calendar-day-number {
+    color: $body-color-dark;
+  }
+
+  .calendar-day-hours {
+    background: rgba($success, 0.2);
+  }
+
+  .day-details-panel {
+    border-color: $border-color-dark;
+
+    h6 {
+      color: $body-color-dark;
+    }
+  }
+}
+
+/* Calendar - Responsive adjustments */
+@include media-breakpoint-down(md) {
+  .calendar-day {
+    min-height: 45px;
+    padding: 0.25rem;
+
+    .calendar-day-number {
+      font-size: 0.6875rem;
+    }
+
+    .calendar-day-hours {
+      font-size: 0.5625rem;
+      padding: 0.0625rem 0.125rem;
+    }
+  }
+
+  .calendar-month-label {
+    font-size: 1rem;
+    min-width: 140px;
+  }
+}
+
+@include media-breakpoint-down(sm) {
+  .calendar-day {
+    min-height: 36px;
+    aspect-ratio: auto;
+  }
+}
+
+/* ================================================
+   MULTI-SELECT CALENDAR STYLES
+   ================================================ */
+
+.calendar-day.multi-selected {
+  background-color: rgba($info, 0.2) !important;
+  border-color: $info !important;
+  box-shadow: inset 0 0 0 2px rgba($info, 0.3);
+
+  &:hover {
+    background-color: rgba($info, 0.3) !important;
+  }
+
+  .calendar-day-number {
+    font-weight: $font-weight-bold;
+  }
+}
+
+.calendar-grid.multi-select-mode {
+  .calendar-day:not(.empty) {
+    cursor: pointer;
+
+    &:hover {
+      background-color: rgba($info, 0.1);
+      border-color: $info;
+    }
+  }
+}
+
+/* Bulk Log Panel */
+.bulk-log-panel {
+  background: $body-tertiary-bg;
+  border: 1px solid $border-color;
+  border-radius: $border-radius-lg;
+  padding: 1.25rem;
+
+  h6 {
+    font-weight: $font-weight-semibold;
+    color: $body-color;
+    margin-bottom: 1rem;
+  }
+
+  .form-label {
+    font-size: 0.875rem;
+  }
+}
+
+#bulk-log-status {
+  &:not(:empty) {
+    padding: 0.75rem;
+    border-radius: $border-radius;
+    font-size: 0.875rem;
+  }
+
+  &.success {
+    background-color: rgba($success, 0.1);
+    color: $success;
+    border: 1px solid rgba($success, 0.3);
+  }
+
+  &.error {
+    background-color: rgba($danger, 0.1);
+    color: $danger;
+    border: 1px solid rgba($danger, 0.3);
+  }
+
+  &.loading {
+    background-color: rgba($primary, 0.1);
+    color: $primary;
+    border: 1px solid rgba($primary, 0.3);
+  }
+}
+
+/* Multi-select toggle button active state */
+#toggle-multiselect-btn.active {
+  background-color: $info;
+  border-color: $info;
+  color: $white;
+
+  &:hover {
+    background-color: darken($info, 10%);
+    border-color: darken($info, 10%);
+  }
+}
+
+/* Dark mode - Multi-select */
+@include color-mode(dark) {
+  .calendar-day.multi-selected {
+    background-color: rgba($info, 0.25) !important;
+    border-color: $info !important;
+  }
+
+  .calendar-grid.multi-select-mode {
+    .calendar-day:not(.empty):hover {
+      background-color: rgba($info, 0.15);
+    }
+  }
+
+  .bulk-log-panel {
+    background: $body-tertiary-bg-dark;
+    border-color: $border-color-dark;
+
+    h6 {
+      color: $body-color-dark;
+    }
+  }
+}
