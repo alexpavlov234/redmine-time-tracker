@@ -2,7 +2,7 @@
 export const elements = {
     // Global
     globalErrorContainer: document.getElementById('global-error-container') as HTMLDivElement,
-    
+
     // Navigation
     navTracker: document.getElementById('nav-tracker') as HTMLAnchorElement,
     navSettings: document.getElementById('nav-settings') as HTMLAnchorElement,
@@ -21,7 +21,8 @@ export const elements = {
     activitySelect: document.getElementById('activity-select') as HTMLSelectElement,
     configPrompt: document.getElementById('config-prompt') as HTMLDivElement,
     noTaskPrompt: document.getElementById('no-task-prompt') as HTMLDivElement,
-    taskSelectionForm: document.getElementById('task-selection-form') as HTMLDivElement,
+    timerBarContent: document.getElementById('timer-bar-content') as HTMLDivElement,
+    queueCount: document.getElementById('queue-count') as HTMLSpanElement,
     promptLinkToSettings: document.getElementById('prompt-link-to-settings') as HTMLAnchorElement,
 
     // Timer

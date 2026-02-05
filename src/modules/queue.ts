@@ -221,6 +221,12 @@ export function deleteTodo(id: number) {
 
 export function renderTodos() {
     elements.todoList.innerHTML = '';
+
+    // Update queue count badge
+    if (elements.queueCount) {
+        elements.queueCount.textContent = state.todos.length.toString();
+    }
+
     if (state.todos.length === 0) {
         elements.todoList.innerHTML = `<li class="empty-state">Add tasks to your queue!</li>`;
         if (!state.timerInterval) {
@@ -302,6 +308,11 @@ export function renderTodos() {
 export function prepareNextTask() {
     const hasConfig = localStorage.getItem('redmineUrl') && localStorage.getItem('redmineApiKey');
 
+    // Update queue count badge
+    if (elements.queueCount) {
+        elements.queueCount.textContent = state.todos.length.toString();
+    }
+
     if (state.todos.length > 0 && !state.timerInterval) {
         const nextTodo = state.todos[0];
 
@@ -313,12 +324,11 @@ export function prepareNextTask() {
         const projectDisplay = document.getElementById('project-display');
         const taskDisplay = document.getElementById('task-display');
         const activityDisplay = document.getElementById('activity-display');
-        const activityContainer = document.getElementById('activity-display-container');
 
         if (projectDisplay) projectDisplay.textContent = nextTodo.projectName;
         if (taskDisplay) taskDisplay.textContent = `#${nextTodo.taskId} - ${nextTodo.taskSubject}`;
 
-        // Set the hiddenly selects' values for submission
+        // Set the hidden selects' values for submission
         elements.projectSelect.value = nextTodo.projectId;
         elements.taskSelect.value = nextTodo.taskId;
 
@@ -326,23 +336,21 @@ export function prepareNextTask() {
         if (nextTodo.activityId && activityDisplay) {
             elements.activitySelect.value = nextTodo.activityId.toString();
             activityDisplay.textContent = nextTodo.activityName || '';
-            if (activityContainer) activityContainer.style.display = 'flex';
-        } else {
-            if (activityContainer) activityContainer.style.display = 'none';
+            activityDisplay.style.display = 'inline';
+        } else if (activityDisplay) {
+            activityDisplay.style.display = 'none';
         }
 
-        // Disable main selectors and enable start
-        elements.projectInput.disabled = true;
-        elements.taskInput.disabled = true;
+        // Enable start button
         elements.startBtn.disabled = false;
 
-        // UI visibility
+        // UI visibility - show timer bar with task info
         elements.configPrompt.style.display = 'none';
         elements.noTaskPrompt.style.display = 'none';
-        elements.taskSelectionForm.style.display = 'block';
+        if (elements.timerBarContent) elements.timerBarContent.style.display = 'flex';
 
     } else if (state.todos.length === 0 && !state.timerInterval) {
-        // No more tasks in the queue, reset the form to be editable
+        // No more tasks in the queue
         elements.projectInput.value = '';
         elements.taskInput.value = '';
         elements.projectSelect.value = '';
@@ -353,22 +361,20 @@ export function prepareNextTask() {
         const projectDisplay = document.getElementById('project-display');
         const taskDisplay = document.getElementById('task-display');
         const activityDisplay = document.getElementById('activity-display');
-        const activityContainer = document.getElementById('activity-display-container');
 
         if (projectDisplay) projectDisplay.textContent = '';
         if (taskDisplay) taskDisplay.textContent = '';
-        if (activityDisplay) activityDisplay.textContent = '';
-        if (activityContainer) activityContainer.style.display = 'none';
+        if (activityDisplay) {
+            activityDisplay.textContent = '';
+            activityDisplay.style.display = 'none';
+        }
 
-        elements.projectInput.disabled = false;
-        elements.taskInput.disabled = true;
-        elements.taskInput.placeholder = 'Select a project first';
         elements.startBtn.disabled = true;
 
-        // UI visibility
+        // UI visibility - show empty state or config prompt
         elements.configPrompt.style.display = hasConfig ? 'none' : 'block';
-        elements.noTaskPrompt.style.display = hasConfig ? 'block' : 'none';
-        elements.taskSelectionForm.style.display = 'none';
+        elements.noTaskPrompt.style.display = hasConfig ? 'flex' : 'none';
+        if (elements.timerBarContent) elements.timerBarContent.style.display = 'none';
     }
 }
 

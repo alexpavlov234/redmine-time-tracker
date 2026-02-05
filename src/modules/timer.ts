@@ -1,4 +1,4 @@
-import { 
+import {
     state,
     setTimerInterval, setStartTime, setPausedTime, setTotalElapsedTime,
     addActivity, setActivities, setActiveTodoId, setTodos
@@ -65,17 +65,17 @@ export function updateTime() {
     }
 }
 
-export function promptForFirstActivity(): Promise<string | null> {
+export function promptForFirstActivity(initialValue?: string): Promise<string | null> {
     return new Promise((resolve) => {
         // Check if Bootstrap is available
         if (typeof window.bootstrap === 'undefined') {
             console.error('Bootstrap is not loaded');
-            resolve(prompt('What task are you performing?')); // Fallback to native prompt
+            resolve(prompt('What task are you performing?', initialValue || '')); // Fallback to native prompt
             return;
         }
-        
+
         const modal = new (window as any).bootstrap.Modal(elements.firstActivityModal);
-        
+
         const handleResolve = (value: string | null) => {
             elements.startWithActivityBtn.onclick = null;
             elements.closeFirstActivityModalBtn.onclick = null;
@@ -93,9 +93,10 @@ export function promptForFirstActivity(): Promise<string | null> {
             }
         };
 
-        elements.firstActivityInput.value = '';
+        // Pre-populate with initial value (e.g., from todo note)
+        elements.firstActivityInput.value = initialValue || '';
         modal.show();
-        
+
         // Wait for modal to be shown before focusing
         elements.firstActivityModal.addEventListener('shown.bs.modal', () => {
             elements.firstActivityInput.focus();
@@ -130,20 +131,20 @@ export async function startTimer() {
             // Check if we have a task either from queue or manual selection
             const hasQueueTask = state.todos.length > 0;
             const hasManualTask = elements.taskSelect.value && elements.projectSelect.value;
-            
+
             if (!hasQueueTask && !hasManualTask) {
                 // Reset button state before showing warning
                 elements.startBtn.disabled = false;
-                elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+                elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
                 (window as any).showWarning('Please add a task to the Work Queue or select a project and task manually before starting the timer.', 'No Task Selected');
                 return;
             }
         }
-        
+
         // Show immediate feedback to user
         elements.startBtn.disabled = true;
-        elements.startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Starting...';
-        
+        elements.startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
         if (!isResuming) { // First start of a task
             // Check if we have a task from queue or manual selection
             const hasQueueTask = state.todos.length > 0;
@@ -157,12 +158,12 @@ export async function startTimer() {
                     taskInputValue: elements.taskInput.value
                 });
             }
-            
+
             const firstActivityText = await promptForFirstActivity();
             if (!firstActivityText) {
                 // User cancelled, restore button state
                 elements.startBtn.disabled = false;
-                elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+                elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
                 return;
             }
 
@@ -195,7 +196,7 @@ export async function startTimer() {
         console.error('Error in startTimer:', error);
         // Reset button state in case of error
         elements.startBtn.disabled = false;
-        elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+        elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         (window as any).showError('Failed to start timer: ' + errorMessage, 'Timer Error');
     }
@@ -225,7 +226,7 @@ export function pauseTimer() {
     setPausedTime(0);
 
     elements.startBtn.disabled = false;
-    elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+    elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
     elements.pauseBtn.disabled = true;
     document.title = "⏸️ Paused | Time Tracker";
     renderActivities();
@@ -237,16 +238,16 @@ export function stopTimer() {
         clearInterval(state.timerInterval);
     }
     const now = new Date();
-    
+
     // Final update to totalElapsedTime if timer was running
     if (state.startTime) {
         const newTotalElapsedTime = (now.getTime() - state.startTime + state.pausedTime) / 1000;
         setTotalElapsedTime(newTotalElapsedTime);
     }
 
-     if (state.activities.length > 0) {
+    if (state.activities.length > 0) {
         const lastActivity = state.activities[state.activities.length - 1];
-        if(!lastActivity.durationSeconds) { // Only update if not already set by adding another activity
+        if (!lastActivity.durationSeconds) { // Only update if not already set by adding another activity
             const previousActivitiesDuration = state.activities
                 .slice(0, -1)
                 .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
@@ -276,9 +277,9 @@ export function resetState(advanceQueue: boolean = false) {
     setStartTime(null);
     setPausedTime(0);
     setTotalElapsedTime(0);
-    
+
     elements.timeDisplay.textContent = '00:00:00';
-    elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i> Start';
+    elements.startBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
     elements.pauseBtn.disabled = true;
     elements.stopBtn.disabled = true;
     elements.activityInput.disabled = true;
@@ -344,7 +345,8 @@ export async function startTimerForTodo(todoId: number) {
     }
 
     if (!isResuming) {
-        const firstActivityText = await promptForFirstActivity();
+        // Pre-populate first activity with the todo's note if available
+        const firstActivityText = await promptForFirstActivity(todo.note || undefined);
         if (!firstActivityText) {
             return;
         }

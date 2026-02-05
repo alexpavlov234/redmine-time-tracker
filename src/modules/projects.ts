@@ -238,13 +238,13 @@ export function checkConfiguration() {
 
     if (isConfigured) {
         elements.configPrompt.style.display = 'none';
-        elements.taskSelectionForm.style.display = 'block';
+        // Timer bar content visibility is handled by prepareNextTask based on queue state
         if (state.allProjects.length === 0) {
             populateProjects();
         }
     } else {
         elements.configPrompt.style.display = 'block';
-        elements.taskSelectionForm.style.display = 'none';
+        if (elements.timerBarContent) elements.timerBarContent.style.display = 'none';
         elements.startBtn.disabled = true;
     }
 }
