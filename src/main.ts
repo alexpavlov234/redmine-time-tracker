@@ -25,6 +25,7 @@ import { initializeCustomFields } from './modules/customFields.js';
 import { initLoggedTimePage } from './modules/loggedTime.js';
 import { setUser } from './state';
 import { getCurrentUser } from './services/redmine.js';
+import { initWatchedIssues } from './modules/watchedIssues.js';
 
 async function init() {
     try {
@@ -45,6 +46,7 @@ async function init() {
         populateTasksForTodoForm();
         initializeActivities();
         initializeCustomFields();
+        initWatchedIssues();
 
         // Fetch user data after everything else is loaded
         try {

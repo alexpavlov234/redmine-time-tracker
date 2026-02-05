@@ -134,6 +134,19 @@
             </section>
 
             <aside id="sidebar" class="col-lg-4">
+                <div class="card mb-3" id="watched-issues-card">
+                    <div class="card-body">
+                        <h5 class="card-title d-flex justify-content-between align-items-center">
+                            <span><i class="fa-solid fa-eye text-primary"></i> Watched Issues</span>
+                            <button id="refresh-watched-btn" class="btn btn-sm btn-outline-secondary" title="Refresh">
+                                <i class="fa-solid fa-sync-alt"></i>
+                            </button>
+                        </h5>
+                        <div id="watched-issues-list" class="watched-issues-container">
+                            <div class="text-center text-muted py-2">Loading...</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="card" id="work-queue-card">
                     <div class="card-body">
                         <h5 class="card-title">

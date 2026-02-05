@@ -14,21 +14,23 @@ let allProjects: (RedmineProject | { id: string; name: string })[] = [];
 let allTasks: RedmineIssue[] = [];
 let todoFormTasks: RedmineIssue[] = [];
 let issueStatuses: IssueStatus[] = [];
+let watchedIssues: RedmineIssue[] = [];
 let user: User | null = null;
 
 export const state = {
-  get timerInterval() { return timerInterval; },
-  get startTime() { return startTime; },
-  get pausedTime() { return pausedTime; },
-  get totalElapsedTime() { return totalElapsedTime; },
-  get activities() { return activities; },
-  get todos() { return todos; },
-  get activeTodoId() { return activeTodoId; },
-  get allProjects() { return allProjects; },
-  get allTasks() { return allTasks; },
-  get todoFormTasks() { return todoFormTasks; },
-  get issueStatuses() { return issueStatuses; },
-  get user() { return user; },
+    get timerInterval() { return timerInterval; },
+    get startTime() { return startTime; },
+    get pausedTime() { return pausedTime; },
+    get totalElapsedTime() { return totalElapsedTime; },
+    get activities() { return activities; },
+    get todos() { return todos; },
+    get activeTodoId() { return activeTodoId; },
+    get allProjects() { return allProjects; },
+    get allTasks() { return allTasks; },
+    get todoFormTasks() { return todoFormTasks; },
+    get issueStatuses() { return issueStatuses; },
+    get watchedIssues() { return watchedIssues; },
+    get user() { return user; },
 };
 
 // State setters
@@ -83,6 +85,10 @@ export function setTodoFormTasks(tasks: RedmineIssue[]) {
 
 export function setIssueStatuses(statuses: IssueStatus[]) {
     issueStatuses = statuses;
+}
+
+export function setWatchedIssues(issues: RedmineIssue[]) {
+    watchedIssues = issues;
 }
 
 export function setUser(newUser: User | null) {

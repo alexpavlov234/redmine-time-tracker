@@ -92,16 +92,16 @@ export function addToQueue() {
         (window as any).showWarning('Please select a project and a task.', 'Validation Error');
         return;
     }
-    
+
     const selectedTask = state.todoFormTasks.find(t => t.id.toString() === taskId);
     if (!selectedTask) {
         showGlobalError('Could not find selected task details. Please refresh and try again.');
         return;
     }
-    
+
     // For "My Issues", the project name in the selector is "--- My Assigned Issues ---",
     // but the task itself has the correct project name.
-    const projectName = (projectId === 'my_issues') 
+    const projectName = (projectId === 'my_issues')
         ? selectedTask.project.name
         : elements.todoProjectSelect.options[elements.todoProjectSelect.selectedIndex].text;
 
@@ -131,7 +131,7 @@ export function addToQueue() {
 
     // Update UI
     renderTodos();
-    
+
     // Reset form - using setTimeout to prevent validation being triggered during reset
     setTimeout(() => {
         elements.todoProjectInput.value = '';
@@ -147,6 +147,49 @@ export function addToQueue() {
     }, 0);
 
     // Prepare the next task if this is the first one in the queue and the timer isn't running
+    if (updatedTodos.length === 1 && !state.timerInterval) {
+        prepareNextTask();
+    }
+}
+
+/**
+ * Add a watched issue to the queue directly (for quick-add from watched issues list)
+ */
+export function addToQueueFromWatched(issueId: string, projectId: string, projectName: string, subject: string) {
+    // Get default activity if available
+    const todoActivitySelect = document.getElementById('todo-activity-select') as HTMLSelectElement | null;
+    let activityId: number | undefined;
+    let activityName: string | undefined;
+
+    if (todoActivitySelect && todoActivitySelect.value) {
+        activityId = parseInt(todoActivitySelect.value, 10);
+        activityName = todoActivitySelect.options[todoActivitySelect.selectedIndex]?.text;
+    }
+
+    const newTodo: Todo = {
+        id: Date.now(),
+        note: '',
+        projectId,
+        projectName,
+        taskId: issueId,
+        taskSubject: subject,
+        activityId,
+        activityName,
+        elapsedMs: 0,
+        startTime: null,
+        isRunning: false,
+        activities: []
+    };
+
+    const updatedTodos = [...state.todos, newTodo];
+    setTodos(updatedTodos);
+    saveTodos();
+    renderTodos();
+
+    // Show success toast
+    (window as any).showSuccess?.(`Added #${issueId} to queue`, 'Task Added');
+
+    // Prepare next task if this is the first one
     if (updatedTodos.length === 1 && !state.timerInterval) {
         prepareNextTask();
     }
@@ -169,7 +212,7 @@ export function deleteTodo(id: number) {
 
     // Refresh the UI
     renderTodos();
-    
+
     // If the deleted item was the 'next' one and the timer wasn't running, update the main tracker
     if (state.todos.length > 0 && !state.timerInterval) {
         prepareNextTask();
@@ -188,7 +231,7 @@ export function renderTodos() {
             const li = document.createElement('li');
             li.dataset.id = todo.id.toString();
             li.draggable = true;
-    
+
             li.innerHTML = `
                 <span class="todo-drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
                 <div class="todo-content">
@@ -209,7 +252,7 @@ export function renderTodos() {
                     <button type="button" class="delete-btn icon-btn" title="Remove from queue" draggable="false"><i class="fa-solid fa-trash"></i></button>
                 </div>
             `;
-            
+
             const deleteBtn = li.querySelector('.delete-btn');
             // Strengthen interaction: block drag initiation on press so the first click always works
             deleteBtn?.addEventListener('mousedown', (e) => {
@@ -250,7 +293,7 @@ export function renderTodos() {
                 }
             });
             startPauseBtn?.addEventListener('dragstart', (e) => e.preventDefault());
-    
+
             elements.todoList.appendChild(li);
         });
     }
@@ -278,7 +321,7 @@ export function prepareNextTask() {
         // Set the hiddenly selects' values for submission
         elements.projectSelect.value = nextTodo.projectId;
         elements.taskSelect.value = nextTodo.taskId;
-        
+
         // Set activity if available
         if (nextTodo.activityId && activityDisplay) {
             elements.activitySelect.value = nextTodo.activityId.toString();
@@ -338,8 +381,8 @@ export function initializeDragAndDrop() {
 
         draggedItem = e.target as HTMLElement;
         // Use a timeout to allow the browser to render the drag image before hiding the element
-        setTimeout(() => { 
-            if (draggedItem) draggedItem.classList.add('dragging'); 
+        setTimeout(() => {
+            if (draggedItem) draggedItem.classList.add('dragging');
         }, 0);
     });
 

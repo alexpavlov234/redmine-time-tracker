@@ -1,4 +1,4 @@
-import { TimeEntry } from '../types/index.js';
+import { TimeEntry, RedmineIssue } from '../types/index.js';
 
 // Configuration for proxy URL
 const PROXY_BASE_URL = 'http://localhost:3000/api';
@@ -206,7 +206,7 @@ export async function updateTimeEntry(id: number, data: {
     spent_on?: string;
     issue_id?: number;
     project_id?: number;
-    custom_fields?: Array<{id: number, value: any}>;
+    custom_fields?: Array<{ id: number, value: any }>;
 }) {
     try {
         const body = { time_entry: data };
@@ -233,17 +233,17 @@ export async function getTimeEntryCustomFields() {
         // First, try to get time entry custom fields
         // Unfortunately, Redmine doesn't have a direct API for time entry custom fields
         // We need to get them from a time entry or infer from project settings
-        
+
         // Let's try to get custom fields from any existing time entry
         const timeEntriesResponse = await redmineApiRequest('/time_entries.json?limit=1&include=custom_fields');
-        
+
         if (timeEntriesResponse.time_entries && timeEntriesResponse.time_entries.length > 0) {
             const timeEntry = timeEntriesResponse.time_entries[0];
             if (timeEntry.custom_fields) {
                 return timeEntry.custom_fields;
             }
         }
-        
+
         // If no time entries exist, return an empty array
         return [];
     } catch (error) {
@@ -255,25 +255,36 @@ export async function getTimeEntryCustomFields() {
 export async function detectBillableField() {
     try {
         const customFields = await getTimeEntryCustomFields();
-        
+
         // Look for fields that might be billable
-        const billableField = customFields.find((field: any) => 
+        const billableField = customFields.find((field: any) =>
             field.name && (
                 field.name.toLowerCase().includes('billable') ||
                 field.name.toLowerCase().includes('billing') ||
                 field.name.toLowerCase().includes('bill')
             )
         );
-        
+
         if (billableField) {
             console.log('Auto-detected billable field:', billableField);
             localStorage.setItem('billableFieldId', billableField.id.toString());
             return billableField;
         }
-        
+
         return null;
     } catch (error) {
         console.error('Failed to detect billable field:', error);
         return null;
+    }
+}
+
+export async function getWatchedIssues(limit: number = 25): Promise<RedmineIssue[]> {
+    try {
+        const endpoint = `/issues.json?watcher_id=me&status_id=open&limit=${limit}`;
+        const response = await redmineApiRequest(endpoint);
+        return response.issues || [];
+    } catch (error) {
+        console.error('Failed to fetch watched issues:', error);
+        return [];
     }
 }
