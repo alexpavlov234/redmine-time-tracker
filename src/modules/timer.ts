@@ -1,14 +1,14 @@
 import {
     state,
     setTimerInterval, setStartTime, setPausedTime, setTotalElapsedTime,
-    addActivity, setActivities, setActiveTodoId, setTodos
+    addActivity, setActivities, setActiveTodoId
 } from '@/src/state';
 import { Activity } from '@/src/types';
 import { elements } from '../utils/dom.js';
 import { formatTime } from '../utils/helpers.js';
 import { showSummary } from './summary.js';
 import { renderActivities } from './activities.js';
-import { renderTodos, prepareNextTask, saveTodos } from './queue.js';
+import { renderTodos, prepareNextTask } from './queue.js';
 import { checkConfiguration } from './projects.js';
 
 export function updateTime() {
@@ -239,23 +239,6 @@ export function stopTimer() {
     }
     const now = new Date();
 
-    // Final update to totalElapsedTime if timer was running
-    if (state.startTime) {
-        const newTotalElapsedTime = (now.getTime() - state.startTime + state.pausedTime) / 1000;
-        setTotalElapsedTime(newTotalElapsedTime);
-    }
-
-    if (state.activities.length > 0) {
-        const lastActivity = state.activities[state.activities.length - 1];
-        if (!lastActivity.durationSeconds) { // Only update if not already set by adding another activity
-            const previousActivitiesDuration = state.activities
-                .slice(0, -1)
-                .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
-            const newDuration = state.totalElapsedTime - previousActivitiesDuration;
-            // Ensure duration is not negative due to floating point issues
-            lastActivity.durationSeconds = Math.max(0, newDuration);
-        }
-    }
     // Mark active todo as not running and accumulate elapsed
     if (state.activeTodoId != null) {
         const idx = state.todos.findIndex(t => t.id === state.activeTodoId);
@@ -266,8 +249,31 @@ export function stopTimer() {
             const newElapsedMs = (todo.elapsedMs || 0) + sessionMs;
             (state.todos as any)[idx] = { ...todo, elapsedMs: newElapsedMs, startTime: null, isRunning: false, activities: [...state.activities] };
             localStorage.setItem('todos', JSON.stringify(state.todos));
+
+            // CRITICAL FIX: Update the global totalElapsedTime to reflect the total time of this task
+            // This ensures the summary modal shows the correct total time.
+            setTotalElapsedTime(newElapsedMs / 1000);
+        }
+    } else if (state.startTime) {
+        // Validation for manual timer (no active todo)
+        const newTotalElapsedTime = (now.getTime() - state.startTime + state.pausedTime) / 1000;
+        setTotalElapsedTime(newTotalElapsedTime);
+    }
+
+    if (state.activities.length > 0) {
+        const lastActivity = state.activities[state.activities.length - 1];
+        if (!lastActivity.durationSeconds) { // Only update if not already set by adding another activity
+            const previousActivitiesDuration = state.activities
+                .slice(0, -1)
+                .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
+
+            // Recalculate based on the CORRECT totalElapsedTime set above
+            const newDuration = state.totalElapsedTime - previousActivitiesDuration;
+            // Ensure duration is not negative due to floating point issues
+            lastActivity.durationSeconds = Math.max(0, newDuration);
         }
     }
+
     showSummary();
 }
 

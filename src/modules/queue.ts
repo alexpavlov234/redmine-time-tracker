@@ -243,12 +243,12 @@ export function renderTodos() {
                 <div class="todo-content">
                     <div class="todo-header">
                         <span class="todo-project">${todo.projectName}</span>
-                        ${todo.activityName ? `<span class="todo-activity"><i class="fa-solid fa-tasks"></i> ${todo.activityName}</span>` : ''}
+                        ${todo.activityName ? `<span class="text-body-secondary small ms-2">${todo.activityName}</span>` : ''}
                     </div>
-                    <span class="todo-task" title="#${todo.taskId} - ${todo.taskSubject}">#${todo.taskId} - ${todo.taskSubject}</span>
-                    ${todo.note ? `<span class="todo-note" title="${todo.note}"><i class="fa-solid fa-sticky-note"></i> ${todo.note}</span>` : ''}
-                    <div class="todo-timer" style="margin-top:4px; display:flex; align-items:center; gap:8px;">
-                        <span id="todo-time-${todo.id}" class="badge bg-secondary">${formatTime(Math.floor((todo.elapsedMs || 0) / 1000))}</span>
+                    <span class="todo-task d-block text-truncate" style="max-width: 350px;" title="#${todo.taskId} - ${todo.taskSubject}">#${todo.taskId} - ${todo.taskSubject}</span>
+                    ${todo.note ? `<span class="todo-note text-body-secondary small d-block text-truncate" style="max-width: 350px;" title="${todo.note}">${todo.note}</span>` : ''}
+                    <div class="todo-timer mt-1 d-flex align-items-center gap-2">
+                        <span id="todo-time-${todo.id}" class="font-monospace fw-bold">${formatTime(Math.floor((todo.elapsedMs || 0) / 1000))}</span>
                         <button type="button" class="icon-btn start-pause-btn" title="${todo.isRunning ? 'Pause' : 'Start'}" draggable="false">
                             ${todo.isRunning ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>'}
                         </button>
