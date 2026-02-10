@@ -4,6 +4,7 @@ import { renderDailyProjectsSummary } from './ProjectSummary.js';
 interface DailyLogCardOptions {
     container: HTMLElement;
     title: string;
+    dateIso: string; // YYYY-MM-DD for accurate logging
     entries: TimeEntry[];
     issuesMap: Map<number, RedmineIssue>;
     onEdit: (entry: TimeEntry) => void;
@@ -12,7 +13,7 @@ interface DailyLogCardOptions {
 }
 
 export function renderDailyLogCard(options: DailyLogCardOptions) {
-    const { container, title, entries, issuesMap, onEdit, onDelete, onAdd } = options;
+    const { container, title, dateIso, entries, issuesMap, onEdit, onDelete, onAdd } = options;
 
     if (!container) return;
 
@@ -44,14 +45,8 @@ export function renderDailyLogCard(options: DailyLogCardOptions) {
         addBtn.innerHTML = '<i class="fa-solid fa-plus me-1"></i>Log Time';
         addBtn.title = 'Add time entry for this day';
 
-        // Try to parse date from title or context if possible, otherwise pass generic
-        // For Calendar details, title is usually the formatted date. 
-        // We'll rely on the caller to handle the context, but here we can pass the title as a hint if needed
-        // The simplest way is to let the click handler use the closure variable if available at call site,
-        // but here we are in a generic component.
-        // Ideally, DailyLogCard should receive the raw date string too if it needs to pass it back.
-        // For now, we'll pass the title string which might be a date.
-        addBtn.addEventListener('click', () => onAdd(title));
+        // Use the ISO date string for accurate pre-filling
+        addBtn.addEventListener('click', () => onAdd(dateIso));
 
         headerRow.appendChild(addBtn);
     }
@@ -109,12 +104,23 @@ function renderEntriesList(
 
         let taskName = 'No task';
         let taskId = entry.issue ? entry.issue.id : null;
-        if (entry.issue && entry.issue.subject) {
-            taskName = entry.issue.subject;
-        } else if (entry.issue && entry.issue.id) {
-            const issue = issuesMap.get(entry.issue.id);
-            if (issue) {
-                taskName = issue.subject;
+
+        // Try to get task name from entry.issue directly (handle variations in API response)
+        // Redmine API might return { id, name } or { id, value } or { id, subject }
+        const issueDirect = entry.issue as any;
+        if (issueDirect) {
+            if (issueDirect.subject) taskName = issueDirect.subject;
+            else if (issueDirect.name) taskName = issueDirect.name;
+            else if (issueDirect.value) taskName = issueDirect.value;
+        }
+
+        // If we still don't have a good name (or just have ID), look up in the map
+        // We check if taskName is still "No task" or looks like just an ID placeholder if we were to fallback
+        // But simpler: if we have an ID, try to get the full issue details which are preferred
+        if (taskId) {
+            const issueDetails = issuesMap.get(taskId);
+            if (issueDetails) {
+                taskName = issueDetails.subject;
             }
         }
 

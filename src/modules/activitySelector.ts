@@ -12,9 +12,6 @@ export async function loadActivities() {
         const defaultActivity = availableActivities.find(activity => activity.is_default);
         defaultActivityId = defaultActivity ? defaultActivity.id : (availableActivities.length > 0 ? availableActivities[0].id : null);
 
-        console.log('Loaded activities:', availableActivities);
-        console.log('Default activity ID:', defaultActivityId);
-
         // Populate all activity selectors
         populateActivitySelect(elements.activitySelect);
         populateActivitySelect(elements.todoActivitySelect);

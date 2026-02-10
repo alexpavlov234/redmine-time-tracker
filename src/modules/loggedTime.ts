@@ -50,17 +50,21 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
                             <!-- Project Selection (Autocomplete) -->
                             <div class="mb-3 position-relative">
                                 <label for="manage-project-input" class="form-label">Project</label>
-                                <input type="text" class="form-control form-control-sm" id="manage-project-input" placeholder="Type to search projects..." autocomplete="off" required>
+                                <div class="autocomplete-container">
+                                    <input type="text" class="form-control form-control-sm" id="manage-project-input" placeholder="Type to search projects..." autocomplete="off" required>
+                                    <div id="manage-project-list" class="autocomplete-items"></div>
+                                </div>
                                 <input type="hidden" id="manage-project-id">
-                                <div id="manage-project-list" class="autocomplete-list"></div>
                             </div>
 
                             <!-- Task Selection (Autocomplete) -->
                             <div class="mb-3 position-relative">
                                 <label for="manage-task-search" class="form-label">Task (Issue)</label>
-                                <input type="text" class="form-control form-control-sm" id="manage-task-search" placeholder="Select a project first..." autocomplete="off" required disabled>
+                                <div class="autocomplete-container">
+                                    <input type="text" class="form-control form-control-sm" id="manage-task-search" placeholder="Select a project first..." autocomplete="off" required disabled>
+                                    <div id="manage-task-list" class="autocomplete-items"></div>
+                                </div>
                                 <input type="hidden" id="manage-task-id">
-                                <div id="manage-task-list" class="autocomplete-list"></div>
                             </div>
 
                              <div class="mb-3">
@@ -79,6 +83,14 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
                                 <div class="col-md-6 mb-3">
                                     <label for="manage-spent-on" class="form-label">Date</label>
                                     <input type="date" class="form-control form-control-sm" id="manage-spent-on" value="${dateValue}" required>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="manage-billable" checked>
+                                        <label class="form-check-label" for="manage-billable">
+                                            Billable
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
 
@@ -200,22 +212,14 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
         inputEl: taskInput,
         listEl: taskList,
         sourceData: () => projectTasks, // Use the local array which gets updated
-        renderItem: (item: RedmineIssue) => `
-            <div class="autocomplete-item">
-                <span class="badge bg-secondary me-2">#${item.id}</span>
-                <span class="fw-bold text-truncate" style="max-width: 150px;">${item.project.name}</span>
-                <div class="small text-muted text-truncate">${item.subject}</div>
-            </div>
-        `,
+        // Use same style as projects.ts/home page for consistency
+        renderItem: (item: RedmineIssue) => `#${item.id} - ${item.subject}`,
         filterItem: (item: RedmineIssue, query: string) => {
-            const search = query.toLowerCase();
-            return (
-                item.subject.toLowerCase().includes(search) ||
-                item.id.toString().includes(search)
-            );
+            const searchString = `#${item.id} ${item.subject}`.toLowerCase();
+            return searchString.includes(query.toLowerCase());
         },
         onSelect: (item: RedmineIssue) => {
-            taskInput.value = `#${item.id} ${item.subject}`;
+            taskInput.value = `#${item.id} - ${item.subject}`; // Also align input value format
             taskIdHidden.value = item.id.toString();
             selectedTaskId = item.id;
         }
@@ -235,6 +239,8 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
         const activityId = parseInt(activitySelect.value);
         const issueId = parseInt(taskIdHidden.value);
         const projectId = parseInt(projectIdHidden.value);
+        const billableCheckbox = document.getElementById('manage-billable') as HTMLInputElement;
+        const isBillable = billableCheckbox ? billableCheckbox.checked : false;
 
         // Validation
         if (isNaN(hours) || hours <= 0) {
@@ -255,13 +261,24 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
         }
 
         try {
+            // Prepare custom fields (Billable)
+            const customFields: { id: number; value: any }[] = [];
+            const billableFieldId = localStorage.getItem('billableFieldId');
+            if (billableFieldId) {
+                customFields.push({
+                    id: parseInt(billableFieldId, 10),
+                    value: isBillable ? "1" : "0"
+                });
+            }
+
             if (isEdit && entry) {
                 await updateTimeEntry(entry.id, {
                     hours,
                     comments,
                     spent_on: spentOn,
                     activity_id: activityId,
-                    issue_id: issueId
+                    issue_id: issueId,
+                    custom_fields: customFields
                 });
                 showSuccess('Time entry updated successfully.');
             } else {
@@ -272,7 +289,8 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
                     spent_on: spentOn,
                     activity_id: activityId,
                     issue_id: issueId,
-                    project_id: projectId
+                    project_id: projectId,
+                    custom_fields: customFields
                 });
                 showSuccess('Time entry created successfully.');
             }
@@ -390,6 +408,7 @@ export async function initLoggedTimePage() {
         renderDailyLogCard({
             container: todayLogContainer,
             title: 'Today',
+            dateIso: todayStr,
             entries: timeEntries,
             issuesMap,
             onEdit: (entry) => manageTimeEntry(entry),
@@ -668,6 +687,7 @@ export function showCalendarDayDetails(dateStr: string) {
     renderDailyLogCard({
         container: dayDetailsContainer,
         title: formattedDate,
+        dateIso: dateStr,
         entries: entries,
         issuesMap: new Map(), // Calendar entries already contain issue subtitles
         onEdit: (entry) => manageTimeEntry(entry),
