@@ -12,6 +12,7 @@ const todayLogContainer = document.getElementById('today-log-container') as HTML
 // Calendar state
 let currentCalendarMonth = new Date();
 let calendarEntriesCache: Map<string, TimeEntry[]> = new Map();
+let calendarIssuesCache: Map<number, RedmineIssue> = new Map();
 
 let currentBulkTasks: any[] = [];
 
@@ -539,6 +540,36 @@ async function loadCalendarView() {
             calendarEntriesCache.get(dateKey)!.push(entry);
         });
 
+        // --- NEW: Fetch missing issue details for the whole month ---
+        // Identify issues that have an ID but no subject in the time entry
+        const issueIdsToFetch = new Set<number>();
+        timeEntries.forEach(entry => {
+            if (entry.issue && entry.issue.id && !entry.issue.subject) {
+                issueIdsToFetch.add(entry.issue.id);
+            }
+        });
+
+        // Clear previous issue cache for the calendar (or merge?)
+        // Let's clear to be safe and fresh for the month view
+        calendarIssuesCache.clear();
+
+        if (issueIdsToFetch.size > 0) {
+            const ids = Array.from(issueIdsToFetch);
+
+            // Chunking to avoid URL too long errors
+            const chunkSize = 20; // Safe chunk size
+            for (let i = 0; i < ids.length; i += chunkSize) {
+                const chunk = ids.slice(i, i + chunkSize);
+                try {
+                    const issues = await getIssues(chunk);
+                    issues.forEach((issue: RedmineIssue) => calendarIssuesCache.set(issue.id, issue));
+                } catch (err) {
+                    console.error('Failed to fetch chunk of issues', err);
+                    // Continue to next chunk
+                }
+            }
+        }
+
         // Render the calendar
         renderCalendar(year, month);
 
@@ -689,7 +720,7 @@ export function showCalendarDayDetails(dateStr: string) {
         title: formattedDate,
         dateIso: dateStr,
         entries: entries,
-        issuesMap: new Map(), // Calendar entries already contain issue subtitles
+        issuesMap: calendarIssuesCache, // Pass the cache here
         onEdit: (entry) => manageTimeEntry(entry),
         onDelete: deleteTimeEntryHandler,
         onAdd: (date) => manageTimeEntry(null, date)
