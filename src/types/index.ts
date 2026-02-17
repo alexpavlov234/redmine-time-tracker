@@ -47,6 +47,11 @@ export interface TimeEntry {
   spent_on: string;
   created_on: string;
   updated_on: string;
+  custom_fields?: Array<{
+    id: number;
+    name: string;
+    value: string;
+  }>;
 }
 
 export interface IssueStatus {

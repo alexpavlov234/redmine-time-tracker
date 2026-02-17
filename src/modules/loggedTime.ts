@@ -28,6 +28,23 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
     const commentsValue = isEdit ? (entry.comments || '') : '';
     const dateValue = isEdit ? entry.spent_on : (dateStr || formatDate(new Date()));
 
+    // Determine billable state
+    const billableFieldId = localStorage.getItem('billableFieldId');
+    let isBillable = true; // Default
+
+    if (isEdit && entry && entry.custom_fields && billableFieldId) {
+        const fieldId = parseInt(billableFieldId, 10);
+        const field = entry.custom_fields.find(f => f.id === fieldId);
+        if (field) {
+            isBillable = field.value === '1' || field.value === 'true';
+        }
+    } else if (isEdit && entry && !billableFieldId) {
+        // If we don't know the ID but are editing, we can't be sure, so default to true or try to find by name? 
+        // For now, stick to default true if config is missing to be safe, or maybe check existing logic
+        isBillable = true;
+    }
+
+
     // IDs for prepopulation
     let selectedProjectId = isEdit ? entry?.project?.id : null;
     let selectedTaskId = isEdit ? entry?.issue?.id : null;
@@ -87,7 +104,7 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
                                 </div>
                                 <div class="col-12 mb-3">
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="manage-billable" checked>
+                                        <input class="form-check-input" type="checkbox" id="manage-billable" ${isBillable ? 'checked' : ''}>
                                         <label class="form-check-label" for="manage-billable">
                                             Billable
                                         </label>

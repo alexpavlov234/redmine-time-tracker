@@ -156,7 +156,7 @@ export async function getCurrentUser() {
 export async function getTimeEntries(params: { from: string, to: string, user_id: number }): Promise<TimeEntry[]> {
     const { from, to, user_id } = params;
     // Note: Redmine API `to` and `from` are inclusive.
-    const endpoint = `/time_entries.json?user_id=${user_id}&from=${from}&to=${to}&limit=100&include=issue`;
+    const endpoint = `/time_entries.json?user_id=${user_id}&from=${from}&to=${to}&limit=100&include=issue,custom_fields`;
     try {
         const response = await redmineApiRequest(endpoint);
         return response.time_entries || [];
