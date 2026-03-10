@@ -199,6 +199,16 @@ export async function getTimeEntryActivities() {
     }
 }
 
+export async function getProjectActivities(projectId: string | number) {
+    try {
+        const response = await redmineApiRequest(`/projects/${projectId}.json?include=time_entry_activities`);
+        return response.project?.time_entry_activities || [];
+    } catch (error) {
+        console.error(`Failed to fetch activities for project ${projectId}:`, error);
+        return [];
+    }
+}
+
 export async function updateTimeEntry(id: number, data: {
     hours?: number;
     comments?: string;

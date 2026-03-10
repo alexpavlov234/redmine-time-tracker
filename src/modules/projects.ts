@@ -7,6 +7,7 @@ import { elements } from '../utils/dom.js';
 import { showGlobalError } from '../utils/helpers.js';
 import { redmineApiRequest } from '../services/redmine.js';
 import { initAutocomplete } from '../utils/autocomplete.js';
+import { loadProjectActivities } from './activitySelector.js';
 
 export async function populateProjects() {
     elements.projectInput.placeholder = 'Loading projects...';
@@ -156,6 +157,9 @@ export async function populateTasks() {
         const tasks = await populateTasksForSelect(elements.taskSelect, selectedProjectValue);
         setAllTasks(tasks);
 
+        // Filter activity dropdown by project-enabled activities
+        loadProjectActivities(selectedProjectValue, elements.activitySelect);
+
         if (state.allTasks.length === 0) {
             elements.taskInput.placeholder = 'No open tasks found';
             elements.taskInput.value = '';
@@ -204,6 +208,10 @@ export async function populateTasksForTodoForm() {
         try {
             const tasks = await populateTasksForSelect(elements.todoTaskSelect, projectId);
             setTodoFormTasks(tasks);
+
+            // Filter activity dropdown by project-enabled activities
+            loadProjectActivities(projectId, elements.todoActivitySelect);
+
             if (state.todoFormTasks.length > 0) {
                 elements.todoTaskInput.disabled = false;
                 elements.todoTaskInput.placeholder = 'Search tasks...';

@@ -1,11 +1,11 @@
-import { 
+import {
     state,
     setIssueStatuses
 } from '../state/index.js';
 import { elements } from '../utils/dom.js';
 import { formatTime, setButtonLoading, showGlobalError } from '../utils/helpers.js';
 import { redmineApiRequest } from '../services/redmine.js';
-import { getSelectedOrDefaultActivityId } from './activitySelector.js';
+import { getSelectedOrDefaultActivityId, loadProjectActivities } from './activitySelector.js';
 import { getCustomFieldValues, resetCustomFields } from './customFields.js';
 import { resetState } from './timer.js';
 import { deleteTodo } from './queue.js';
@@ -40,18 +40,26 @@ export function showSummary() {
         totalElapsedTime: state.totalElapsedTime,
         totalElapsedTimeFormatted: formatTime(state.totalElapsedTime)
     });
-    
-    // Copy current activity selection to summary modal
-    if (elements.activitySelect.value) {
-        elements.summaryActivitySelect.value = elements.activitySelect.value;
+
+    // Filter summary activity dropdown by current project and restore selection
+    const currentProjectId = elements.projectSelect.value;
+    const currentActivityValue = elements.activitySelect.value;
+    if (currentProjectId) {
+        loadProjectActivities(currentProjectId, elements.summaryActivitySelect).then(() => {
+            if (currentActivityValue) {
+                elements.summaryActivitySelect.value = currentActivityValue;
+            }
+        });
+    } else if (currentActivityValue) {
+        elements.summaryActivitySelect.value = currentActivityValue;
     }
-    
+
     const detailsText = state.activities
         .map(act => act.text.trim())
         .filter(text => text)
         .join(' ');
     elements.summaryDetails.value = detailsText;
-    
+
     elements.modalStatus.textContent = '';
     elements.modalStatus.className = 'status-message';
     elements.submitBtn.disabled = false;
@@ -64,7 +72,7 @@ export function showSummary() {
     elements.changeStatusCheckbox.checked = false;
     elements.statusChangeContainer.style.display = 'none';
     populateIssueStatuses();
-    
+
     // Reset custom fields to their default values
     resetCustomFields();
 }
@@ -87,19 +95,19 @@ export async function submitTimeToRedmine() {
     } else {
         // Round UP to next 0.05 increment
         hours = Math.ceil(rawHours * 20) / 20; // Multiply by 20, ceil, then divide by 20
-        
+
         // Ensure minimum of 0.1
         hours = Math.max(0.1, hours);
     }
-    
+
     const hoursFormatted = parseFloat(hours.toFixed(2));
     const comments = elements.summaryDetails.value.trim();
     const billableFieldId = localStorage.getItem('billableFieldId');
     // Billable is non-nullable: derive a boolean, unchecked => false
     const billableChecked: boolean = !!(elements.billableCheckboxSimple && elements.billableCheckboxSimple.checked);
 
-    console.log('Submit validation:', { 
-        issueId, 
+    console.log('Submit validation:', {
+        issueId,
         totalElapsedTime: state.totalElapsedTime,
         totalElapsedTimeInMinutes: state.totalElapsedTime / 60,
         rawHours,
@@ -107,12 +115,12 @@ export async function submitTimeToRedmine() {
         hoursType: typeof hoursFormatted,
         totalElapsedTimeFormatted: formatTime(state.totalElapsedTime)
     });
-    
+
     if (!issueId) {
         (window as any).showError('No issue selected. Please select an issue from the dropdown.', 'Submission Error');
         return;
     }
-    
+
     // No need to check for minimum hours since we guarantee at least 0.1
 
     setButtonLoading(elements.submitBtn, true);
@@ -144,7 +152,7 @@ export async function submitTimeToRedmine() {
     // Add billable custom field if configured, or create a generic one
     const customFieldValues = getCustomFieldValues();
     const customFields: { id: number; value: string }[] = [];
-    
+
     // Check if we have a specific billable field ID configured
     if (billableFieldId) {
         // Always include billable custom field; unchecked maps to "0"
@@ -154,21 +162,21 @@ export async function submitTimeToRedmine() {
         // Log the resolved non-nullable boolean for diagnostics
         console.log('No billable field ID configured. Billable (boolean):', billableChecked);
     }
-    
+
     // Add other custom fields
     Object.entries(customFieldValues).forEach(([fieldId, value]) => {
         if (value && value.trim() !== '') {
             customFields.push({ id: parseInt(fieldId, 10), value: value.trim() });
         }
     });
-    
+
     // Add custom fields to payload if any exist
     if (customFields.length > 0) {
         timeEntryPayload.time_entry.custom_fields = customFields;
     }
-    
+
     console.log('Time entry payload being sent:', timeEntryPayload);
-    
+
     let timeEntrySuccess = false;
     const statusUpdateAttempted = elements.changeStatusCheckbox.checked && elements.issueStatusSelect.value;
 
@@ -194,7 +202,7 @@ export async function submitTimeToRedmine() {
         }
         elements.modalStatus.classList.add('success');
         setButtonLoading(elements.submitBtn, false, '<i class="fa-solid fa-check"></i> Success!');
-        
+
         // Remove the task from the queue only AFTER successful submission, then advance
         setTimeout(() => {
             hideSummary();

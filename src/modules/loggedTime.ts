@@ -4,7 +4,7 @@ import { RedmineIssue, TimeEntry } from '../types/index.js';
 import { formatDate } from '../utils/helpers.js';
 import { showError, showConfirm, showSuccess } from '../utils/ui.js';
 import { renderDailyLogCard } from '../components/DailyLogCard.js';
-import { getAvailableActivities } from './activitySelector.js';
+import { getAvailableActivities, loadProjectActivities } from './activitySelector.js';
 import { initAutocomplete } from '../utils/autocomplete.js';
 
 const todayLogContainer = document.getElementById('today-log-container') as HTMLDivElement;
@@ -173,12 +173,10 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
         const proj = state.allProjects.find(p => p.id === selectedProjectId);
         if (proj) {
             projectInput.value = proj.name;
-            // Fetch tasks initially if editing or pre-selected
-            // Note: This is async, so fields might update moments after modal shows
+            // Fetch tasks and filter activities for the pre-selected project
             fetchTasksForProject(selectedProjectId).then(() => {
                 if (selectedTaskId) {
                     taskIdHidden.value = selectedTaskId.toString();
-                    // Tasks might be loaded now, try to find issue
                     const issue = projectTasks.find(t => t.id === selectedTaskId) || entry?.issue;
                     if (issue) {
                         taskInput.value = `#${issue.id} ${issue.subject || ''}`;
@@ -187,12 +185,19 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
                     }
                 }
             });
-        }
-    }
 
-    // Set other fields that don't depend on async loading
-    if (selectedActivityId) {
-        activitySelect.value = selectedActivityId.toString();
+            // Filter activities by this project, then restore selection
+            loadProjectActivities(selectedProjectId, activitySelect).then(() => {
+                if (selectedActivityId) {
+                    activitySelect.value = selectedActivityId.toString();
+                }
+            });
+        }
+    } else {
+        // No project pre-selected, set activity from global list
+        if (selectedActivityId) {
+            activitySelect.value = selectedActivityId.toString();
+        }
     }
 
     // If we have a task ID but no project loaded yet (rare, but possible if entry incomplete), 
@@ -220,8 +225,9 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
             taskIdHidden.value = '';
             selectedTaskId = null;
 
-            // Fetch Tasks
+            // Fetch Tasks and filter activities for the new project
             await fetchTasksForProject(item.id);
+            await loadProjectActivities(item.id, activitySelect);
         }
     });
 
@@ -875,7 +881,7 @@ function initBulkLogForm() {
     }
 
     // Setup autocomplete (simplified version of queue.ts logic)
-    setupBulkAutocomplete(projectInput, taskInput);
+    setupBulkAutocomplete(projectInput, taskInput, activitySelect);
 
     // Handle submit
     form.addEventListener('submit', async (e) => {
@@ -886,7 +892,7 @@ function initBulkLogForm() {
     bulkFormInitialized = true;
 }
 
-function setupBulkAutocomplete(projectInput: HTMLInputElement, taskInput: HTMLInputElement) {
+function setupBulkAutocomplete(projectInput: HTMLInputElement, taskInput: HTMLInputElement, activitySelect: HTMLSelectElement) {
     // Project autocomplete
     const projectList = document.getElementById('bulk-project-list') as HTMLDivElement;
     if (projectList) {
@@ -906,6 +912,9 @@ function setupBulkAutocomplete(projectInput: HTMLInputElement, taskInput: HTMLIn
                 taskInput.placeholder = 'Loading tasks...';
                 delete taskInput.dataset.taskId;
                 currentBulkTasks = [];
+
+                // Filter activity dropdown by project
+                loadProjectActivities(item.id, activitySelect);
 
                 try {
                     const endpoint = `/issues.json?project_id=${item.id}&status_id=open&limit=100`;
