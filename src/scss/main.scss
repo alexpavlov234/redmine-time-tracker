@@ -563,7 +563,10 @@ header {
       color: $body-color-dark;
     }
 
-    .todo-project,
+    .todo-project {
+      color: $gray-400;
+    }
+
     .todo-activity {
       background: $primary-bg-subtle;
       color: $primary;
@@ -605,10 +608,7 @@ header {
 .todo-project {
   font-size: 0.75rem;
   font-weight: $font-weight-semibold;
-  color: $primary;
-  background: $primary-bg-subtle;
-  padding: 0.25rem 0.5rem;
-  border-radius: $border-radius-sm;
+  color: $secondary;
 }
 
 .todo-task {
@@ -729,9 +729,9 @@ header {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Watched Issues Styling */
-.watched-issues-container {
-  max-height: 300px;
+/* Task Browser Styling */
+.task-browser-container {
+  max-height: 400px;
   overflow-y: auto;
 
   &::-webkit-scrollbar {
@@ -749,78 +749,137 @@ header {
   }
 }
 
-.watched-issue-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-radius: $border-radius;
-  margin-bottom: 0.5rem;
-  background-color: $body-bg;
-  border: 1px solid $border-color;
-  transition: all $transition-fast;
-  cursor: pointer;
+.task-browser-project-group {
+  margin-bottom: 0.75rem;
 
   &:last-child {
     margin-bottom: 0;
   }
+}
+
+.task-browser-project-header {
+  font-size: 0.75rem;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: $secondary;
+  padding: 0.5rem 0.75rem 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid $border-color;
+  margin-bottom: 0.25rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color $transition-fast;
 
   &:hover {
-    background-color: $primary-bg-subtle;
-    border-color: rgba($primary, 0.3);
-
-    .watched-add-btn {
-      opacity: 1;
-    }
+    background-color: $gray-100;
   }
 }
 
-.watched-issue-main {
-  flex: 1;
-  min-width: 0;
+.task-browser-chevron {
+  font-size: 0.625rem;
+  transition: transform $transition-fast;
+
+  .expanded>.task-browser-project-header>& {
+    transform: rotate(90deg);
+  }
+}
+
+.task-browser-project-count {
+  font-size: 0.625rem;
+  font-weight: $font-weight-bold;
+  color: $white;
+  background: $secondary;
+  border-radius: 10px;
+  padding: 0.0625rem 0.375rem;
+  min-width: 1.25rem;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.task-browser-project-issues {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
 }
 
-.watched-issue-project {
-  display: inline-block;
-  font-size: 0.6875rem;
-  font-weight: $font-weight-semibold;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-  color: $primary;
-  background: $primary-bg-subtle;
-  padding: 0.125rem 0.5rem;
+.task-browser-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
   border-radius: $border-radius-sm;
-  max-width: fit-content;
+  cursor: pointer;
+  transition: background-color $transition-fast;
+
+  &:hover:not(.in-queue) {
+    background-color: $gray-100;
+  }
+
+  &.in-queue {
+    opacity: 0.5;
+    cursor: default;
+  }
 }
 
-.watched-issue-title {
-  font-size: 0.875rem;
+.task-browser-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.task-browser-item-id {
+  font-size: 0.8125rem;
+  font-weight: $font-weight-bold;
+  color: $primary;
+  flex-shrink: 0;
+}
+
+.task-browser-item-subject {
+  font-size: 0.8125rem;
   font-weight: $font-weight-medium;
   color: $body-color;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.4;
 }
 
-.watched-issue-id {
-  font-weight: $font-weight-bold;
-  color: $primary;
-}
-
-.watched-add-btn {
+.task-browser-item-status {
+  font-size: 0.6875rem;
+  color: $secondary;
   flex-shrink: 0;
-  opacity: 0;
-  transition: opacity $transition-fast;
-  padding: 0.25rem 0.5rem !important;
-  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
-#refresh-watched-btn {
+.task-browser-add-btn {
+  background: none;
+  border: 1px solid $border-color;
+  color: $primary;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: $border-radius-sm;
+  font-size: 0.75rem;
+  transition: all $transition-fast;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background-color: $primary;
+    color: $white;
+    border-color: $primary;
+  }
+
+  &:disabled {
+    color: $success;
+    border-color: rgba($success, 0.3);
+    cursor: default;
+  }
+}
+
+#refresh-task-browser-btn {
   padding: 0.25rem 0.5rem;
 
   i {
@@ -833,27 +892,46 @@ header {
 }
 
 @include color-mode(dark) {
-  .watched-issues-container {
+  .task-browser-container {
     &::-webkit-scrollbar-track {
       background: $gray-800;
     }
   }
 
-  .watched-issue-item {
-    background-color: $body-bg-dark;
+  .task-browser-project-header {
+    color: $body-color-dark;
     border-color: $border-color-dark;
 
     &:hover {
-      background-color: $primary-bg-subtle-dark;
+      background-color: $gray-800;
     }
   }
 
-  .watched-issue-title {
+  .task-browser-project-count {
+    background: $gray-600;
+  }
+
+  .task-browser-item {
+    &:hover:not(.in-queue) {
+      background-color: $gray-800;
+    }
+  }
+
+  .task-browser-item-subject {
     color: $body-color-dark;
   }
 
-  .watched-issue-project {
-    background: rgba($primary, 0.15);
+  .task-browser-item-status {
+    color: $gray-400;
+  }
+
+  .task-browser-add-btn {
+    border-color: $border-color-dark;
+
+    &:disabled {
+      color: $success;
+      border-color: rgba($success, 0.3);
+    }
   }
 }
 

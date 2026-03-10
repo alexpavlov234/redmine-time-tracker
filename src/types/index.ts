@@ -10,6 +10,10 @@ export interface RedmineIssue {
     id: number;
     name: string;
   };
+  status?: {
+    id: number;
+    name: string;
+  };
 }
 
 export interface RedmineProject {

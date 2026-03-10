@@ -91,46 +91,59 @@
                 <div id="activity-display-container" style="display: none;"></div>
             </div>
 
-            <main class="row g-4 mt-2">
-                <!-- Left Column: Quick Add Panel -->
-                <section id="quick-add-panel" class="col-lg-5">
-                    <!-- Watched Issues - Collapsible -->
-                    <div class="card mb-3" id="watched-issues-card">
-                        <div class="card-header accordion-header" data-bs-toggle="collapse"
-                            data-bs-target="#watched-issues-collapse" aria-expanded="true">
-                            <h5 class="card-title mb-0 d-flex justify-content-between align-items-center">
-                                <span class="d-flex align-items-center gap-2">
-                                    <i class="fa-solid fa-eye text-primary"></i>
-                                    Watched Issues
-                                    <i class="fa-solid fa-chevron-down collapse-icon"></i>
-                                </span>
-                                <button id="refresh-watched-btn" class="btn btn-sm btn-outline-secondary"
+            <main class="mt-3">
+                <!-- Task Browser - Full Width -->
+                <section id="task-browser-section" class="mb-3">
+                    <div class="card" id="task-browser-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0 d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-tasks text-primary"></i>
+                                My Tasks
+                            </h5>
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="text" id="task-browser-search" class="form-control form-control-sm"
+                                    placeholder="Search tasks..." style="width: 200px;">
+                                <button id="refresh-task-browser-btn" class="btn btn-sm btn-outline-secondary"
                                     title="Refresh" onclick="event.stopPropagation();">
                                     <i class="fa-solid fa-sync-alt"></i>
                                 </button>
-                            </h5>
+                            </div>
                         </div>
-                        <div id="watched-issues-collapse" class="collapse show">
-                            <div class="card-body pt-0">
-                                <p class="text-muted small mb-2">Click any issue to add it to your queue</p>
-                                <div id="watched-issues-list" class="watched-issues-container">
-                                    <div class="text-center text-muted py-2">Loading...</div>
-                                </div>
+                        <div class="card-body pt-2">
+                            <div id="task-browser-list" class="task-browser-container">
+                                <div class="text-center text-muted py-3">Loading...</div>
                             </div>
                         </div>
                     </div>
+                </section>
 
-                    <!-- Manual Add Form - Collapsible -->
+                <!-- Work Queue - Full Width -->
+                <section id="work-queue-section" class="mb-3">
+                    <div class="card" id="work-queue-card">
+                        <div class="card-body">
+                            <h5 class="card-title d-flex justify-content-between align-items-center">
+                                <span><i class="fa-solid fa-layer-group text-primary"></i> Work Queue</span>
+                                <span id="queue-count" class="badge bg-primary">0</span>
+                            </h5>
+                            <p class="text-muted small mb-3">Drag to reorder. First task is active when timer starts.
+                            </p>
+                            <ul id="todo-list" class="list-unstyled work-queue-list"></ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Add Task Manually - Collapsed by default -->
+                <section id="add-task-section" class="mb-3">
                     <div class="card" id="add-task-card">
                         <div class="card-header accordion-header" data-bs-toggle="collapse"
-                            data-bs-target="#add-task-collapse" aria-expanded="true">
+                            data-bs-target="#add-task-collapse" aria-expanded="false">
                             <h5 class="card-title mb-0 d-flex align-items-center gap-2">
                                 <i class="fa-solid fa-plus-circle text-primary"></i>
                                 Add Task Manually
                                 <i class="fa-solid fa-chevron-down collapse-icon"></i>
                             </h5>
                         </div>
-                        <div id="add-task-collapse" class="collapse show">
+                        <div id="add-task-collapse" class="collapse">
                             <div class="card-body">
                                 <form id="todo-form">
                                     <div class="mb-3">
@@ -179,22 +192,9 @@
                     </div>
                 </section>
 
-                <!-- Right Column: Work Queue -->
-                <aside id="sidebar" class="col-lg-7">
-                    <div class="card" id="work-queue-card">
-                        <div class="card-body">
-                            <h5 class="card-title d-flex justify-content-between align-items-center">
-                                <span><i class="fa-solid fa-layer-group text-primary"></i> Work Queue</span>
-                                <span id="queue-count" class="badge bg-primary">0</span>
-                            </h5>
-                            <p class="text-muted small mb-3">Drag to reorder. First task is active when timer starts.
-                            </p>
-                            <ul id="todo-list" class="list-unstyled work-queue-list"></ul>
-                        </div>
-                    </div>
-
-                    <!-- Performed Tasks - Below Queue -->
-                    <div class="card mt-3" id="activity-card">
+                <!-- Performed Tasks - Collapsed -->
+                <section id="performed-tasks-section">
+                    <div class="card" id="activity-card">
                         <div class="card-header accordion-header" data-bs-toggle="collapse"
                             data-bs-target="#performed-tasks-collapse" aria-expanded="false">
                             <h5 class="card-title mb-0 d-flex align-items-center gap-2">
@@ -218,7 +218,7 @@
                             </div>
                         </div>
                     </div>
-                </aside>
+                </section>
             </main>
         </div>
 

@@ -15,6 +15,7 @@ let allTasks: RedmineIssue[] = [];
 let todoFormTasks: RedmineIssue[] = [];
 let issueStatuses: IssueStatus[] = [];
 let watchedIssues: RedmineIssue[] = [];
+let myIssues: RedmineIssue[] = [];
 let user: User | null = null;
 
 export const state = {
@@ -30,6 +31,7 @@ export const state = {
     get todoFormTasks() { return todoFormTasks; },
     get issueStatuses() { return issueStatuses; },
     get watchedIssues() { return watchedIssues; },
+    get myIssues() { return myIssues; },
     get user() { return user; },
 };
 
@@ -89,6 +91,10 @@ export function setIssueStatuses(statuses: IssueStatus[]) {
 
 export function setWatchedIssues(issues: RedmineIssue[]) {
     watchedIssues = issues;
+}
+
+export function setMyIssues(issues: RedmineIssue[]) {
+    myIssues = issues;
 }
 
 export function setUser(newUser: User | null) {

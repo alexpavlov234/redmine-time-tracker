@@ -317,3 +317,14 @@ export async function getWatchedIssues(limit: number = 25): Promise<RedmineIssue
         return [];
     }
 }
+
+export async function getMyIssues(limit: number = 50): Promise<RedmineIssue[]> {
+    try {
+        const endpoint = `/issues.json?assigned_to_id=me&status_id=open&limit=${limit}`;
+        const response = await redmineApiRequest(endpoint);
+        return response.issues || [];
+    } catch (error) {
+        console.error('Failed to fetch my issues:', error);
+        return [];
+    }
+}
