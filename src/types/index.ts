@@ -91,3 +91,16 @@ export interface Todo {
   // Per‑todo performed tasks (persisted)
   activities?: Activity[];
 }
+
+export interface TimeLogPreset {
+  id: string;
+  name: string;
+  projectId: string;
+  projectName: string;
+  taskId: string;
+  taskSubject: string;
+  activityId: string;
+  hours: number;
+  comments: string;
+  isBillable: boolean;
+}

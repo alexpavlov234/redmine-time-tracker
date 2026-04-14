@@ -152,48 +152,7 @@ export function addToQueue() {
     }
 }
 
-/**
- * Add a watched issue to the queue directly (for quick-add from watched issues list)
- */
-export function addToQueueFromWatched(issueId: string, projectId: string, projectName: string, subject: string) {
-    // Get default activity if available
-    const todoActivitySelect = document.getElementById('todo-activity-select') as HTMLSelectElement | null;
-    let activityId: number | undefined;
-    let activityName: string | undefined;
 
-    if (todoActivitySelect && todoActivitySelect.value) {
-        activityId = parseInt(todoActivitySelect.value, 10);
-        activityName = todoActivitySelect.options[todoActivitySelect.selectedIndex]?.text;
-    }
-
-    const newTodo: Todo = {
-        id: Date.now(),
-        note: '',
-        projectId,
-        projectName,
-        taskId: issueId,
-        taskSubject: subject,
-        activityId,
-        activityName,
-        elapsedMs: 0,
-        startTime: null,
-        isRunning: false,
-        activities: []
-    };
-
-    const updatedTodos = [...state.todos, newTodo];
-    setTodos(updatedTodos);
-    saveTodos();
-    renderTodos();
-
-    // Show success toast
-    (window as any).showSuccess?.(`Added #${issueId} to queue`, 'Task Added');
-
-    // Prepare next task if this is the first one
-    if (updatedTodos.length === 1 && !state.timerInterval) {
-        prepareNextTask();
-    }
-}
 
 export function deleteTodo(id: number) {
     const isActive = state.activeTodoId === id;

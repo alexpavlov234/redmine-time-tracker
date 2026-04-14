@@ -25,7 +25,6 @@ import { initializeCustomFields } from './modules/customFields.js';
 import { initLoggedTimePage, initCalendarListeners } from './modules/loggedTime.js';
 import { setUser } from './state';
 import { getCurrentUser } from './services/redmine.js';
-import { initTaskBrowser } from './modules/taskBrowser.js';
 
 // Initialize calendar listeners (for logged time page)
 initCalendarListeners();
@@ -49,7 +48,6 @@ async function init() {
         populateTasksForTodoForm();
         initializeActivities();
         initializeCustomFields();
-        initTaskBrowser();
 
         // Fetch user data after everything else is loaded
         try {

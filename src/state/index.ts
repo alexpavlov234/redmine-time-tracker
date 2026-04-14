@@ -1,4 +1,4 @@
-import { Activity, Todo, RedmineProject, RedmineIssue, IssueStatus, User } from '@/src/types';
+import { Activity, Todo, RedmineProject, RedmineIssue, IssueStatus, User, TimeLogPreset } from '@/src/types';
 
 // Timer state
 let timerInterval: number | null = null;
@@ -14,9 +14,8 @@ let allProjects: (RedmineProject | { id: string; name: string })[] = [];
 let allTasks: RedmineIssue[] = [];
 let todoFormTasks: RedmineIssue[] = [];
 let issueStatuses: IssueStatus[] = [];
-let watchedIssues: RedmineIssue[] = [];
-let myIssues: RedmineIssue[] = [];
 let user: User | null = null;
+let presets: TimeLogPreset[] = [];
 
 export const state = {
     get timerInterval() { return timerInterval; },
@@ -30,9 +29,8 @@ export const state = {
     get allTasks() { return allTasks; },
     get todoFormTasks() { return todoFormTasks; },
     get issueStatuses() { return issueStatuses; },
-    get watchedIssues() { return watchedIssues; },
-    get myIssues() { return myIssues; },
     get user() { return user; },
+    get presets() { return presets; },
 };
 
 // State setters
@@ -89,14 +87,10 @@ export function setIssueStatuses(statuses: IssueStatus[]) {
     issueStatuses = statuses;
 }
 
-export function setWatchedIssues(issues: RedmineIssue[]) {
-    watchedIssues = issues;
-}
-
-export function setMyIssues(issues: RedmineIssue[]) {
-    myIssues = issues;
-}
-
 export function setUser(newUser: User | null) {
     user = newUser;
+}
+
+export function setPresets(newPresets: TimeLogPreset[]) {
+    presets = newPresets;
 }

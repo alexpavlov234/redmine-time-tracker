@@ -4,8 +4,9 @@ import { RedmineIssue, TimeEntry } from '../types/index.js';
 import { formatDate } from '../utils/helpers.js';
 import { showError, showConfirm, showSuccess } from '../utils/ui.js';
 import { renderDailyLogCard } from '../components/DailyLogCard.js';
-import { getAvailableActivities, loadProjectActivities } from './activitySelector.js';
-import { initAutocomplete } from '../utils/autocomplete.js';
+import { createTimeEntryForm } from '../components/TimeEntryForm.js';
+import { getAvailableActivities } from './activitySelector.js';
+
 
 const todayLogContainer = document.getElementById('today-log-container') as HTMLDivElement;
 
@@ -14,12 +15,12 @@ let currentCalendarMonth = new Date();
 let calendarEntriesCache: Map<string, TimeEntry[]> = new Map();
 let calendarIssuesCache: Map<number, RedmineIssue> = new Map();
 
-let currentBulkTasks: any[] = [];
+
 
 // Multi-select state
 let multiSelectMode = false;
 let selectedDays: Set<string> = new Set();
-let selectedDayDate: string | null = null;
+
 
 async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
     const isEdit = !!entry;
@@ -50,10 +51,7 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
     let selectedTaskId = isEdit ? entry?.issue?.id : null;
     let selectedActivityId = isEdit ? entry?.activity?.id : getAvailableActivities().find(a => a.is_default)?.id;
 
-    // Store tasks for the selected project
-    let projectTasks: RedmineIssue[] = [];
-
-    // Create modal HTML
+    // Create modal HTML shell
     const modalId = 'manage-time-entry-modal';
     const modalHtml = `
         <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="manageTimeEntryModalLabel" aria-hidden="true">
@@ -63,64 +61,8 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
                         <h5 class="modal-title" id="manageTimeEntryModalLabel">${title}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <form id="manage-time-entry-form">
-                            <!-- Project Selection (Autocomplete) -->
-                            <div class="mb-3 position-relative">
-                                <label for="manage-project-input" class="form-label">Project</label>
-                                <div class="autocomplete-container">
-                                    <input type="text" class="form-control form-control-sm" id="manage-project-input" placeholder="Type to search projects..." autocomplete="off" required>
-                                    <div id="manage-project-list" class="autocomplete-items"></div>
-                                </div>
-                                <input type="hidden" id="manage-project-id">
-                            </div>
-
-                            <!-- Task Selection (Autocomplete) -->
-                            <div class="mb-3 position-relative">
-                                <label for="manage-task-search" class="form-label">Task (Issue)</label>
-                                <div class="autocomplete-container">
-                                    <input type="text" class="form-control form-control-sm" id="manage-task-search" placeholder="Select a project first..." autocomplete="off" required disabled>
-                                    <div id="manage-task-list" class="autocomplete-items"></div>
-                                </div>
-                                <input type="hidden" id="manage-task-id">
-                            </div>
-
-                             <div class="mb-3">
-                                <label for="manage-activity" class="form-label">Activity</label>
-                                <select class="form-select form-select-sm" id="manage-activity" required>
-                                     <option value="">-- Select Activity --</option>
-                                    ${getAvailableActivities().map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
-                                </select>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="manage-hours" class="form-label">Hours</label>
-                                    <input type="number" class="form-control form-control-sm" id="manage-hours" value="${hoursValue}" step="0.25" min="0.25" max="24" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="manage-spent-on" class="form-label">Date</label>
-                                    <input type="date" class="form-control form-control-sm" id="manage-spent-on" value="${dateValue}" required>
-                                </div>
-                                <div class="col-12 mb-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="manage-billable" ${isBillable ? 'checked' : ''}>
-                                        <label class="form-check-label" for="manage-billable">
-                                            Billable
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="manage-comments" class="form-label">Comments</label>
-                                <textarea class="form-control form-control-sm" id="manage-comments" rows="2" placeholder="Optional comment">${commentsValue}</textarea>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="save-time-entry">Save</button>
+                    <div class="modal-body" id="manage-time-entry-form-container">
+                        <!-- Form will be injected here -->
                     </div>
                 </div>
             </div>
@@ -136,201 +78,89 @@ async function manageTimeEntry(entry: TimeEntry | null, dateStr?: string) {
     const modal = new window.bootstrap.Modal(document.getElementById(modalId));
     modal.show();
 
-    // --- Logic Implementation ---
-
-    const projectInput = document.getElementById('manage-project-input') as HTMLInputElement;
-    const projectIdHidden = document.getElementById('manage-project-id') as HTMLInputElement;
-    const projectList = document.getElementById('manage-project-list') as HTMLDivElement;
-
-    const taskInput = document.getElementById('manage-task-search') as HTMLInputElement;
-    const taskList = document.getElementById('manage-task-list') as HTMLDivElement;
-    const taskIdHidden = document.getElementById('manage-task-id') as HTMLInputElement;
-
-    const activitySelect = document.getElementById('manage-activity') as HTMLSelectElement;
-
-    // --- Helper to fetch tasks ---
-    const fetchTasksForProject = async (pid: number) => {
-        taskInput.disabled = true;
-        taskInput.placeholder = 'Loading tasks...';
-        projectTasks = []; // Clear
-
-        try {
-            const endpoint = `/issues.json?project_id=${pid}&status_id=open&limit=100`;
-            const data = await redmineApiRequest(endpoint);
-            projectTasks = data.issues || [];
-
-            taskInput.disabled = false;
-            taskInput.placeholder = 'Type to search tasks...';
-        } catch (error) {
-            console.error('Failed to load tasks', error);
-            taskInput.placeholder = 'Error loading tasks';
-        }
-    };
-
-    // --- Pre-population ---
-    if (selectedProjectId) {
-        projectIdHidden.value = selectedProjectId.toString();
-        const proj = state.allProjects.find(p => p.id === selectedProjectId);
-        if (proj) {
-            projectInput.value = proj.name;
-            // Fetch tasks and filter activities for the pre-selected project
-            fetchTasksForProject(selectedProjectId).then(() => {
-                if (selectedTaskId) {
-                    taskIdHidden.value = selectedTaskId.toString();
-                    const issue = projectTasks.find(t => t.id === selectedTaskId) || entry?.issue;
-                    if (issue) {
-                        taskInput.value = `#${issue.id} ${issue.subject || ''}`;
-                    } else {
-                        taskInput.value = `#${selectedTaskId}`;
-                    }
-                }
-            });
-
-            // Filter activities by this project, then restore selection
-            loadProjectActivities(selectedProjectId, activitySelect).then(() => {
-                if (selectedActivityId) {
-                    activitySelect.value = selectedActivityId.toString();
-                }
-            });
-        }
-    } else {
-        // No project pre-selected, set activity from global list
-        if (selectedActivityId) {
-            activitySelect.value = selectedActivityId.toString();
-        }
-    }
-
-    // If we have a task ID but no project loaded yet (rare, but possible if entry incomplete), 
-    // Fallback if no project selected:
-    if (selectedTaskId && !selectedProjectId) {
-        taskInput.value = `#${selectedTaskId}`;
-        taskIdHidden.value = selectedTaskId.toString();
-    }
-
-
-    // --- Project Autocomplete ---
-    initAutocomplete({
-        inputEl: projectInput,
-        listEl: projectList,
-        sourceData: state.allProjects,
-        renderItem: (item: any) => item.name,
-        filterItem: (item: any, query: string) => item.name.toLowerCase().includes(query),
-        onSelect: async (item: any) => {
-            projectInput.value = item.name;
-            projectIdHidden.value = item.id.toString();
-            selectedProjectId = item.id;
-
-            // Reset Task
-            taskInput.value = '';
-            taskIdHidden.value = '';
-            selectedTaskId = null;
-
-            // Fetch Tasks and filter activities for the new project
-            await fetchTasksForProject(item.id);
-            await loadProjectActivities(item.id, activitySelect);
-        }
-    });
-
-    // --- Task Autocomplete ---
-    initAutocomplete({
-        inputEl: taskInput,
-        listEl: taskList,
-        sourceData: () => projectTasks, // Use the local array which gets updated
-        // Use same style as projects.ts/home page for consistency
-        renderItem: (item: RedmineIssue) => `#${item.id} - ${item.subject}`,
-        filterItem: (item: RedmineIssue, query: string) => {
-            const searchString = `#${item.id} ${item.subject}`.toLowerCase();
-            return searchString.includes(query.toLowerCase());
+    const formContainer = document.getElementById('manage-time-entry-form-container') as HTMLElement;
+    
+    // Inject dynamic component
+    createTimeEntryForm({
+        mode: 'single',
+        container: formContainer,
+        prefix: 'manage',
+        submitText: 'Save',
+        showCancel: true,
+        initialValues: {
+            projectId: selectedProjectId || undefined,
+            taskId: selectedTaskId || undefined,
+            activityId: selectedActivityId || undefined,
+            hours: hoursValue,
+            comments: commentsValue,
+            spentOn: dateValue,
+            isBillable
         },
-        onSelect: (item: RedmineIssue) => {
-            taskInput.value = `#${item.id} - ${item.subject}`; // Also align input value format
-            taskIdHidden.value = item.id.toString();
-            selectedTaskId = item.id;
-        }
-    });
+        onCancel: () => {
+             modal.hide();
+        },
+        onSubmit: async (values: any) => {
+            const { projectId, taskId, activityId, hours, spentOn, comments, isBillable } = values;
 
-
-    // Handle form submission
-    const saveButton = document.getElementById('save-time-entry');
-    saveButton?.addEventListener('click', async () => {
-        const hoursInput = document.getElementById('manage-hours') as HTMLInputElement;
-        const commentsInput = document.getElementById('manage-comments') as HTMLTextAreaElement;
-        const spentOnInput = document.getElementById('manage-spent-on') as HTMLInputElement;
-
-        const hours = parseFloat(hoursInput.value);
-        const comments = commentsInput.value;
-        const spentOn = spentOnInput.value;
-        const activityId = parseInt(activitySelect.value);
-        const issueId = parseInt(taskIdHidden.value);
-        const projectId = parseInt(projectIdHidden.value);
-        const billableCheckbox = document.getElementById('manage-billable') as HTMLInputElement;
-        const isBillable = billableCheckbox ? billableCheckbox.checked : false;
-
-        // Validation
-        if (isNaN(hours) || hours <= 0) {
-            showError('Please enter valid hours.');
-            return;
-        }
-        if (!projectId) {
-            showError('Please select a project.');
-            return;
-        }
-        if (!issueId) {
-            showError('Please select a task.');
-            return;
-        }
-        if (!activityId) {
-            showError('Please select an activity.');
-            return;
-        }
-
-        try {
-            // Prepare custom fields (Billable)
-            const customFields: { id: number; value: any }[] = [];
-            const billableFieldId = localStorage.getItem('billableFieldId');
-            if (billableFieldId) {
-                customFields.push({
-                    id: parseInt(billableFieldId, 10),
-                    value: isBillable ? "1" : "0"
-                });
+            // Validation
+            if (isNaN(hours) || hours <= 0) {
+                showError('Please enter valid hours.');
+                throw new Error('Invalid hours');
+            }
+            if (!projectId) {
+                showError('Please select a project.');
+                throw new Error('Project missing');
+            }
+            if (!taskId) {
+                showError('Please select a task.');
+                throw new Error('Task missing');
+            }
+            if (!activityId) {
+                showError('Please select an activity.');
+                throw new Error('Activity missing');
             }
 
-            if (isEdit && entry) {
-                await updateTimeEntry(entry.id, {
-                    hours,
-                    comments,
-                    spent_on: spentOn,
-                    activity_id: activityId,
-                    issue_id: issueId,
-                    custom_fields: customFields
-                });
-                showSuccess('Time entry updated successfully.');
-            } else {
-                // Create New Entry
-                await createTimeEntry({
-                    hours,
-                    comments,
-                    spent_on: spentOn,
-                    activity_id: activityId,
-                    issue_id: issueId,
-                    project_id: projectId,
-                    custom_fields: customFields
-                });
-                showSuccess('Time entry created successfully.');
+            try {
+                // Prepare custom fields (Billable)
+                const customFields: { id: number; value: any }[] = [];
+                if (billableFieldId) {
+                    customFields.push({
+                        id: parseInt(billableFieldId, 10),
+                        value: isBillable ? "1" : "0"
+                    });
+                }
+
+                if (isEdit && entry) {
+                    await updateTimeEntry(entry.id, {
+                        hours,
+                        comments,
+                        spent_on: spentOn,
+                        activity_id: parseInt(activityId),
+                        issue_id: parseInt(taskId),
+                        custom_fields: customFields
+                    });
+                    showSuccess('Time entry updated successfully.');
+                } else {
+                    // Create New Entry
+                    await createTimeEntry({
+                        hours,
+                        comments,
+                        spent_on: spentOn,
+                        activity_id: parseInt(activityId),
+                        issue_id: parseInt(taskId),
+                        project_id: parseInt(projectId),
+                        custom_fields: customFields
+                    });
+                    showSuccess('Time entry created successfully.');
+                }
+
+                modal.hide();
+                await refreshCalendarAfterChange();
+            } catch (error) {
+                showError('Failed to save time entry.');
+                console.error(error);
+                throw error;
             }
-
-            modal.hide();
-
-            // Remove the modal from DOM after hiding
-            document.getElementById(modalId)?.addEventListener('hidden.bs.modal', function () {
-                modalContainer.remove();
-            });
-
-            // Refresh the logged time page and calendar if open
-            await refreshCalendarAfterChange();
-        } catch (error) {
-            showError('Failed to save time entry.');
-            console.error(error);
         }
     });
 
@@ -537,7 +367,7 @@ async function loadCalendarView() {
     if (dayDetails) {
         dayDetails.style.display = 'none';
     }
-    selectedDayDate = null;
+
 
     try {
         // Calculate date range for the month
@@ -725,7 +555,7 @@ export function showCalendarDayDetails(dateStr: string) {
         selectedDay.classList.add('selected');
     }
 
-    selectedDayDate = dateStr;
+
 
     const entries = calendarEntriesCache.get(dateStr) || [];
 
@@ -846,165 +676,65 @@ function updateMultiSelectUI(specificDateStr?: string) {
 
 function updateBulkLogButton() {
     const submitBtn = document.getElementById('bulk-submit-btn') as HTMLButtonElement;
-    const countSpan = document.getElementById('bulk-submit-count');
-
-    if (submitBtn && countSpan) {
-        countSpan.textContent = selectedDays.size.toString();
+    if (submitBtn) {
+        submitBtn.innerHTML = `<i class="fa-solid fa-paper-plane me-1"></i>Log Time for ${selectedDays.size} Days`;
         submitBtn.disabled = selectedDays.size === 0;
     }
 }
 
 // Bulk Log Form Logic
 
+let bulkFormCleanup: (() => void) | null = null;
 let bulkFormInitialized = false;
 
 function initBulkLogForm() {
     if (bulkFormInitialized) return;
 
-    // Initialize autocomplete for bulk form
-    // Note: We're reusing the population logic from projects.ts but specialized for this form
-    // Since we don't have direct access to populateTasksForTodoForm with a target, we'll
-    // replicate the necessary bits or assume the data is already in state.projects/tasks
+    const container = document.getElementById('bulk-log-form-container');
+    if (!container) return;
 
-    const projectInput = document.getElementById('bulk-project-input') as HTMLInputElement;
-    const taskInput = document.getElementById('bulk-task-input') as HTMLInputElement;
-    const activitySelect = document.getElementById('bulk-activity-select') as HTMLSelectElement;
-    const form = document.getElementById('bulk-log-form') as HTMLFormElement;
+    if (bulkFormCleanup) bulkFormCleanup();
 
-    if (!projectInput || !taskInput || !activitySelect || !form) return;
-
-    // Populate activities
-    const availableActivities = getAvailableActivities();
-    if (availableActivities.length > 0) {
-        activitySelect.innerHTML = '<option value="">-- Select Activity --</option>' +
-            availableActivities.map(act => `<option value="${act.id}">${act.name}</option>`).join('');
-    }
-
-    // Setup autocomplete (simplified version of queue.ts logic)
-    setupBulkAutocomplete(projectInput, taskInput, activitySelect);
-
-    // Handle submit
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await submitBulkTimeEntries();
+    bulkFormCleanup = createTimeEntryForm({
+        mode: 'bulk',
+        container,
+        prefix: 'bulk',
+        submitText: `Log Time for ${selectedDays.size} Days`,
+        onSubmit: async (values) => {
+            await submitBulkTimeEntries(values);
+        }
     });
 
     bulkFormInitialized = true;
 }
 
-function setupBulkAutocomplete(projectInput: HTMLInputElement, taskInput: HTMLInputElement, activitySelect: HTMLSelectElement) {
-    // Project autocomplete
-    const projectList = document.getElementById('bulk-project-list') as HTMLDivElement;
-    if (projectList) {
-        initAutocomplete({
-            inputEl: projectInput,
-            listEl: projectList,
-            sourceData: state.allProjects,
-            renderItem: (item: any) => item.name,
-            filterItem: (item: any, query: string) => item.name.toLowerCase().includes(query),
-            onSelect: async (item: any) => {
-                projectInput.value = item.name;
-                projectInput.dataset.projectId = item.id.toString();
-
-                // Enable task input and reset it
-                taskInput.disabled = true;
-                taskInput.value = '';
-                taskInput.placeholder = 'Loading tasks...';
-                delete taskInput.dataset.taskId;
-                currentBulkTasks = [];
-
-                // Filter activity dropdown by project
-                loadProjectActivities(item.id, activitySelect);
-
-                try {
-                    const endpoint = `/issues.json?project_id=${item.id}&status_id=open&limit=100`;
-                    const data = await redmineApiRequest(endpoint);
-                    currentBulkTasks = data.issues || [];
-
-                    taskInput.disabled = false;
-                    taskInput.placeholder = 'Search tasks...';
-                } catch (error) {
-                    console.error('Failed to load tasks', error);
-                    taskInput.placeholder = 'Error loading tasks';
-                }
-            }
-        });
-    }
-
-    // Task autocomplete
-    const taskList = document.getElementById('bulk-task-list') as HTMLDivElement;
-    if (taskList) {
-        initAutocomplete({
-            inputEl: taskInput,
-            listEl: taskList,
-            sourceData: () => currentBulkTasks,
-            renderItem: (item: any) => `#${item.id} ${item.subject}`,
-            filterItem: (item: any, query: string) => {
-                return item.subject.toLowerCase().includes(query) || item.id.toString().includes(query);
-            },
-            onSelect: (item: any) => {
-                taskInput.value = `#${item.id} ${item.subject}`;
-                taskInput.dataset.taskId = item.id.toString();
-            }
-        });
-    }
-
-    // Helper to close lists when clicking outside is now handled by initAutocomplete
-}
-
-async function submitBulkTimeEntries() {
+// We still need a method to handle the loop
+async function submitBulkTimeEntries(values: any) {
     const statusDiv = document.getElementById('bulk-log-status');
-    const submitBtn = document.getElementById('bulk-submit-btn') as HTMLButtonElement;
+    const { taskId, activityId, hours, comments, isBillable } = values;
 
     if (selectedDays.size === 0) {
         showError('Please select at least one day.');
-        return;
+        throw new Error('No selected days');
     }
 
-    const taskInput = document.getElementById('bulk-task-input') as HTMLInputElement;
-    const issueId = taskInput.dataset.taskId;
-
-    const activitySelect = document.getElementById('bulk-activity-select') as HTMLSelectElement;
-    const activityId = activitySelect.value;
-
-    const hoursInput = document.getElementById('bulk-hours-input') as HTMLInputElement;
-    const hours = parseFloat(hoursInput.value);
-
-    const descInput = document.getElementById('bulk-description-input') as HTMLInputElement;
-    const comments = descInput.value.trim();
-
-    const billableCheckbox = document.getElementById('bulk-billable-checkbox') as HTMLInputElement;
-    const isBillable = billableCheckbox.checked;
-
-    // Validation
-    if (!issueId) {
-        if (statusDiv) {
-            statusDiv.textContent = 'Please select a valid task.';
-            statusDiv.className = 'status-message error';
-        }
-        return;
+    if (!taskId) {
+        showError('Please select a valid task.');
+        throw new Error('No task');
     }
     if (!activityId) {
-        if (statusDiv) {
-            statusDiv.textContent = 'Please select an activity.';
-            statusDiv.className = 'status-message error';
-        }
-        return;
+        showError('Please select an activity.');
+        throw new Error('No activity');
     }
     if (isNaN(hours) || hours <= 0) {
-        if (statusDiv) {
-            statusDiv.textContent = 'Please enter valid hours.';
-            statusDiv.className = 'status-message error';
-        }
-        return;
+        showError('Please enter valid hours.');
+        throw new Error('Invalid hours');
     }
 
-    // Submit
     if (statusDiv) {
         statusDiv.textContent = `Submitting time for ${selectedDays.size} days...`;
         statusDiv.className = 'status-message loading';
     }
-    submitBtn.disabled = true;
 
     const billableFieldId = localStorage.getItem('billableFieldId');
     const customFields = [];
@@ -1016,12 +746,11 @@ async function submitBulkTimeEntries() {
     let failCount = 0;
     const total = selectedDays.size;
 
-    // Process days sequentially to avoid rate limiting
     for (const dateStr of selectedDays) {
         try {
             const payload = {
                 time_entry: {
-                    issue_id: parseInt(issueId),
+                    issue_id: parseInt(taskId),
                     hours: hours,
                     comments: comments,
                     activity_id: parseInt(activityId),
@@ -1043,29 +772,23 @@ async function submitBulkTimeEntries() {
         }
     }
 
-    // Final status
     if (failCount === 0) {
         if (statusDiv) {
             statusDiv.textContent = `Successfully logged time for all ${successCount} days!`;
             statusDiv.className = 'status-message success';
         }
 
-        // Reset and refresh
         setTimeout(() => {
-            // Exit multi-select mode
             toggleMultiSelect();
-            // Refresh calendar
             loadCalendarView();
-            // Refresh recent logs
             initLoggedTimePage();
 
             if (statusDiv) statusDiv.textContent = '';
-
-            // Clear form inputs
-            taskInput.value = '';
-            delete taskInput.dataset.taskId;
-            descInput.value = '';
-
+            
+            // Re-initialize later natively
+            bulkFormInitialized = false; 
+            const container = document.getElementById('bulk-log-form-container');
+            if(container) container.innerHTML = '';
         }, 1500);
 
     } else {
@@ -1073,10 +796,8 @@ async function submitBulkTimeEntries() {
             statusDiv.textContent = `Completed with errors. Success: ${successCount}, Failed: ${failCount}. See console for details.`;
             statusDiv.className = 'status-message warning';
         }
-        submitBtn.disabled = false;
-
-        // Refresh to show partial success
         loadCalendarView();
+        throw new Error('Completed with errors');
     }
 }
 

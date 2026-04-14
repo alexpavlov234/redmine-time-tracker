@@ -44,7 +44,7 @@ function mapHttpError(status: number, statusText: string, errorText: string) {
     return new Error(readable);
 }
 
-function mapNetworkError(e: unknown, context: 'proxy' | 'direct', redmineUrl: string) {
+function mapNetworkError(e: unknown, context: 'proxy' | 'direct') {
     const msg = e instanceof Error ? e.message : String(e);
     let hint = '';
     if (context === 'proxy') {
@@ -107,7 +107,7 @@ export async function redmineApiRequest(endpoint: string, method: string = 'GET'
         const shouldTryDirect = isHttps;
         // If we shouldn't try direct, rethrow mapped proxy error
         if (!shouldTryDirect) {
-            throw mapNetworkError(e, 'proxy', redmineUrl);
+            throw mapNetworkError(e, 'proxy');
         }
 
         // Try direct HTTPS call (may be blocked by CORS depending on Redmine server)
@@ -136,8 +136,8 @@ export async function redmineApiRequest(endpoint: string, method: string = 'GET'
         } catch (e2) {
             clearDirectTimeout();
             // Provide a combined error indicating proxy and direct both failed
-            const proxyErr = mapNetworkError(e, 'proxy', redmineUrl).message;
-            const directErr = mapNetworkError(e2, 'direct', redmineUrl).message;
+            const proxyErr = mapNetworkError(e, 'proxy').message;
+            const directErr = mapNetworkError(e2, 'direct').message;
             throw new Error(`${proxyErr}\n${directErr}`);
         }
     }
