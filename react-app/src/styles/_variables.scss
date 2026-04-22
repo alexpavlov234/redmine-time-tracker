@@ -1,0 +1,63 @@
+// Premium Theme Variables
+
+// Colors
+$color-bg-light: #f8fafc;
+$color-surface-light: #ffffff;
+$color-text-light: #0f172a;
+$color-text-muted-light: #64748b;
+
+$color-bg-dark: #0f172a;
+$color-surface-dark: #1e293b;
+$color-text-dark: #f8fafc;
+$color-text-muted-dark: #94a3b8;
+
+$color-primary: #3b82f6;
+$color-primary-hover: #2563eb;
+$color-primary-alpha: rgba(59, 130, 246, 0.15);
+
+$color-success: #10b981;
+$color-warning: #f59e0b;
+$color-danger: #ef4444;
+
+$color-border-light: #e2e8f0;
+$color-border-dark: #334155;
+
+// Typography
+$font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+$font-size-xs: 0.75rem;
+$font-size-sm: 0.875rem;
+$font-size-md: 1rem;
+$font-size-lg: 1.125rem;
+$font-size-xl: 1.25rem;
+$font-size-2xl: 1.5rem;
+$font-size-3xl: 1.875rem;
+
+// Spacing
+$spacing-1: 0.25rem;
+$spacing-2: 0.5rem;
+$spacing-3: 0.75rem;
+$spacing-4: 1rem;
+$spacing-5: 1.25rem;
+$spacing-6: 1.5rem;
+$spacing-8: 2rem;
+$spacing-10: 2.5rem;
+$spacing-12: 3rem;
+
+// Shadows (Premium Glassmorphism / Depth)
+$shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+$shadow-glow: 0 0 15px rgba(59, 130, 246, 0.5);
+
+// Radii
+$radius-sm: 0.25rem;
+$radius-md: 0.375rem;
+$radius-lg: 0.5rem;
+$radius-xl: 0.75rem;
+$radius-2xl: 1rem;
+$radius-full: 9999px;
+
+// Transitions
+$transition-fast: 150ms ease-in-out;
+$transition-normal: 250ms ease-in-out;
+$transition-bounce: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);

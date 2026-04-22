@@ -1,0 +1,76 @@
+@use "../../styles/variables" as *;
+
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-1;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.label {
+  font-size: $font-size-sm;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.inputContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icon {
+  position: absolute;
+  left: $spacing-3;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  padding: $spacing-2 $spacing-3;
+  font-family: inherit;
+  font-size: $font-size-sm;
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  transition: border-color $transition-fast, box-shadow $transition-fast;
+  outline: none;
+
+  &::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  &.hasIcon {
+    padding-left: 2.25rem;
+  }
+
+  &:focus {
+    border-color: $color-primary;
+    box-shadow: 0 0 0 2px $color-primary-alpha;
+  }
+
+  &.hasError {
+    border-color: $color-danger;
+    &:focus {
+      box-shadow: 0 0 0 2px rgba($color-danger, 0.15);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+}
+
+.errorText {
+  font-size: $font-size-xs;
+  color: $color-danger;
+  margin-top: 0.125rem;
+}

@@ -1,0 +1,90 @@
+@use "../../styles/variables" as *;
+
+.header {
+  text-align: center;
+  margin-bottom: $spacing-6;
+}
+
+.title {
+  font-size: $font-size-3xl;
+  font-weight: 700;
+  margin-bottom: $spacing-4;
+  color: var(--text-color);
+}
+
+.navContainer {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: $spacing-4;
+}
+
+.navLinks {
+  display: flex;
+  gap: $spacing-4;
+  background: var(--surface-color);
+  padding: $spacing-2 $spacing-4;
+  border-radius: $radius-full;
+  border: 1px solid var(--border-color);
+  box-shadow: $shadow-sm;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: $spacing-2;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: $spacing-2 $spacing-4;
+  border-radius: $radius-full;
+  transition: all $transition-normal;
+
+  &:hover {
+    color: var(--text-color);
+    background: rgba(0, 0, 0, 0.05);
+
+    :global([data-theme="dark"]) & {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  &.active {
+    color: white;
+    background: $color-primary;
+    box-shadow: $shadow-sm;
+
+    &:hover {
+      background: $color-primary-hover;
+    }
+  }
+}
+
+.themeToggle {
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all $transition-fast;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: scale(1.05);
+
+    :global([data-theme="dark"]) & {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}

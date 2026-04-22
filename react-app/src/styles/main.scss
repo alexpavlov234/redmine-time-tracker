@@ -1,0 +1,61 @@
+@use "./variables" as *;
+
+:root {
+  --bg-color: #{$color-bg-light};
+  --surface-color: #{$color-surface-light};
+  --text-color: #{$color-text-light};
+  --text-muted: #{$color-text-muted-light};
+  --border-color: #{$color-border-light};
+}
+
+[data-theme="dark"] {
+  --bg-color: #{$color-bg-dark};
+  --surface-color: #{$color-surface-dark};
+  --text-color: #{$color-text-dark};
+  --text-muted: #{$color-text-muted-dark};
+  --border-color: #{$color-border-dark};
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: $font-family;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color $transition-normal, color $transition-normal;
+}
+
+a {
+  color: $color-primary;
+  text-decoration: none;
+  transition: color $transition-fast;
+  
+  &:hover {
+    color: $color-primary-hover;
+  }
+}
+
+// Global utility classes for premium feel
+.glass-panel {
+  background: rgba(var(--surface-color), 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  box-shadow: $shadow-md;
+}
+
+// App shell specific layout
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: $spacing-6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-6;
+}

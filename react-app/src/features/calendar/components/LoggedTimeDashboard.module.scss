@@ -1,0 +1,38 @@
+@use "../../../styles/variables" as *;
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-6;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pageTitle {
+  font-size: $font-size-2xl;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-3;
+}
+
+.grid {
+  display: grid;
+  gap: $spacing-6;
+  grid-template-columns: 1fr;
+}
+
+.bulkFormContainer {
+  margin-top: $spacing-4;
+}

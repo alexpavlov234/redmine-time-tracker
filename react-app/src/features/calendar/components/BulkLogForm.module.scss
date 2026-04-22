@@ -1,0 +1,77 @@
+@use "../../../styles/variables" as *;
+
+.bulkCard {
+  animation: slideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid $color-primary;
+  box-shadow: 0 0 0 1px rgba($color-primary, 0.1), $shadow-md;
+}
+
+.badge {
+  background-color: $color-primary;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: $radius-full;
+  font-size: $font-size-sm;
+  font-weight: 700;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-4;
+  margin-top: $spacing-2;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $spacing-4;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-3;
+  margin-top: $spacing-4;
+  padding-top: $spacing-4;
+  border-top: 1px solid var(--border-color);
+}
+
+.progressContainer {
+  margin-top: $spacing-4;
+  height: 8px;
+  background-color: var(--border-color);
+  border-radius: $radius-full;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressBar {
+  height: 100%;
+  background-color: $color-success;
+  transition: width 300ms ease-out;
+}
+
+.progressText {
+  position: absolute;
+  top: -20px;
+  right: 0;
+  font-size: $font-size-xs;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

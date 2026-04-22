@@ -1,0 +1,56 @@
+@use "../../styles/variables" as *;
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: $radius-xl;
+  overflow: hidden;
+  transition: box-shadow $transition-normal;
+  
+  &:hover {
+    box-shadow: $shadow-lg;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-4 $spacing-5;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.02);
+
+  :global([data-theme="dark"]) & {
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: $font-size-lg;
+  font-weight: 600;
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  gap: $spacing-2;
+}
+
+.action {
+  display: flex;
+  gap: $spacing-2;
+}
+
+.body {
+  padding: $spacing-5;
+  flex: 1;
+}
+
+.footer {
+  padding: $spacing-3 $spacing-5;
+  border-top: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.01);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $spacing-3;
+}

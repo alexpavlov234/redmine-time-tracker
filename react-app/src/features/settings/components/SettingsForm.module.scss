@@ -1,0 +1,49 @@
+@use "../../../styles/variables" as *;
+
+.settingsCard {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.formContainer {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-4;
+}
+
+.actions {
+  display: flex;
+  gap: $spacing-3;
+  margin-top: $spacing-2;
+}
+
+.alert {
+  padding: $spacing-3;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-weight: 500;
+  animation: slideIn 300ms ease-out;
+}
+
+.alertSuccess {
+  background-color: rgba($color-success, 0.1);
+  color: $color-success;
+  border: 1px solid rgba($color-success, 0.2);
+}
+
+.alertError {
+  background-color: rgba($color-danger, 0.1);
+  color: $color-danger;
+  border: 1px solid rgba($color-danger, 0.2);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
