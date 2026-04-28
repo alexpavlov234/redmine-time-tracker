@@ -26,8 +26,8 @@ function loadTodosFromStorage(): Todo[] {
     return parsed.map((t: any) => ({
       ...t,
       elapsedMs: typeof t.elapsedMs === 'number' ? t.elapsedMs : 0,
-      startTime: null, // Don't keep running state across reloads
-      isRunning: false,
+      startTime: typeof t.startTime === 'number' ? t.startTime : null,
+      isRunning: typeof t.isRunning === 'boolean' ? t.isRunning : false,
       activities: Array.isArray(t.activities)
         ? t.activities.map((a: any) => ({
             text: a.text,

@@ -25,14 +25,24 @@ interface QueueTimerActions {
 export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
   const { todos, activeTodoId, setActiveTodoId, updateTodo, removeTodo, getActiveTodo } = useQueue();
 
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [totalElapsedTime, setTotalElapsedTime] = useState(0);
+  const activeTodo = getActiveTodo();
+  const isRunning = activeTodo?.isRunning || false;
+
+  const calculateElapsed = useCallback(() => {
+    const todo = getActiveTodo();
+    if (!todo) return 0;
+    const baseElapsed = todo.elapsedMs || 0;
+    const runningStart = (todo.isRunning && todo.startTime) ? (Date.now() - todo.startTime) : 0;
+    return Math.floor((baseElapsed + Math.max(0, runningStart)) / 1000);
+  }, [getActiveTodo]);
+
+  const [activities, setActivities] = useState<Activity[]>(() => 
+    (activeTodo?.activities && Array.isArray(activeTodo.activities)) ? activeTodo.activities : []
+  );
+  const [totalElapsedTime, setTotalElapsedTime] = useState(calculateElapsed);
 
   const intervalRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
-
-  const isRunning = intervalRef.current !== null;
-  const activeTodo = getActiveTodo();
 
   // Live update function
   const updateTime = useCallback(() => {
@@ -49,11 +59,35 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
     setTotalElapsedTime(elapsedSec);
   }, [activeTodoId, getActiveTodo]);
 
+  // Sync local state when context changes
+  useEffect(() => {
+    const todo = getActiveTodo();
+    if (todo) {
+      if (JSON.stringify(todo.activities) !== JSON.stringify(activities)) {
+        setActivities(todo.activities || []);
+      }
+      setTotalElapsedTime(calculateElapsed());
+    } else {
+      setActivities([]);
+      setTotalElapsedTime(0);
+    }
+  }, [activeTodoId, todos, calculateElapsed]);
+
+  // Resume timer on mount/load if it was running
+  useEffect(() => {
+    const todo = getActiveTodo();
+    if (todo?.isRunning && !intervalRef.current) {
+      intervalRef.current = window.setInterval(() => updateTime(), 1000);
+      updateTime();
+    }
+  }, [activeTodoId, getActiveTodo, updateTime]);
+
   // Clean up interval on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, []);
