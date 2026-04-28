@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "proxy": "node proxy-simple.js",
-    "dev:full": "concurrently \"npm run proxy\" \"npm run dev\"",
+    "dev:full": "concurrently -n \"proxy,vite\" -c \"blue,green\" --kill-others \"npm:proxy\" \"npm:dev\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
