@@ -5,28 +5,32 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:scss": "concurrently \"npm run sass:watch\" \"npm run dev\"",
-    "build": "npm run sass:build && vite build",
-    "build:css": "vite build --mode production",
-    "preview": "vite preview",
     "proxy": "node proxy-simple.js",
-    "dev:full": "npm run sass:build && concurrently \"npm run proxy\" \"npm run dev:scss\"",
-    "sass:watch": "sass src/scss/main.scss:dist/css/main.min.css --watch --style=compressed --source-map",
-    "sass:build": "sass src/scss/main.scss:dist/css/main.min.css --style=compressed --source-map"
+    "dev:full": "concurrently \"npm run proxy\" \"npm run dev\"",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "bootstrap": "^5.3.7",
-    "cors": "^2.8.5",
-    "express": "^4.18.0",
-    "http-proxy-middleware": "^3.0.5",
-    "node-fetch": "^3.3.2",
-    "sass": "^1.89.2"
+    "lucide-react": "^1.8.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-router-dom": "^7.14.2",
+    "sass": "^1.99.0"
   },
   "devDependencies": {
-    "@types/bootstrap": "^5.2.10",
-    "@types/node": "^22.14.0",
-    "concurrently": "^9.2.0",
-    "typescript": "~5.7.2",
-    "vite": "^6.2.0"
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.5.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.58.2",
+    "vite": "^8.0.9"
   }
 }

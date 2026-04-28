@@ -1,8 +1,8 @@
-import { TimeEntry, RedmineIssue } from '../types/index.js';
+import type { RedmineIssue, TimeEntry, CustomField } from '../types';
 
 // Configuration for proxy URL
 const PROXY_BASE_URL = 'http://localhost:3000/api';
-const TIMEOUT_MS = 15000; // 15s default timeout
+const TIMEOUT_MS = 60000; // 60s timeout
 
 function withTimeout(controller: AbortController, ms: number) {
     const timer = setTimeout(() => controller.abort(), ms);
@@ -171,7 +171,7 @@ export async function getIssues(ids: number[]) {
         return [];
     }
     try {
-        const response = await redmineApiRequest(`/issues.json?issue_id=${ids.join(',')}&limit=${ids.length}`);
+        const response = await redmineApiRequest(`/issues.json?issue_id=${ids.join(',')}&status_id=*&limit=${ids.length}`);
         return response.issues;
     } catch (error) {
         console.error(`Could not fetch issues`, error);
@@ -257,27 +257,29 @@ export async function deleteTimeEntry(id: number) {
     }
 }
 
-export async function getTimeEntryCustomFields() {
+export async function getTimeEntryCustomFields(): Promise<CustomField[]> {
+    // Try scanning recent entries first - this works for non-admins!
     try {
-        // First, try to get time entry custom fields
-        // Unfortunately, Redmine doesn't have a direct API for time entry custom fields
-        // We need to get them from a time entry or infer from project settings
-
-        // Let's try to get custom fields from any existing time entry
-        const timeEntriesResponse = await redmineApiRequest('/time_entries.json?limit=1&include=custom_fields');
-
-        if (timeEntriesResponse.time_entries && timeEntriesResponse.time_entries.length > 0) {
-            const timeEntry = timeEntriesResponse.time_entries[0];
-            if (timeEntry.custom_fields) {
-                return timeEntry.custom_fields;
+        const timeEntriesResponse = await redmineApiRequest('/time_entries.json?limit=10&include=custom_fields');
+        if (timeEntriesResponse.time_entries) {
+            const entryWithFields = timeEntriesResponse.time_entries.find((e: any) => 
+                e.custom_fields && e.custom_fields.length > 0
+            );
+            if (entryWithFields) {
+                return entryWithFields.custom_fields;
             }
         }
+    } catch (e) {
+        console.warn('Scanning recent entries failed, trying admin API...');
+    }
 
-        // If no time entries exist, return an empty array
-        return [];
+    // Fallback to official API (requires admin permissions)
+    try {
+        const response = await redmineApiRequest('/custom_fields.json');
+        return response.custom_fields.filter((f: any) => f.type === 'TimeEntryCustomField' || f.customized_type === 'time_entry');
     } catch (error) {
-        console.error('Failed to fetch time entry custom fields:', error);
-        return [];
+        console.error('All custom field detection methods failed.');
+        throw error;
     }
 }
 
