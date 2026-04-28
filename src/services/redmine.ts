@@ -1,7 +1,8 @@
 import type { RedmineIssue, TimeEntry, CustomField } from '../types';
 
 // Configuration for proxy URL
-const PROXY_BASE_URL = 'http://localhost:3000/api';
+const IS_DEV = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const PROXY_BASE_URL = IS_DEV ? 'http://localhost:3000/api' : '/api'; // Fallback or configurable in the future
 const TIMEOUT_MS = 60000; // 60s timeout
 
 function withTimeout(controller: AbortController, ms: number) {
