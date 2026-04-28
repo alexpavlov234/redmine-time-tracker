@@ -20,7 +20,7 @@ function App() {
           <QueueProvider>
             <ToastProvider>
               <ConfirmProvider>
-                <BrowserRouter>
+                <BrowserRouter basename="/redmine-time-tracker">
                   <Routes>
                     <Route path="/" element={<AppShell />}>
                       <Route index element={<TrackerDashboard />} />
