@@ -10,6 +10,7 @@ interface QueueContextProps {
   setActiveTodoId: (id: number | null) => void;
   updateTodo: (id: number, updates: Partial<Todo>) => void;
   getActiveTodo: () => Todo | undefined;
+  totalElapsedTime: number;
 }
 
 const QueueContext = createContext<QueueContextProps | undefined>(undefined);
@@ -55,11 +56,35 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Only restore if the todo still exists
     return storedId && todosFromStorage.some(t => t.id === storedId) ? storedId : null;
   });
+  const [totalElapsedTime, setTotalElapsedTime] = useState(0);
 
   // Persist todos whenever they change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
   }, [todos]);
+
+  // Global timer interval
+  useEffect(() => {
+    const syncTime = () => {
+      const activeTodo = todos.find(t => t.id === activeTodoId);
+      if (activeTodo && activeTodo.isRunning && activeTodo.startTime) {
+        const now = Date.now();
+        const baseElapsed = activeTodo.elapsedMs || 0;
+        const sessionMs = now - activeTodo.startTime;
+        const totalMs = baseElapsed + Math.max(0, sessionMs);
+        setTotalElapsedTime(Math.floor(totalMs / 1000));
+      } else if (activeTodo) {
+        setTotalElapsedTime(Math.floor((activeTodo.elapsedMs || 0) / 1000));
+      } else {
+        setTotalElapsedTime(0);
+      }
+    };
+
+    syncTime(); // Sync immediately
+    const interval = setInterval(syncTime, 1000);
+
+    return () => clearInterval(interval);
+  }, [todos, activeTodoId]);
 
   const setActiveTodoId = useCallback((id: number | null) => {
     setActiveTodoIdState(id);
@@ -123,6 +148,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveTodoId,
         updateTodo,
         getActiveTodo,
+        totalElapsedTime,
       }}
     >
       {children}
