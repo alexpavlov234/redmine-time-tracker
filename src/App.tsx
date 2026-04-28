@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { UserProvider } from './contexts/UserContext';
 import { ProjectsProvider } from './contexts/ProjectsContext';
@@ -20,7 +20,7 @@ function App() {
           <QueueProvider>
             <ToastProvider>
               <ConfirmProvider>
-                <BrowserRouter basename="/redmine-time-tracker">
+                <Router>
                   <Routes>
                     <Route path="/" element={<AppShell />}>
                       <Route index element={<TrackerDashboard />} />
@@ -28,7 +28,7 @@ function App() {
                       <Route path="settings" element={<SettingsForm />} />
                     </Route>
                   </Routes>
-                </BrowserRouter>
+                </Router>
               </ConfirmProvider>
             </ToastProvider>
           </QueueProvider>
