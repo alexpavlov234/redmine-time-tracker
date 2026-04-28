@@ -122,7 +122,6 @@ export const AddTaskForm: React.FC = () => {
               onChange={(e) => setActivityId(e.target.value)}
               fullWidth
               disabled={isLoadingActivities || !projectId}
-              loading={isLoadingActivities}
             >
               <option value="">-- Select activity (optional) --</option>
               {activities.map(a => (

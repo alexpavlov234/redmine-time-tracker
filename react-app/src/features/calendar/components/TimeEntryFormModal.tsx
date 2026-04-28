@@ -7,7 +7,8 @@ import { usePresets } from '../../../hooks/usePresets';
 import { useToast } from '../../../contexts/ToastContext';
 import { createTimeEntry, updateTimeEntry } from '../../../services/redmine';
 import type { TimeEntry, TimeLogPreset } from '../../../types';
-import { Save, Send, Bookmark, Trash2, Plus } from 'lucide-react';
+import { Save, Send, Trash2, Plus, ListTodo } from 'lucide-react';
+import { useCustomFields } from '../../../hooks/useCustomFields';
 
 interface TimeEntryFormModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   const { allProjects } = useProjects();
   const { showSuccess, showError } = useToast();
   const { presets, savePreset, deletePreset } = usePresets();
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   const [projectId, setProjectId] = useState('');
   const [taskId, setTaskId] = useState('');
@@ -36,9 +38,12 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   const [hours, setHours] = useState('');
   const [spentOn, setSpentOn] = useState('');
   const [comments, setComments] = useState('');
-  const [isBillable, setIsBillable] = useState(true);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState('');
+
+  const { customFields } = useCustomFields();
+  const billableFieldId = localStorage.getItem('billableFieldId');
 
   const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
   const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
@@ -77,10 +82,13 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       setComments(editEntry.comments || '');
 
       // Check billable
-      const billableFieldId = localStorage.getItem('billableFieldId');
-      if (billableFieldId && editEntry.custom_fields) {
-        const billableField = editEntry.custom_fields.find(f => f.id === parseInt(billableFieldId));
-        setIsBillable(billableField ? billableField.value === '1' : true);
+      const bId = localStorage.getItem('billableFieldId');
+      if (bId && editEntry.custom_fields) {
+        const billableField = editEntry.custom_fields.find(f => f.id === parseInt(bId));
+        setCustomFieldValues(prev => ({
+          ...prev,
+          [parseInt(bId)]: billableField ? billableField.value : '1'
+        }));
       }
     } else {
       // New entry
@@ -90,10 +98,20 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       setHours('');
       setSpentOn(defaultDate || new Date().toISOString().split('T')[0]);
       setComments('');
-      setIsBillable(true);
       setSelectedPresetId('');
+
+      // Initialize custom field values
+      const initialValues: Record<number, string> = {};
+      customFields.forEach(field => {
+        if (field.id === Number(billableFieldId)) {
+          initialValues[field.id] = '1';
+        } else {
+          initialValues[field.id] = field.default_value || '';
+        }
+      });
+      setCustomFieldValues(initialValues);
     }
-  }, [isOpen, editEntry, defaultDate]);
+  }, [isOpen, editEntry, defaultDate, customFields, billableFieldId]);
 
   // Update activity dropdown when project changes and activities load
   useEffect(() => {
@@ -123,7 +141,15 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       if (preset.activityId) setActivityId(preset.activityId);
       if (preset.hours) setHours(preset.hours.toString());
       if (preset.comments !== undefined) setComments(preset.comments);
-      if (preset.isBillable !== undefined) setIsBillable(preset.isBillable);
+      if (preset.isBillable !== undefined) {
+        const bId = localStorage.getItem('billableFieldId');
+        if (bId) {
+          setCustomFieldValues(prev => ({
+            ...prev,
+            [parseInt(bId)]: preset.isBillable ? '1' : '0'
+          }));
+        }
+      }
     }
   };
 
@@ -144,7 +170,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       activityId,
       hours: parseFloat(hours) || 0,
       comments,
-      isBillable,
+      isBillable: customFieldValues[Number(billableFieldId)] === '1',
     };
 
     savePreset(newPreset);
@@ -167,14 +193,12 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const billableFieldId = localStorage.getItem('billableFieldId');
-      const customFields: { id: number; value: any }[] = [];
-      if (billableFieldId) {
-        customFields.push({
-          id: parseInt(billableFieldId),
-          value: isBillable ? '1' : '0',
-        });
-      }
+      const payloadCustomFields = Object.entries(customFieldValues)
+        .filter(([_, value]) => value !== '')
+        .map(([id, value]) => ({
+          id: parseInt(id, 10),
+          value: value,
+        }));
 
       const data = {
         hours: parseFloat(hours),
@@ -183,7 +207,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         spent_on: spentOn,
         issue_id: parseInt(taskId),
         project_id: projectId && projectId !== 'my_issues' ? parseInt(projectId) : undefined,
-        ...(customFields.length > 0 && { custom_fields: customFields }),
+        ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
       };
 
       if (isEditing && editEntry) {
@@ -222,7 +246,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
           <Button
             variant="primary"
             icon={isEditing ? Save : Send}
-            onClick={() => document.getElementById('time-entry-form')?.requestSubmit()}
+            onClick={() => (formRef.current as any)?.requestSubmit()}
             isLoading={isSubmitting}
             disabled={!taskId || !activityId || !hours || isSubmitting}
           >
@@ -239,7 +263,6 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
               value={selectedPresetId}
               onChange={e => handleApplyPreset(e.target.value)}
               fullWidth
-              icon={Bookmark}
             >
               <option value="">-- Choose preset --</option>
               {presets.map(p => (
@@ -260,7 +283,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
         <hr style={{ opacity: 0.1 }} />
 
-        <form id="time-entry-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form ref={formRef} id="time-entry-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <Autocomplete
             label="Project"
             placeholder="Search projects..."
@@ -291,7 +314,6 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
             onChange={e => setActivityId(e.target.value)}
             fullWidth
             disabled={isLoadingActivities || !projectId}
-            loading={isLoadingActivities}
             required
           >
             <option value="">-- Select activity --</option>
@@ -304,9 +326,8 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
             <Input
               label="Hours"
               type="number"
-              step="0.25"
-              min="0.1"
-              max="24"
+              step="any"
+              min="0"
               value={hours}
               onChange={e => setHours(e.target.value)}
               required
@@ -322,10 +343,103 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
             />
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-            <input type="checkbox" checked={isBillable} onChange={e => setIsBillable(e.target.checked)} />
-            <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Billable</span>
-          </label>
+          {/* Dynamic Custom Fields */}
+          {customFields.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ListTodo size={14} /> Custom Fields
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+                {customFields.map(field => {
+                  const value = customFieldValues[field.id] || '';
+
+                  const format = field.field_format || (field as any).format;
+                  const isLikelyBool = format === 'bool' || 
+                                       format === 'boolean' ||
+                                       field.name.toLowerCase().includes('billable') ||
+                                       field.name.toLowerCase().includes('billing');
+
+                  if (isLikelyBool) {
+                    return (
+                      <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={value === '1'}
+                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.checked ? '1' : '0' }))}
+                          style={{ width: '1rem', height: '1rem' }}
+                        />
+                        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{field.name}</span>
+                      </label>
+                    );
+                  }
+
+                  if (field.field_format === 'list' || field.field_format === 'user' || field.field_format === 'version') {
+                    return (
+                      <Select
+                        key={field.id}
+                        label={field.name}
+                        value={value}
+                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                        fullWidth
+                        required={field.is_required || field.required}
+                      >
+                        <option value="">-- Select {field.name} --</option>
+                        {field.possible_values?.map(v => (
+                          <option key={v} value={v}>{v}</option>
+                        ))}
+                      </Select>
+                    );
+                  }
+
+                  if (field.field_format === 'text') {
+                    return (
+                      <div key={field.id} style={{ gridColumn: '1 / -1' }}>
+                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.375rem', fontSize: '0.875rem' }}>
+                          {field.name}{field.is_required ? ' *' : ''}
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={value}
+                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                          required={field.is_required || field.required}
+                          style={{
+                            width: '100%',
+                            padding: '0.625rem',
+                            borderRadius: '0.5rem',
+                            border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+                            background: 'var(--color-surface, rgba(255,255,255,0.05))',
+                            color: 'inherit',
+                            fontFamily: 'inherit',
+                            fontSize: '0.875rem',
+                            resize: 'vertical',
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+
+                  const inputType = 
+                    field.field_format === 'int' ? 'number' :
+                    field.field_format === 'float' ? 'number' :
+                    field.field_format === 'date' ? 'date' : 'text';
+
+                  return (
+                    <Input
+                      key={field.id}
+                      label={field.name}
+                      type={inputType}
+                      step={field.field_format === 'float' ? 'any' : undefined}
+                      value={value}
+                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                      fullWidth
+                      required={field.is_required || field.required}
+                      placeholder={`Enter ${field.name.toLowerCase()}...`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <Input
             label="Comments"

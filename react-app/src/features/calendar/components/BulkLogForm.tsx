@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Input, Button, Select, Autocomplete, type AutocompleteItem } from '../../../components/ui';
 import styles from './BulkLogForm.module.scss';
-import { Send, CheckCircle2 } from 'lucide-react';
+import { Send, CheckCircle2, ListTodo } from 'lucide-react';
+import { useCustomFields } from '../../../hooks/useCustomFields';
 import { createTimeEntry } from '../../../services/redmine';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
@@ -23,13 +24,30 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   const [activityId, setActivityId] = useState('');
   const [hours, setHours] = useState('');
   const [comments, setComments] = useState('');
-  const [isBillable, setIsBillable] = useState(true);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   const [isDeploying, setIsDeploying] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
   const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
+  const { customFields } = useCustomFields();
+
+  // Initialize custom fields when they load
+  React.useEffect(() => {
+    if (customFields.length > 0) {
+      const initialValues: Record<number, string> = {};
+      const billableFieldId = localStorage.getItem('billableFieldId');
+      customFields.forEach(field => {
+        if (field.id === Number(billableFieldId)) {
+          initialValues[field.id] = '1';
+        } else {
+          initialValues[field.id] = field.default_value || '';
+        }
+      });
+      setCustomFieldValues(initialValues);
+    }
+  }, [customFields]);
 
   const projectOptions = useMemo((): AutocompleteItem[] => {
     const options: AutocompleteItem[] = [
@@ -75,14 +93,12 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     let failCount = 0;
 
     // Build custom fields
-    const billableFieldId = localStorage.getItem('billableFieldId');
-    const customFields: { id: number; value: string }[] = [];
-    if (billableFieldId) {
-      customFields.push({
-        id: parseInt(billableFieldId, 10),
-        value: isBillable ? '1' : '0',
-      });
-    }
+    const payloadCustomFields = Object.entries(customFieldValues)
+      .filter(([_, value]) => value !== '')
+      .map(([id, value]) => ({
+        id: parseInt(id, 10),
+        value: value,
+      }));
 
     for (const dateStr of days) {
       try {
@@ -93,7 +109,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
           spent_on: dateStr,
           issue_id: parseInt(taskId),
           project_id: projectId && projectId !== 'my_issues' ? parseInt(projectId) : undefined,
-          ...(customFields.length > 0 && { custom_fields: customFields }),
+          ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
         });
         successCount++;
         setProgress(Math.round((successCount + failCount) / days.length * 100));
@@ -154,7 +170,6 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
             onChange={e => setActivityId(e.target.value)}
             fullWidth
             disabled={isLoadingActivities || isDeploying}
-            loading={isLoadingActivities}
             required
           >
             <option value="">-- Select activity --</option>
@@ -166,8 +181,8 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
           <Input
             label="Hours per day *"
             type="number"
-            step="0.1"
-            min="0.1"
+            step="any"
+            min="0"
             placeholder="e.g. 8"
             value={hours}
             onChange={e => setHours(e.target.value)}
@@ -186,10 +201,107 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
           fullWidth
         />
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-          <input type="checkbox" checked={isBillable} onChange={e => setIsBillable(e.target.checked)} disabled={isDeploying} />
-          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Billable</span>
-        </label>
+        {/* Dynamic Custom Fields */}
+        {customFields.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ListTodo size={14} /> Custom Fields
+            </div>
+            <div className={styles.grid}>
+              {customFields.map(field => {
+                const value = customFieldValues[field.id] || '';
+                
+                const format = field.field_format || (field as any).format;
+                const isLikelyBool = format === 'bool' || 
+                                     format === 'boolean' ||
+                                     field.name.toLowerCase().includes('billable') ||
+                                     field.name.toLowerCase().includes('billing');
+
+                if (isLikelyBool) {
+                  return (
+                    <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={value === '1'}
+                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.checked ? '1' : '0' }))}
+                        disabled={isDeploying}
+                        style={{ width: '1rem', height: '1rem' }}
+                      />
+                      <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{field.name}</span>
+                    </label>
+                  );
+                }
+                
+                if (field.field_format === 'list' || field.field_format === 'user' || field.field_format === 'version') {
+                  return (
+                    <Select
+                      key={field.id}
+                      label={field.name}
+                      value={value}
+                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                      disabled={isDeploying}
+                      fullWidth
+                      required={field.is_required || field.required}
+                    >
+                      <option value="">-- Select {field.name} --</option>
+                      {field.possible_values?.map(v => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </Select>
+                  );
+                }
+
+                if (field.field_format === 'text') {
+                  return (
+                    <div key={field.id} style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.375rem', fontSize: '0.875rem' }}>
+                        {field.name}{field.is_required ? ' *' : ''}
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={value}
+                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                        disabled={isDeploying}
+                        required={field.is_required || field.required}
+                        style={{
+                          width: '100%',
+                          padding: '0.625rem',
+                          borderRadius: '0.5rem',
+                          border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+                          background: 'var(--color-surface, rgba(255,255,255,0.05))',
+                          color: 'inherit',
+                          fontFamily: 'inherit',
+                          fontSize: '0.875rem',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
+                  );
+                }
+
+                const inputType = 
+                  field.field_format === 'int' ? 'number' :
+                  field.field_format === 'float' ? 'number' :
+                  field.field_format === 'date' ? 'date' : 'text';
+
+                return (
+                  <Input
+                    key={field.id}
+                    label={field.name}
+                    type={inputType}
+                    step={field.field_format === 'float' ? 'any' : undefined}
+                    value={value}
+                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                    disabled={isDeploying}
+                    fullWidth
+                    required={field.is_required || field.required}
+                    placeholder={`Enter ${field.name.toLowerCase()}...`}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {isDeploying && (
           <div className={styles.progressContainer}>

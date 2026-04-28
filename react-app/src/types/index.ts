@@ -104,3 +104,13 @@ export interface TimeLogPreset {
   comments: string;
   isBillable: boolean;
 }
+
+export interface CustomField {
+  id: number;
+  name: string;
+  field_format: string;
+  possible_values?: string[];
+  default_value?: string;
+  required?: boolean;
+  is_required?: boolean;
+}

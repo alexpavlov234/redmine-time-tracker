@@ -7,7 +7,8 @@ import { useProjects } from '../../../contexts/ProjectsContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { redmineApiRequest } from '../../../services/redmine';
 import { formatTime } from '../../../utils/formatters';
-import { Send, CheckCircle } from 'lucide-react';
+import { Send, CheckCircle, ListTodo } from 'lucide-react';
+import { useCustomFields } from '../../../hooks/useCustomFields';
 
 interface SummaryModalProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ interface SummaryModalProps {
 
 export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) => {
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
-  const { activeTodoId } = useQueue();
+  const { } = useQueue();
   const { issueStatuses, setIssueStatuses } = useProjects();
   const { showSuccess, showError } = useToast();
 
@@ -25,11 +26,14 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
   const [comments, setComments] = useState('');
   const [activityId, setActivityId] = useState('');
-  const [isBillable, setIsBillable] = useState(true);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [changeStatus, setChangeStatus] = useState(false);
   const [statusId, setStatusId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const { customFields } = useCustomFields();
+  const billableFieldId = localStorage.getItem('billableFieldId');
 
   // Populate form when modal opens
   useEffect(() => {
@@ -58,8 +62,19 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
           .then(data => setIssueStatuses(data.issue_statuses || []))
           .catch(() => {});
       }
+
+      // Initialize custom field values
+      const initialValues: Record<number, string> = {};
+      customFields.forEach(field => {
+        if (field.id === Number(billableFieldId)) {
+          initialValues[field.id] = '1'; // Default billable to true
+        } else {
+          initialValues[field.id] = field.default_value || '';
+        }
+      });
+      setCustomFieldValues(initialValues);
     }
-  }, [isOpen, activities, activeTodo, defaultActivityId, issueStatuses.length, setIssueStatuses]);
+  }, [isOpen, activities, activeTodo, defaultActivityId, issueStatuses.length, setIssueStatuses, customFields, billableFieldId]);
 
   // Update activity when project activities load
   useEffect(() => {
@@ -98,14 +113,12 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
     try {
       // Build payload
-      const billableFieldId = localStorage.getItem('billableFieldId');
-      const customFields: { id: number; value: string }[] = [];
-      if (billableFieldId) {
-        customFields.push({
-          id: parseInt(billableFieldId, 10),
-          value: isBillable ? '1' : '0',
-        });
-      }
+      const payloadCustomFields = Object.entries(customFieldValues)
+        .filter(([_, value]) => value !== '')
+        .map(([id, value]) => ({
+          id: parseInt(id, 10),
+          value: value,
+        }));
 
       const timeEntryPayload: any = {
         time_entry: {
@@ -114,7 +127,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
           comments: comments.trim(),
           activity_id: parseInt(activityId),
           spent_on: new Date().toISOString().split('T')[0],
-          ...(customFields.length > 0 && { custom_fields: customFields }),
+          ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
         },
       };
 
@@ -227,16 +240,101 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
           ))}
         </Select>
 
-        {/* Billable */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={isBillable}
-            onChange={e => setIsBillable(e.target.checked)}
-            style={{ width: '1rem', height: '1rem' }}
-          />
-          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Billable</span>
-        </label>
+        {/* Dynamic Custom Fields */}
+        {customFields.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ListTodo size={14} /> Custom Fields
+            </div>
+            {customFields.map(field => {
+              const value = customFieldValues[field.id] || '';
+              
+              const format = field.field_format || (field as any).format;
+              const isLikelyBool = format === 'bool' || 
+                                   format === 'boolean' ||
+                                   field.name.toLowerCase().includes('billable') ||
+                                   field.name.toLowerCase().includes('billing');
+
+              if (isLikelyBool) {
+                return (
+                  <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={value === '1'}
+                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.checked ? '1' : '0' }))}
+                      style={{ width: '1rem', height: '1rem' }}
+                    />
+                    <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{field.name}</span>
+                  </label>
+                );
+              }
+              
+              if (field.field_format === 'list' || field.field_format === 'user' || field.field_format === 'version') {
+                return (
+                  <Select
+                    key={field.id}
+                    label={field.name}
+                    value={value}
+                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                    fullWidth
+                    required={field.is_required || field.required}
+                  >
+                    <option value="">-- Select {field.name} --</option>
+                    {field.possible_values?.map(v => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </Select>
+                );
+              }
+
+              if (field.field_format === 'text') {
+                return (
+                  <div key={field.id} style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.375rem', fontSize: '0.875rem' }}>
+                      {field.name}{field.is_required ? ' *' : ''}
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={value}
+                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                      required={field.is_required || field.required}
+                      style={{
+                        width: '100%',
+                        padding: '0.625rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+                        background: 'var(--color-surface, rgba(255,255,255,0.05))',
+                        color: 'inherit',
+                        fontFamily: 'inherit',
+                        fontSize: '0.875rem',
+                        resize: 'vertical',
+                      }}
+                    />
+                  </div>
+                );
+              }
+
+              const inputType = 
+                field.field_format === 'int' ? 'number' :
+                field.field_format === 'float' ? 'number' :
+                field.field_format === 'date' ? 'date' : 'text';
+
+              return (
+                <Input
+                  key={field.id}
+                  label={field.name}
+                  type={inputType}
+                  step={field.field_format === 'float' ? 'any' : undefined}
+                  value={value}
+                  onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                  fullWidth
+                  required={field.is_required || field.required}
+                  placeholder={`Enter ${field.name.toLowerCase()}...`}
+                />
+              );
+            })}
+          </div>
+        )}
 
         {/* Change Status */}
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>

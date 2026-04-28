@@ -80,7 +80,7 @@ app.use('/api', async (req, res) => {
     const fetchOptions = {
       method: req.method,
       headers: proxyHeaders,
-      timeout: 30000,
+      timeout: 60000,
       agent: httpsAgent // Use the custom HTTPS agent that ignores SSL errors
     };
 

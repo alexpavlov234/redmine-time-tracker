@@ -49,14 +49,26 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
       headerAction={<span className={styles.badge}>{totalHours.toFixed(1)}h Total</span>}
       className={styles.detailsCard}
     >
-      {/* Project summary badges */}
+      {/* Project summary stats */}
       {Object.keys(projectSummary).length > 0 && (
-        <div className={styles.projectSummary}>
-          {Object.entries(projectSummary).map(([name, hours]) => (
-            <span key={name} className={styles.projectBadge}>
-              {name}: {hours.toFixed(1)}h
-            </span>
-          ))}
+        <div className={styles.projectSummaryStats}>
+          {Object.entries(projectSummary).map(([name, hours]) => {
+            const percentage = totalHours > 0 ? (hours / totalHours) * 100 : 0;
+            return (
+              <div key={name} className={styles.projectStatItem}>
+                <div className={styles.projectStatHeader}>
+                  <span className={styles.projectStatName}>{name}</span>
+                  <span className={styles.projectStatHours}>{hours.toFixed(1)}h</span>
+                </div>
+                <div className={styles.projectProgressBar}>
+                  <div 
+                    className={styles.projectProgressFill} 
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

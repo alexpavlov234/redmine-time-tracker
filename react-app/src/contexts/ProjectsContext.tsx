@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { RedmineProject, RedmineIssue, IssueStatus } from '../types';
+import type { RedmineProject, IssueStatus } from '../types';
 import { redmineApiRequest } from '../services/redmine';
 import { useSettings } from './SettingsContext';
 

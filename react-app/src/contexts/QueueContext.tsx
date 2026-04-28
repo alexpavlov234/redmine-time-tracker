@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import type { Todo, Activity } from '../types';
+import type { Todo } from '../types';
 
 interface QueueContextProps {
   todos: Todo[];
