@@ -10,9 +10,17 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  closeOnOutsideClick?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer }) => {
+export const Modal: React.FC<ModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  footer,
+  closeOnOutsideClick = false 
+}) => {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,7 +42,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
   if (!isOpen) return null;
 
   return createPortal(
-    <div className={styles.overlay} ref={overlayRef} onClick={(e) => e.target === overlayRef.current && onClose()}>
+    <div className={styles.overlay} ref={overlayRef} onClick={(e) => closeOnOutsideClick && e.target === overlayRef.current && onClose()}>
       <div className={`${styles.modal} glass-panel`} role="dialog" aria-modal="true">
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
