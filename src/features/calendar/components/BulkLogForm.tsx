@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Card, Input, Button, Select, Autocomplete, type AutocompleteItem } from '../../../components/ui';
 import styles from './BulkLogForm.module.scss';
-import { Send, CheckCircle2, ListTodo } from 'lucide-react';
+import { Send, CheckCircle2, ListTodo, Trash2, Plus } from 'lucide-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
-import { createTimeEntry } from '../../../services/redmine';
+import { createTimeEntry, getIssue } from '../../../services/redmine';
+import type { RedmineIssue, TimeLogPreset } from '../../../types';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { useToast } from '../../../contexts/ToastContext';
+import { usePresets } from '../../../hooks/usePresets';
 
 interface BulkLogFormProps {
   selectedDays: Set<string>;
@@ -18,7 +20,9 @@ interface BulkLogFormProps {
 export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSuccess, onCancel }) => {
   const { allProjects } = useProjects();
   const { showSuccess, showError } = useToast();
+  const { presets, savePreset, deletePreset } = usePresets();
 
+  const [selectedPresetId, setSelectedPresetId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [taskId, setTaskId] = useState('');
   const [activityId, setActivityId] = useState('');
@@ -28,6 +32,9 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
   const [isDeploying, setIsDeploying] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
+  const [isLoadingIssue, setIsLoadingIssue] = useState(false);
 
   const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
   const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
@@ -61,24 +68,130 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   }, [allProjects]);
 
   const taskOptions = useMemo((): AutocompleteItem[] => {
-    return tasks.map(t => ({
+    const options = tasks.map(t => ({
       id: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
       sublabel: t.project?.name
     }));
-  }, [tasks]);
+    if (loadedTask && !options.some(o => o.id === loadedTask.id.toString())) {
+      options.push({
+        id: loadedTask.id.toString(),
+        label: `#${loadedTask.id} - ${loadedTask.subject}`,
+        sublabel: loadedTask.project?.name
+      });
+    }
+    const preset = presets.find(p => p.id === selectedPresetId);
+    if (preset && preset.taskId && preset.taskSubject && !options.some(o => o.id === preset.taskId)) {
+      options.push({
+        id: preset.taskId,
+        label: `#${preset.taskId} - ${preset.taskSubject}`,
+        sublabel: preset.projectName
+      });
+    }
+    return options;
+  }, [tasks, loadedTask, presets, selectedPresetId]);
 
   const selectedProject = projectOptions.find(p => p.id === projectId);
   const selectedTask = taskOptions.find(t => t.id === taskId);
 
   const handleProjectChange = (item: AutocompleteItem | null) => {
     setProjectId(item?.id.toString() || '');
-    setTaskId('');
+    if (!item) {
+      setTaskId('');
+    }
     setActivityId('');
   };
 
   const handleTaskChange = (item: AutocompleteItem | null) => {
-    setTaskId(item?.id.toString() || '');
+    const newTaskId = item?.id.toString() || '';
+    setTaskId(newTaskId);
+    
+    if (item && !projectId) {
+      const task = tasks.find(t => t.id.toString() === item.id) || (loadedTask?.id.toString() === item.id ? loadedTask : null);
+      if (task?.project?.id) {
+        setProjectId(task.project.id.toString());
+      }
+    }
+  };
+
+  const handleQuickLoad = async (id: string) => {
+    if (!id) return;
+    setIsLoadingIssue(true);
+    try {
+      const cleanId = id.replace(/^#/, '').trim();
+      const issue = await getIssue(parseInt(cleanId, 10));
+      setLoadedTask(issue);
+      setTaskId(issue.id.toString());
+      if (issue.project) {
+        setProjectId(issue.project.id.toString());
+      }
+      showSuccess(`Loaded task #${issue.id}`);
+    } catch (error: any) {
+      showError(`Failed to load task #${id}. It may not exist or you lack permission.`);
+    } finally {
+      setIsLoadingIssue(false);
+    }
+  };
+
+  const handleApplyPreset = (presetId: string) => {
+    setSelectedPresetId(presetId);
+    if (!presetId) return;
+
+    const preset = presets.find(p => p.id === presetId);
+    if (preset) {
+      if (preset.projectId) setProjectId(preset.projectId);
+      if (preset.taskId) {
+        setTaskId(preset.taskId);
+      }
+      if (preset.activityId) setActivityId(preset.activityId);
+      if (preset.hours) setHours(preset.hours.toString());
+      if (preset.comments !== undefined) setComments(preset.comments);
+      if (preset.isBillable !== undefined) {
+        const bId = localStorage.getItem('billableFieldId');
+        if (bId) {
+          setCustomFieldValues(prev => ({
+            ...prev,
+            [parseInt(bId)]: preset.isBillable ? '1' : '0'
+          }));
+        }
+      }
+    }
+  };
+
+  const handleSavePreset = () => {
+    const name = prompt("Enter a name for this preset (e.g. 'Standard Day'):");
+    if (!name?.trim()) return;
+
+    const project = allProjects.find(p => p.id.toString() === projectId);
+    const task = tasks.find(t => t.id.toString() === taskId);
+
+    const billableFieldId = localStorage.getItem('billableFieldId');
+
+    const newPreset: TimeLogPreset = {
+      id: 'preset_' + Date.now(),
+      name: name.trim(),
+      projectId,
+      projectName: project?.name || '',
+      taskId,
+      taskSubject: task?.subject || '',
+      activityId,
+      hours: parseFloat(hours) || 0,
+      comments,
+      isBillable: customFieldValues[Number(billableFieldId)] === '1',
+    };
+
+    savePreset(newPreset);
+    setSelectedPresetId(newPreset.id);
+    showSuccess(`Preset "${name.trim()}" saved.`);
+  };
+
+  const handleDeletePreset = () => {
+    const preset = presets.find(p => p.id === selectedPresetId);
+    if (preset && confirm(`Delete preset "${preset.name}"?`)) {
+      deletePreset(selectedPresetId);
+      setSelectedPresetId('');
+      showSuccess('Preset deleted.');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -137,6 +250,31 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
       headerAction={<span className={styles.badge}>{selectedDays.size} Days Selected</span>}
       className={styles.bulkCard}
     >
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1rem' }}>
+        <Select
+          label="Load Preset"
+          value={selectedPresetId}
+          onChange={e => handleApplyPreset(e.target.value)}
+          fullWidth
+        >
+          <option value="">-- Choose preset --</option>
+          {presets.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </Select>
+        <Button
+          variant="danger"
+          icon={Trash2}
+          onClick={handleDeletePreset}
+          disabled={!selectedPresetId || isDeploying}
+          title="Delete selected preset"
+          size="sm"
+          style={{ marginBottom: '0.25rem' }}
+        />
+      </div>
+
+      <hr style={{ opacity: 0.1, marginBottom: '1rem' }} />
+
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.grid}>
           <Autocomplete
@@ -151,21 +289,48 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
             required
           />
 
-          <Autocomplete
-            label="Task *"
-            placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-            items={taskOptions}
-            value={taskId}
-            displayValue={selectedTask?.label || ''}
-            onChange={handleTaskChange}
-            disabled={isLoadingTasks || !projectId || isDeploying}
-            loading={isLoadingTasks}
-            fullWidth
-            required
-          />
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
+              <Input
+                label="Task ID"
+                placeholder="Paste ID..."
+                value={taskId}
+                onChange={e => {
+                  setTaskId(e.target.value);
+                }}
+                onBlur={() => {
+                  if (taskId && taskId !== loadedTask?.id?.toString()) {
+                    handleQuickLoad(taskId);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (taskId) handleQuickLoad(taskId);
+                  }
+                }}
+                disabled={isLoadingIssue || isDeploying}
+                fullWidth
+              />
+            </div>
+            <div style={{ flex: '2 1 200px', minWidth: 0 }}>
+              <Autocomplete
+                label="Task Name"
+                placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
+                items={taskOptions}
+                value={taskId}
+                displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
+                onChange={handleTaskChange}
+                disabled={isLoadingTasks || isDeploying}
+                loading={isLoadingTasks || isLoadingIssue}
+                fullWidth
+                required
+              />
+            </div>
+          </div>
 
           <Select
-            label={isLoadingActivities ? 'Loading...' : 'Activity *'}
+            label={isLoadingActivities ? 'Loading...' : 'Activity'}
             value={activityId}
             onChange={e => setActivityId(e.target.value)}
             fullWidth
@@ -179,7 +344,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
           </Select>
 
           <Input
-            label="Hours per day *"
+            label="Hours per day"
             type="number"
             step="any"
             min="0"
@@ -311,6 +476,17 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
         )}
 
         <div className={styles.actions}>
+          <div style={{ marginRight: 'auto' }}>
+            <Button
+              variant="ghost"
+              icon={Plus}
+              onClick={handleSavePreset}
+              disabled={isDeploying}
+              type="button"
+            >
+              Save Preset
+            </Button>
+          </div>
           <Button variant="ghost" onClick={onCancel} disabled={isDeploying} type="button">Cancel</Button>
           <Button variant="primary" icon={Send} type="submit" disabled={isDeploying || !taskId || !activityId || !hours}>
             {isDeploying ? 'Deploying...' : `Submit across ${selectedDays.size} days`}

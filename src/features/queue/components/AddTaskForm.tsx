@@ -4,6 +4,8 @@ import { useQueue } from '../../../contexts/QueueContext';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
+import { getIssue } from '../../../services/redmine';
+import type { RedmineIssue } from '../../../types';
 import styles from './AddTaskForm.module.scss';
 import { PlusCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -15,6 +17,9 @@ export const AddTaskForm: React.FC = () => {
   const [activityId, setActivityId] = useState('');
   const [note, setNote] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
+  const [isLoadingIssue, setIsLoadingIssue] = useState(false);
 
   const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
   const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
@@ -31,24 +36,60 @@ export const AddTaskForm: React.FC = () => {
   }, [allProjects]);
 
   const taskOptions = useMemo((): AutocompleteItem[] => {
-    return tasks.map(t => ({
+    const options = tasks.map(t => ({
       id: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
       sublabel: t.project?.name
     }));
-  }, [tasks]);
+    if (loadedTask && !options.some(o => o.id === loadedTask.id.toString())) {
+      options.push({
+        id: loadedTask.id.toString(),
+        label: `#${loadedTask.id} - ${loadedTask.subject}`,
+        sublabel: loadedTask.project?.name
+      });
+    }
+    return options;
+  }, [tasks, loadedTask]);
 
   const selectedProject = projectOptions.find(p => p.id === projectId);
   const selectedTask = taskOptions.find(t => t.id === taskId);
 
   const handleProjectChange = (item: AutocompleteItem | null) => {
     setProjectId(item?.id.toString() || '');
-    setTaskId('');
+    if (!item) {
+      setTaskId('');
+    }
     setActivityId('');
   };
 
   const handleTaskChange = (item: AutocompleteItem | null) => {
-    setTaskId(item?.id.toString() || '');
+    const newTaskId = item?.id.toString() || '';
+    setTaskId(newTaskId);
+    
+    if (item && !projectId) {
+      const task = tasks.find(t => t.id.toString() === item.id) || (loadedTask?.id.toString() === item.id ? loadedTask : null);
+      if (task?.project?.id) {
+        setProjectId(task.project.id.toString());
+      }
+    }
+  };
+
+  const handleQuickLoad = async (id: string) => {
+    if (!id) return;
+    setIsLoadingIssue(true);
+    try {
+      const cleanId = id.replace(/^#/, '').trim();
+      const issue = await getIssue(parseInt(cleanId, 10));
+      setLoadedTask(issue);
+      setTaskId(issue.id.toString());
+      if (issue.project) {
+        setProjectId(issue.project.id.toString());
+      }
+    } catch (error: any) {
+      // ignore
+    } finally {
+      setIsLoadingIssue(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,7 +97,7 @@ export const AddTaskForm: React.FC = () => {
     if (!projectId || !taskId) return;
 
     const project = allProjects.find(p => p.id.toString() === projectId);
-    const issue = tasks.find(t => t.id.toString() === taskId);
+    const issue = tasks.find(t => t.id.toString() === taskId) || (loadedTask?.id.toString() === taskId ? loadedTask : null);
     const activity = activities.find(a => a.id.toString() === activityId);
 
     addTodo({
@@ -103,18 +144,45 @@ export const AddTaskForm: React.FC = () => {
               required
             />
 
-            <Autocomplete
-              label="Task"
-              placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-              items={taskOptions}
-              value={taskId}
-              displayValue={selectedTask?.label || ''}
-              onChange={handleTaskChange}
-              disabled={isLoadingTasks || !projectId}
-              loading={isLoadingTasks}
-              fullWidth
-              required
-            />
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
+              <Input
+                label="Task ID"
+                placeholder="Paste ID..."
+                value={taskId}
+                onChange={e => {
+                  setTaskId(e.target.value);
+                }}
+                onBlur={() => {
+                  if (taskId && taskId !== loadedTask?.id?.toString()) {
+                    handleQuickLoad(taskId);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (taskId) handleQuickLoad(taskId);
+                  }
+                }}
+                disabled={isLoadingIssue}
+                fullWidth
+              />
+            </div>
+            <div style={{ flex: '2 1 200px', minWidth: 0 }}>
+              <Autocomplete
+                label="Task Name"
+                placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
+                items={taskOptions}
+                value={taskId}
+                displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
+                onChange={handleTaskChange}
+                disabled={isLoadingTasks}
+                loading={isLoadingTasks || isLoadingIssue}
+                fullWidth
+                required
+              />
+            </div>
+          </div>
 
             <Select
               label={isLoadingActivities ? 'Loading activities...' : 'Activity'}

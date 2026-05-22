@@ -5,8 +5,8 @@ import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { usePresets } from '../../../hooks/usePresets';
 import { useToast } from '../../../contexts/ToastContext';
-import { createTimeEntry, updateTimeEntry } from '../../../services/redmine';
-import type { TimeEntry, TimeLogPreset } from '../../../types';
+import { createTimeEntry, updateTimeEntry, getIssue } from '../../../services/redmine';
+import type { TimeEntry, TimeLogPreset, RedmineIssue } from '../../../types';
 import { Save, Send, Trash2, Plus, ListTodo } from 'lucide-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 
@@ -41,6 +41,8 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
+  const [isLoadingIssue, setIsLoadingIssue] = useState(false);
 
   const { customFields } = useCustomFields();
   const billableFieldId = localStorage.getItem('billableFieldId');
@@ -59,12 +61,35 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   }, [allProjects]);
 
   const taskOptions = useMemo((): AutocompleteItem[] => {
-    return tasks.map(t => ({
+    const options = tasks.map(t => ({
       id: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
       sublabel: t.project?.name
     }));
-  }, [tasks]);
+    if (loadedTask && !options.some(o => o.id === loadedTask.id.toString())) {
+      options.push({
+        id: loadedTask.id.toString(),
+        label: `#${loadedTask.id} - ${loadedTask.subject}`,
+        sublabel: loadedTask.project?.name
+      });
+    }
+    if (isEditing && editEntry?.issue && !options.some(o => o.id === editEntry.issue!.id.toString())) {
+      options.push({
+        id: editEntry.issue.id.toString(),
+        label: `#${editEntry.issue.id} - ${editEntry.issue.name || editEntry.issue.subject}`,
+        sublabel: editEntry.project?.name
+      });
+    }
+    const preset = presets.find(p => p.id === selectedPresetId);
+    if (preset && preset.taskId && preset.taskSubject && !options.some(o => o.id === preset.taskId)) {
+      options.push({
+        id: preset.taskId,
+        label: `#${preset.taskId} - ${preset.taskSubject}`,
+        sublabel: preset.projectName
+      });
+    }
+    return options;
+  }, [tasks, loadedTask, isEditing, editEntry, presets, selectedPresetId]);
 
   const selectedProject = projectOptions.find(p => p.id === projectId);
   const selectedTask = taskOptions.find(t => t.id === taskId);
@@ -81,14 +106,13 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       setSpentOn(editEntry.spent_on);
       setComments(editEntry.comments || '');
 
-      // Check billable
-      const bId = localStorage.getItem('billableFieldId');
-      if (bId && editEntry.custom_fields) {
-        const billableField = editEntry.custom_fields.find(f => f.id === parseInt(bId));
-        setCustomFieldValues(prev => ({
-          ...prev,
-          [parseInt(bId)]: billableField ? billableField.value : '1'
-        }));
+      // Check custom fields
+      if (editEntry.custom_fields) {
+        const initialValues: Record<number, string> = {};
+        editEntry.custom_fields.forEach(f => {
+          initialValues[f.id] = f.value;
+        });
+        setCustomFieldValues(prev => ({ ...prev, ...initialValues }));
       }
     } else {
       // New entry
@@ -122,12 +146,42 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
   const handleProjectChange = (item: AutocompleteItem | null) => {
     setProjectId(item?.id.toString() || '');
-    setTaskId('');
+    if (!item) {
+      setTaskId('');
+    }
     setActivityId('');
   };
 
   const handleTaskChange = (item: AutocompleteItem | null) => {
-    setTaskId(item?.id.toString() || '');
+    const newTaskId = item?.id.toString() || '';
+    setTaskId(newTaskId);
+    
+    // If a task is selected and no project is currently selected, auto-select the project
+    if (item && !projectId) {
+      const task = tasks.find(t => t.id.toString() === item.id) || (loadedTask?.id.toString() === item.id ? loadedTask : null);
+      if (task?.project?.id) {
+        setProjectId(task.project.id.toString());
+      }
+    }
+  };
+
+  const handleQuickLoad = async (id: string) => {
+    if (!id) return;
+    setIsLoadingIssue(true);
+    try {
+      const cleanId = id.replace(/^#/, '').trim();
+      const issue = await getIssue(parseInt(cleanId, 10));
+      setLoadedTask(issue);
+      setTaskId(issue.id.toString());
+      if (issue.project) {
+        setProjectId(issue.project.id.toString());
+      }
+      showSuccess(`Loaded task #${issue.id}`);
+    } catch (error: any) {
+      showError(`Failed to load task #${id}. It may not exist or you lack permission.`);
+    } finally {
+      setIsLoadingIssue(false);
+    }
   };
 
   const handleApplyPreset = (presetId: string) => {
@@ -137,7 +191,9 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     const preset = presets.find(p => p.id === presetId);
     if (preset) {
       if (preset.projectId) setProjectId(preset.projectId);
-      if (preset.taskId) setTaskId(preset.taskId);
+      if (preset.taskId) {
+        setTaskId(preset.taskId);
+      }
       if (preset.activityId) setActivityId(preset.activityId);
       if (preset.hours) setHours(preset.hours.toString());
       if (preset.comments !== undefined) setComments(preset.comments);
@@ -295,18 +351,45 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
             required
           />
 
-          <Autocomplete
-            label="Task *"
-            placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-            items={taskOptions}
-            value={taskId}
-            displayValue={selectedTask?.label || ''}
-            onChange={handleTaskChange}
-            disabled={isLoadingTasks || !projectId}
-            loading={isLoadingTasks}
-            fullWidth
-            required
-          />
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
+              <Input
+                label="Task ID"
+                placeholder="Paste ID..."
+                value={taskId}
+                onChange={e => {
+                  setTaskId(e.target.value);
+                }}
+                onBlur={() => {
+                  if (taskId && taskId !== loadedTask?.id?.toString()) {
+                    handleQuickLoad(taskId);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (taskId) handleQuickLoad(taskId);
+                  }
+                }}
+                disabled={isLoadingIssue || isSubmitting}
+                fullWidth
+              />
+            </div>
+            <div style={{ flex: '2 1 200px', minWidth: 0 }}>
+              <Autocomplete
+                label="Task Name"
+                placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
+                items={taskOptions}
+                value={taskId}
+                displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
+                onChange={handleTaskChange}
+                disabled={isLoadingTasks || isSubmitting}
+                loading={isLoadingTasks || isLoadingIssue}
+                fullWidth
+                required
+              />
+            </div>
+          </div>
 
           <Select
             label={isLoadingActivities ? 'Loading...' : 'Activity'}
@@ -322,7 +405,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
             ))}
           </Select>
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
             <Input
               label="Hours"
               type="number"

@@ -31,6 +31,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   const [statusId, setStatusId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [manualHours, setManualHours] = useState('');
 
   const { customFields } = useCustomFields();
   const billableFieldId = localStorage.getItem('billableFieldId');
@@ -48,6 +49,16 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       setChangeStatus(false);
       setStatusId('');
       setIsSubmitting(false);
+
+      const rawHours = totalElapsedTime / 3600;
+      let hoursCalc: number;
+      if (rawHours <= 0) {
+        hoursCalc = 0.1;
+      } else {
+        hoursCalc = Math.ceil(rawHours * 20) / 20;
+        hoursCalc = Math.max(0.1, hoursCalc);
+      }
+      setManualHours(parseFloat(hoursCalc.toFixed(2)).toString());
 
       // Set activity from todo or default
       if (activeTodo?.activityId) {
@@ -74,6 +85,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       });
       setCustomFieldValues(initialValues);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, activities, activeTodo, defaultActivityId, issueStatuses.length, setIssueStatuses, customFields, billableFieldId]);
 
   // Update activity when project activities load
@@ -97,16 +109,11 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       return;
     }
 
-    // Round hours UP to 0.05 increments
-    const rawHours = totalElapsedTime / 3600;
-    let hours: number;
-    if (rawHours <= 0) {
-      hours = 0.1;
-    } else {
-      hours = Math.ceil(rawHours * 20) / 20;
-      hours = Math.max(0.1, hours);
+    const hoursFormatted = parseFloat(manualHours);
+    if (isNaN(hoursFormatted) || hoursFormatted <= 0) {
+      showError('Please enter a valid number of hours.');
+      return;
     }
-    const hoursFormatted = parseFloat(hours.toFixed(2));
 
     setIsSubmitting(true);
     setSubmitResult(null);
@@ -186,9 +193,20 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
           borderRadius: '0.75rem',
           background: 'var(--color-surface, rgba(255,255,255,0.05))',
         }}>
-          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', opacity: 0.6 }}>Total Time</div>
-          <div style={{ fontSize: '2rem', fontWeight: 700, fontFamily: 'monospace' }}>
-            {formatTime(totalElapsedTime)}
+          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', opacity: 0.6, marginBottom: '0.5rem' }}>Logged Time (Hours)</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <Input
+              type="number"
+              step="any"
+              min="0.1"
+              value={manualHours}
+              onChange={(e) => setManualHours(e.target.value)}
+              style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', width: '120px' }}
+              fullWidth={false}
+            />
+          </div>
+          <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '0.5rem' }}>
+            Timer recorded: {formatTime(totalElapsedTime)}
           </div>
         </div>
 

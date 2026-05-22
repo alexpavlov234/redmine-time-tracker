@@ -29,14 +29,10 @@ export const LoggedTimeDashboard: React.FC = () => {
 
   const handlePrevMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-    setSelectedDays(new Set());
-    setActiveDayStr(null);
   };
 
   const handleNextMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-    setSelectedDays(new Set());
-    setActiveDayStr(null);
   };
 
   const handleDayClick = (dateStr: string) => {
@@ -56,8 +52,12 @@ export const LoggedTimeDashboard: React.FC = () => {
   };
 
   const toggleMultiSelectMode = () => {
+    if (!isMultiSelectMode) {
+      setSelectedDays(new Set(activeDayStr ? [activeDayStr] : []));
+    } else {
+      setSelectedDays(new Set());
+    }
     setIsMultiSelectMode(prev => !prev);
-    setSelectedDays(new Set());
     setActiveDayStr(null);
   };
 
@@ -139,7 +139,7 @@ export const LoggedTimeDashboard: React.FC = () => {
           onPrevMonth={handlePrevMonth}
           onNextMonth={handleNextMonth}
           entriesByDate={entriesByDate}
-          selectedDays={selectedDays}
+          selectedDays={isMultiSelectMode ? selectedDays : new Set(activeDayStr ? [activeDayStr] : [])}
           onDayClick={handleDayClick}
           isLoading={isLoading}
           isMultiSelectMode={isMultiSelectMode}
