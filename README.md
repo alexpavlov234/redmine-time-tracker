@@ -1,73 +1,107 @@
-# React + TypeScript + Vite
+# Redmine Time Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Context-Aware Queue Timer and High-Fidelity Time Entry Logger for Redmine
 
-Currently, two official plugins are available:
+Daily time tracking is a major pain point for developers. Most of us log our hours late, usually at the end of the week. This makes the logged descriptions vague, like "bug fixes" or "work on task." It makes report statistics inaccurate. Redmine Time Tracker is a React single-page application built to solve this. It provides a simple task queue and a live timer. While the timer is running, you can log micro-activities. These are tiny notes of what you are doing in real time. When you stop the timer, the application compiles all notes into a single detailed comment and posts the aggregated entry to Redmine. This process makes reports accurate. 
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+This app was developed with AI agents. We developed this project for work in partnership with Lyuboslav Stankov, using AI coding agents to build a responsive, developer-centric interface.
 
-## React Compiler
+![System Interface and Dashboard Preview](./public/dashboard-preview-placeholder.png)
+*(Note: Replace this placeholder image with a screenshot of the dashboard showing the active timer and task queue).*
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Technical Architecture & Core Patterns
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+The application is structured to minimize friction. We want to keep the UI snappy and ensure no timer progress gets lost if you refresh your browser.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```mermaid
+graph TD
+    A[React SPA Frontend] -->|X-Redmine-URL / API Key Headers| B(Local Node CORS Proxy)
+    B -->|Bypasses CORS & Ignores SSL Errors| C[Redmine REST API]
+    A -->|Persists Settings & Queues| D[(Browser LocalStorage)]
+    A -->|Direct Fetch Fallback for HTTPS| C
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 1. State Synchronization & Contexts
+State management is decoupled into React Contexts to prevent prop drilling and keep components modular:
+*   [TimerContext.tsx](./src/contexts/TimerContext.tsx): Controls the active timer ticks, starts/resumes epoch time, and stores elapsed duration.
+*   [QueueContext.tsx](./src/contexts/QueueContext.tsx): Holds the array of task items (Todos), manages reordering, and handles background synchronization. All queue states are loaded from and serialized to `localStorage` automatically.
+*   [RedmineContext.tsx](./src/contexts/RedmineContext.tsx) & [UserContext.tsx](./src/contexts/UserContext.tsx): Cache the active connection status and details of the current Redmine user session.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 2. High-Resolution Micro-Activity Tracking
+The core feature is the timeline of performed tasks inside a tracking session. This is handled by [useQueueTimer.ts](./src/hooks/useQueueTimer.ts):
+*   **Initial Prompt:** When starting a timer for a new task, the application blocks execution until you type your first micro-activity. This ensures every session has at least one detail.
+*   **Incremental Timing:** When you add a new activity description during a session, the system calculates the duration of the *previous* activity by subtracting its start time from the current elapsed seconds. This gives a sub-task timing log.
+*   **Aggregation:** On stop, [SummaryModal.tsx](./src/features/tracker/components/SummaryModal.tsx) combines all activity texts into a single string. It rounds the accumulated seconds to decimal hours. The system rounds up to the nearest 0.05 hours (3 minutes) to align with business billing structures.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 3. Local CORS Bypass Proxy
+Browsers block direct HTTP requests from local web pages to external corporate Redmine instances due to CORS policies. We solve this with [proxy-simple.js](./proxy-simple.js):
+*   It is an Express server running on port `3000`.
+*   It accepts request payloads from the React app, extracts Redmine server targets and API keys from custom headers (`X-Redmine-URL` and `X-Redmine-API-Key`), and forwards them.
+*   It uses a custom Node.js HTTPS agent configured to ignore SSL errors (`rejectUnauthorized: false`). This is crucial because many corporate Redmines run on intranet domains with self-signed SSL certificates.
+*   If your Redmine server supports CORS directly and runs over HTTPS, [redmine.ts](./src/services/redmine.ts) can fall back to direct browser requests if the local proxy is offline.
+
+---
+
+## User Installation & Run Instructions
+
+This application is meant to run locally on your development machine. Since it needs to forward requests to your corporate Redmine instance, you must run both the frontend app and the proxy server.
+
+### Prerequisites
+*   Node.js (v18 or higher recommended)
+*   npm (packaged with Node.js)
+
+### Quick Start
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/apavlov/redmine-time-tracker.git
+    cd redmine-time-tracker
+    ```
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Launch the client and the proxy concurrently:
+    ```bash
+    npm run dev:full
+    ```
+4.  Open your browser and navigate to `http://localhost:5173`.
+5.  Go to the **Settings** page in the application and enter your Redmine URL and personal API Key. You can find your API key on your Redmine account page (typically under *My Account* -> *API access key* in the right sidebar).
+
+---
+
+## Contributor Setup & Code Verification
+
+If you want to modify features or add new endpoints, use the following guide.
+
+### Codebase Entry Points
+*   **API Integrations:** All endpoint calls are declared inside [redmine.ts](./src/services/redmine.ts).
+*   **Time Aggregation:** The log modal is in [SummaryModal.tsx](./src/features/tracker/components/SummaryModal.tsx).
+*   **Calendar Dashboard:** View log history grids in [CalendarGrid.tsx](./src/features/calendar/components/CalendarGrid.tsx) and [LoggedTimeDashboard.tsx](./src/features/calendar/components/LoggedTimeDashboard.tsx).
+
+### Quality Checks
+We enforce lint rules and type safety using ESLint and the TypeScript compiler. Make sure to run these checks before creating commits:
+```bash
+# Check lint issues
+npm run lint
+
+# Verify TypeScript compilation and build bundle
+npm run build
 ```
+
+---
+
+## Known Issues & Architectural Constraints
+
+We want to be transparent about limitations in our current implementation.
+
+*   **Security Vulnerability in Proxy:** [proxy-simple.js](./proxy-simple.js) sets `rejectUnauthorized: false` to allow self-signed certificates. This opens the proxy to potential man-in-the-middle (MITM) attacks if run on an untrusted public network. Do not expose port 3000 to the public internet.
+*   **Origin Whitelisting:** The proxy server restricts requests to a hardcoded list of local Vite ports (`5173`, `5174`, `5175`). If your Vite client starts on a different port, the proxy will reject CORS requests.
+*   **LocalStorage Vulnerability:** All active queues and configurations are stored in browser local storage. Cleared cache or private browsing sessions will erase your local queue data.
+*   **API Limits:** [redmine.ts](./src/services/redmine.ts) fetches logs for the calendar dashboard with a fixed query limit of 100 entries. It does not implement page pagination. If you log more than 100 entries within the selected range, some logs will be missing from the calendar view.
+
+### Future Enhancements
+*   **Electron Integration:** Wrap the app in a desktop container to allow floating widgets and active window tracking.
+*   **Idle Tracking:** Auto-pause the timer if keyboard or mouse input stops for more than 5 minutes.
+*   **Pre-populated Templates:** Save common tasks as presets for quick logging.
