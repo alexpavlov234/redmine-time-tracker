@@ -58,7 +58,6 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       comments: '',
     },
     validate: {
-      taskId: (value) => (value ? null : 'Task is required'),
       activityId: (value) => (value ? null : 'Activity is required'),
       hours: (value) => (value && Number(value) > 0 ? null : 'Valid hours are required'),
       spentOn: (value) => (value ? null : 'Date is required'),
@@ -74,6 +73,22 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       label: p.name,
     }));
   }, [allProjects]);
+
+  const activityOptions = useMemo(() => {
+    const options = activities.map(a => ({
+      value: a.id.toString(),
+      label: a.name,
+    }));
+
+    if (isEditing && editEntry?.activity && !options.some(o => o.value === editEntry.activity.id.toString())) {
+      options.unshift({
+        value: editEntry.activity.id.toString(),
+        label: editEntry.activity.name || `Activity #${editEntry.activity.id}`,
+      });
+    }
+
+    return options;
+  }, [activities, isEditing, editEntry]);
 
   const taskOptions = useMemo(() => {
     const options = tasks.map(t => ({
@@ -154,7 +169,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     if (isOpen && editEntry?.activity?.id) {
       form.setFieldValue('activityId', editEntry.activity.id.toString());
     }
-  }, [activities]);
+  }, [isOpen, editEntry, activities]);
 
   const handleTaskChange = (val: string | null) => {
     const newTaskId = val || '';
@@ -264,7 +279,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         comments: values.comments.trim(),
         activity_id: parseInt(values.activityId),
         spent_on: values.spentOn,
-        issue_id: parseInt(values.taskId),
+        issue_id: values.taskId ? parseInt(values.taskId, 10) : undefined,
         project_id: values.projectId && values.projectId !== 'my_issues' ? parseInt(values.projectId) : undefined,
         ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
       };
@@ -350,9 +365,9 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                   <Select
                     label="Activity"
                     placeholder={isLoadingActivities ? 'Loading...' : '-- Select activity --'}
-                    data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
+                    data={activityOptions}
                     withAsterisk
-                    disabled={isLoadingActivities || !form.values.projectId}
+                    disabled={isSubmitting}
                     {...form.getInputProps('activityId')}
                   />
 
