@@ -4,32 +4,10 @@ import { Card, Button, Group, Text, Progress, Stack, ActionIcon, Badge, Paper, A
 import { IconClock, IconEdit, IconTrash, IconPlus, IconExternalLink } from '@tabler/icons-react';
 import { useSettings } from '../../../contexts/SettingsContext';
 
-const PROJECT_COLORS = [
-  'blue',
-  'teal',
-  'violet',
-  'grape',
-  'orange',
-  'cyan',
-  'indigo',
-  'lime',
-  'pink',
-  'emerald',
-  'yellow',
-];
-
-const getProjectColor = (projectName: string, index: number): string => {
-  let hash = 0;
-  for (let i = 0; i < projectName.length; i++) {
-    hash = projectName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const colorIndex = Math.abs(hash + index) % PROJECT_COLORS.length;
-  return PROJECT_COLORS[colorIndex];
-};
-
 interface DayDetailsViewProps {
   dateStr: string;
   entries: TimeEntry[];
+  projectColorMap: Map<string, string>;
   onClose: () => void;
   onEdit: (entry: TimeEntry) => void;
   onDelete: (entryId: number) => void;
@@ -39,11 +17,15 @@ interface DayDetailsViewProps {
 export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
   dateStr,
   entries,
+  projectColorMap,
   onClose,
   onEdit,
   onDelete,
   onAdd,
 }) => {
+  const getProjectColor = (projectName: string): string => {
+    return projectColorMap.get(projectName) || 'blue';
+  };
   const { redmineUrl } = useSettings();
   const dateObj = new Date(dateStr + 'T00:00:00');
   const formattedDate = dateObj.toLocaleDateString(undefined, {
@@ -78,16 +60,16 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
             <IconClock size={20} color="var(--mantine-color-blue-filled)" />
             <Text fw={600}>{formattedDate}</Text>
           </Group>
-          <Badge size="lg" color="blue">{totalHours.toFixed(1)}h Total</Badge>
+          <Badge size="lg" color={totalHours >= 8 ? 'green' : 'blue'}>{totalHours.toFixed(1)}h Total</Badge>
         </Group>
       </Card.Section>
 
       <Stack gap="md" mt="md" style={{ flex: 1, overflowY: 'auto' }}>
         {groupedByProject.length > 0 && (
           <Stack gap="sm">
-            {groupedByProject.map(([name, group], index) => {
+            {groupedByProject.map(([name, group]) => {
               const percentage = totalHours > 0 ? (group.totalHours / totalHours) * 100 : 0;
-              const color = getProjectColor(name, index);
+              const color = getProjectColor(name);
               return (
                 <div key={name}>
                   <Group justify="space-between" mb={4}>
@@ -105,8 +87,8 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
           <Text c="dimmed" ta="center" py="xl">No time logged on this day.</Text>
         ) : (
           <Stack gap="xs">
-            {groupedByProject.map(([projectName, group], index) => {
-              const color = getProjectColor(projectName, index);
+            {groupedByProject.map(([projectName, group]) => {
+              const color = getProjectColor(projectName);
               return (
                 <Paper
                   key={projectName}

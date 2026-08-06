@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button, Group, Title, ActionIcon, Stack } from '@mantine/core';
 import { IconCalendar, IconRefresh, IconChecklist, IconSquareX } from '@tabler/icons-react';
 import { useCalendarEntries } from '../hooks/useCalendarEntries';
@@ -9,6 +9,21 @@ import { TimeEntryFormModal } from './TimeEntryFormModal';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { deleteTimeEntry } from '../../../services/redmine';
 import type { TimeEntry } from '../../../types';
+
+const PROJECT_PALETTE = [
+  'blue',
+  'teal',
+  'violet',
+  'grape',
+  'orange',
+  'cyan',
+  'indigo',
+  'lime',
+  'pink',
+  'emerald',
+  'yellow',
+  'red',
+];
 
 export const LoggedTimeDashboard: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -23,6 +38,21 @@ export const LoggedTimeDashboard: React.FC = () => {
 
   const { entriesByDate, isLoading, refetch } = useCalendarEntries(currentMonth);
   const confirm = useConfirm();
+
+  const projectColorMap = useMemo(() => {
+    const names = new Set<string>();
+    Object.values(entriesByDate).forEach(entries => {
+      entries.forEach(e => {
+        names.add(e.project?.name || 'General / No Project');
+      });
+    });
+    const sorted = Array.from(names).sort();
+    const map = new Map<string, string>();
+    sorted.forEach((name, idx) => {
+      map.set(name, PROJECT_PALETTE[idx % PROJECT_PALETTE.length]);
+    });
+    return map;
+  }, [entriesByDate]);
 
   const handlePrevMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -155,6 +185,7 @@ export const LoggedTimeDashboard: React.FC = () => {
             <DayDetailsView
               dateStr={activeDayStr}
               entries={entriesByDate[activeDayStr] || []}
+              projectColorMap={projectColorMap}
               onClose={() => setActiveDayStr(null)}
               onEdit={handleEditEntry}
               onDelete={handleDeleteEntry}
