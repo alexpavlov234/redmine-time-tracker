@@ -133,7 +133,12 @@ export const LoggedTimeDashboard: React.FC = () => {
       </Group>
 
       <Group align="flex-start" wrap="nowrap" style={{ gap: '1.5rem' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ 
+          width: (!isMultiSelectMode && activeDayStr) ? '360px' : 'auto', 
+          flex: (!isMultiSelectMode && activeDayStr) ? '0 0 360px' : 1, 
+          minWidth: 0,
+          transition: 'all 0.3s ease'
+        }}>
           <CalendarGrid
             currentMonth={currentMonth}
             onPrevMonth={handlePrevMonth}
@@ -143,11 +148,12 @@ export const LoggedTimeDashboard: React.FC = () => {
             onDayClick={handleDayClick}
             isLoading={isLoading}
             isMultiSelectMode={isMultiSelectMode}
+            isActiveDaySelected={!isMultiSelectMode && !!activeDayStr}
           />
         </div>
 
         {!isMultiSelectMode && activeDayStr && (
-          <div style={{ width: '350px', flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <DayDetailsView
               dateStr={activeDayStr}
               entries={entriesByDate[activeDayStr] || []}

@@ -1,9 +1,8 @@
 import React from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
-import { AppShell as MantineAppShell, Group, Title, ActionIcon, useMantineColorScheme, Text, Alert, Button } from '@mantine/core';
+import { AppShell as MantineAppShell, Group, Title, ActionIcon, useMantineColorScheme, Alert, Button } from '@mantine/core';
 import { IconClock, IconCalendarEvent, IconSettings, IconSun, IconMoon, IconSunMoon, IconAlertCircle } from '@tabler/icons-react';
-import classes from './AppShell.module.css';
 
 export const AppShell: React.FC = () => {
   const { isConfigured } = useSettings();

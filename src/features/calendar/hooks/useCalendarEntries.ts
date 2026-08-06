@@ -7,25 +7,33 @@ import { useUser } from '../../../contexts/UserContext';
  * DIP-compliant hook: reads userId from UserContext instead of
  * calling getCurrentUser() directly on every fetch.
  */
+const monthCache = new Map<string, Record<string, TimeEntry[]>>();
+
 export const useCalendarEntries = (currentMonth: Date) => {
   const { user } = useUser();
   const [entriesByDate, setEntriesByDate] = useState<Record<string, TimeEntry[]>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchEntries = async () => {
+  const fetchEntries = async (forceRefetch = false) => {
     if (!user) {
       setEntriesByDate({});
       return;
     }
 
-    setIsLoading(true);
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const monthKey = `${year}-${month}`;
+
+    if (!forceRefetch && monthCache.has(monthKey)) {
+      setEntriesByDate(monthCache.get(monthKey)!);
+    } else {
+      setIsLoading(true);
+    }
+
     setError(null);
 
     try {
-      const year = currentMonth.getFullYear();
-      const month = currentMonth.getMonth();
-
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
 
@@ -34,7 +42,7 @@ export const useCalendarEntries = (currentMonth: Date) => {
 
       const timeEntries = await getTimeEntries({ from, to, user_id: user.id });
 
-      // Fetch missing issue subjects in chunks
+      // Fetch missing issue subjects in chunks concurrently
       const issueIdsToFetch = new Set<number>();
       timeEntries.forEach(entry => {
         if (entry.issue && entry.issue.id && !entry.issue.subject) {
@@ -44,24 +52,31 @@ export const useCalendarEntries = (currentMonth: Date) => {
 
       if (issueIdsToFetch.size > 0) {
         const ids = Array.from(issueIdsToFetch);
+        const chunkPromises = [];
+        
         for (let i = 0; i < ids.length; i += 20) {
           const chunk = ids.slice(i, i + 20);
-          try {
-            const issues = await getIssues(chunk);
-            issues.forEach((issue: any) => {
-              timeEntries.forEach(entry => {
-                if (entry.issue && entry.issue.id === issue.id) {
-                  entry.issue.subject = issue.subject;
-                  if (!entry.project && issue.project) {
-                    entry.project = issue.project;
-                  }
-                }
-              });
-            });
-          } catch (e) {
-            console.error('Failed to fetch issue chunk:', e);
-          }
+          chunkPromises.push(
+            getIssues(chunk).catch(e => {
+              console.error('Failed to fetch issue chunk:', e);
+              return [];
+            })
+          );
         }
+        
+        const chunks = await Promise.all(chunkPromises);
+        const issues = chunks.flat();
+        
+        issues.forEach((issue: any) => {
+          timeEntries.forEach(entry => {
+            if (entry.issue && entry.issue.id === issue.id) {
+              entry.issue.subject = issue.subject;
+              if (!entry.project && issue.project) {
+                entry.project = issue.project;
+              }
+            }
+          });
+        });
       }
 
       // Group by date
@@ -73,6 +88,7 @@ export const useCalendarEntries = (currentMonth: Date) => {
         grouped[entry.spent_on].push(entry);
       });
 
+      monthCache.set(monthKey, grouped);
       setEntriesByDate(grouped);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch calendar entries');
@@ -85,7 +101,7 @@ export const useCalendarEntries = (currentMonth: Date) => {
     fetchEntries();
   }, [currentMonth, user?.id]);
 
-  return { entriesByDate, isLoading, error, refetch: fetchEntries };
+  return { entriesByDate, isLoading, error, refetch: () => fetchEntries(true) };
 };
 
 function formatDate(date: Date): string {
