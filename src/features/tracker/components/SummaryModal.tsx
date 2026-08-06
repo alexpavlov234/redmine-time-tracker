@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor } from '@mantine/core';
+import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor, Grid } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
@@ -18,6 +19,7 @@ interface SummaryModalProps {
 }
 
 export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) => {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const { usePerformedTasksList, redmineUrl } = useSettings();
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
   const { } = useQueue();
@@ -178,172 +180,190 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
     <Modal
       opened={isOpen}
       onClose={onClose}
-      title={<Text fw={600}>Submit Time Entry</Text>}
-      size="md"
+      title={<Text fw={600} size="lg">Submit Time Entry</Text>}
+      size="80%"
+      fullScreen={isMobile}
+      centered
     >
-      <Stack gap="md">
-        {/* Total Time */}
-        <Stack align="center" gap="xs" p="md" bg="var(--mantine-color-default)" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
-          <Text size="xs" tt="uppercase" c="dimmed" fw={600}>Logged Time (Hours)</Text>
-          <NumberInput
-            value={manualHours}
-            onChange={setManualHours}
-            decimalScale={2}
-            step={0.1}
-            min={0.1}
-            size="xl"
-            styles={{ input: { textAlign: 'center', fontWeight: 700 } }}
-            w={120}
-          />
-          <Text size="xs" c="dimmed">Timer recorded: {formatTime(totalElapsedTime)}</Text>
-        </Stack>
+      <Grid>
+        {/* Left Column: Hours, Task info, Activity, Status change */}
+        <Grid.Col span={{ base: 12, md: 6 }}>
+          <Stack gap="md">
+            {/* Total Time */}
+            <Stack align="center" gap="xs" p="md" bg="var(--mantine-color-default)" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+              <Text size="xs" tt="uppercase" c="dimmed" fw={600}>Logged Time (Hours)</Text>
+              <NumberInput
+                value={manualHours}
+                onChange={setManualHours}
+                decimalScale={2}
+                step={0.1}
+                min={0.1}
+                size="xl"
+                styles={{ input: { textAlign: 'center', fontWeight: 700 } }}
+                w={120}
+              />
+              <Text size="xs" c="dimmed">Timer recorded: {formatTime(totalElapsedTime)}</Text>
+            </Stack>
 
-        {/* Task info */}
-        {activeTodo && (
-          <Group gap="xs" wrap="nowrap">
-            <Text size="sm" c="dimmed">
-              <Text component="span" fw={600}>{activeTodo.projectName}</Text>
-              <Text component="span" mx="xs">→</Text>
-            </Text>
-            <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="sm" fw={600} underline="hover">
-              #{activeTodo.taskId} - {activeTodo.taskSubject}
-            </Anchor>
-            <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
-          </Group>
-        )}
+            {/* Task info */}
+            {activeTodo && (
+              <Stack gap={2}>
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+                  {activeTodo.projectName}
+                </Text>
+                <Group gap={6} wrap="nowrap">
+                  <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="md" fw={700} underline="hover">
+                    #{activeTodo.taskId} - {activeTodo.taskSubject}
+                  </Anchor>
+                  <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
+                </Group>
+              </Stack>
+            )}
 
-        <Textarea
-          label="Comments"
-          value={comments}
-          onChange={(e) => setComments(e.currentTarget.value)}
-          minRows={3}
-          autosize
-        />
+            <Select
+              label="Activity"
+              placeholder="-- Select activity --"
+              value={activityId}
+              onChange={setActivityId}
+              data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
+              required
+            />
 
-        <Select
-          label="Activity"
-          placeholder="-- Select activity --"
-          value={activityId}
-          onChange={setActivityId}
-          data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
-          required
-        />
+            <Checkbox
+              label="Change issue status after submission"
+              checked={changeStatus}
+              onChange={e => setChangeStatus(e.currentTarget.checked)}
+              mt="xs"
+            />
 
-        {/* Dynamic Custom Fields */}
-        {customFields.length > 0 && (
-          <Stack gap="sm" pt="xs">
-            <Group gap="xs">
-              <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
-              <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
-            </Group>
-            {customFields.map(field => {
-              const value = customFieldValues[field.id] || '';
-              const format = field.field_format || (field as any).format;
-              const isLikelyBool = format === 'bool' || 
-                                   format === 'boolean' ||
-                                   field.name.toLowerCase().includes('billable') ||
-                                   field.name.toLowerCase().includes('billing');
-
-              if (isLikelyBool) {
-                return (
-                  <Checkbox
-                    key={field.id}
-                    label={field.name}
-                    checked={value === '1'}
-                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
-                  />
-                );
-              }
-              
-              if (format === 'list' || format === 'user' || format === 'version') {
-                return (
-                  <Select
-                    key={field.id}
-                    label={field.name}
-                    placeholder={`-- Select ${field.name} --`}
-                    value={value}
-                    onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
-                    data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
-                    required={field.is_required || field.required}
-                  />
-                );
-              }
-
-              if (format === 'text') {
-                return (
-                  <Textarea
-                    key={field.id}
-                    label={field.name}
-                    value={value}
-                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
-                    required={field.is_required || field.required}
-                    minRows={2}
-                    autosize
-                  />
-                );
-              }
-
-              if (format === 'int' || format === 'float') {
-                return (
-                  <NumberInput
-                    key={field.id}
-                    label={field.name}
-                    value={value ? parseFloat(value) : ''}
-                    onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
-                    required={field.is_required || field.required}
-                    decimalScale={format === 'float' ? 2 : 0}
-                  />
-                );
-              }
-
-              return (
-                <TextInput
-                  key={field.id}
-                  label={field.name}
-                  value={value}
-                  onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
-                  required={field.is_required || field.required}
-                  type={format === 'date' ? 'date' : 'text'}
-                />
-              );
-            })}
+            {changeStatus && (
+              <Select
+                placeholder="-- Select status --"
+                value={statusId}
+                onChange={setStatusId}
+                data={issueStatuses.map(s => ({ value: s.id.toString(), label: s.name }))}
+              />
+            )}
           </Stack>
-        )}
+        </Grid.Col>
 
-        <Checkbox
-          label="Change issue status after submission"
-          checked={changeStatus}
-          onChange={e => setChangeStatus(e.currentTarget.checked)}
-          mt="md"
-        />
+        {/* Right Column: Comments & Custom Fields */}
+        <Grid.Col span={{ base: 12, md: 6 }}>
+          <Stack gap="md">
+            <Textarea
+              label="Comments"
+              value={comments}
+              onChange={(e) => setComments(e.currentTarget.value)}
+              minRows={5}
+              autosize
+              placeholder="Detailed work summary..."
+            />
 
-        {changeStatus && (
-          <Select
-            placeholder="-- Select status --"
-            value={statusId}
-            onChange={setStatusId}
-            data={issueStatuses.map(s => ({ value: s.id.toString(), label: s.name }))}
-          />
-        )}
+            {/* Dynamic Custom Fields */}
+            {customFields.length > 0 && (
+              <Stack gap="sm" pt="xs">
+                <Group gap="xs">
+                  <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
+                  <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
+                </Group>
+                {customFields.map(field => {
+                  const value = customFieldValues[field.id] || '';
+                  const format = field.field_format || (field as any).format;
+                  const isLikelyBool = format === 'bool' || 
+                                       format === 'boolean' ||
+                                       field.name.toLowerCase().includes('billable') ||
+                                       field.name.toLowerCase().includes('billing');
 
-        {submitResult && (
-          <Alert color={submitResult.success ? 'green' : 'red'}>
-            {submitResult.message}
-          </Alert>
-        )}
+                  if (isLikelyBool) {
+                    return (
+                      <Checkbox
+                        key={field.id}
+                        label={field.name}
+                        checked={value === '1'}
+                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
+                      />
+                    );
+                  }
+                  
+                  if (format === 'list' || format === 'user' || format === 'version') {
+                    return (
+                      <Select
+                        key={field.id}
+                        label={field.name}
+                        placeholder={`-- Select ${field.name} --`}
+                        value={value}
+                        onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
+                        data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
+                        required={field.is_required || field.required}
+                      />
+                    );
+                  }
 
-        <Group justify="flex-end" mt="md">
-          <Button
-            leftSection={submitResult?.success ? <IconCheck size={16} /> : <IconSend size={16} />}
-            onClick={handleSubmit}
-            disabled={isSubmitting || submitResult?.success}
-            loading={isSubmitting}
-            color={submitResult?.success ? 'green' : 'blue'}
-          >
-            {submitResult?.success ? 'Submitted!' : 'Submit to Redmine'}
-          </Button>
-        </Group>
-      </Stack>
+                  if (format === 'text') {
+                    return (
+                      <Textarea
+                        key={field.id}
+                        label={field.name}
+                        value={value}
+                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                        required={field.is_required || field.required}
+                        minRows={2}
+                        autosize
+                      />
+                    );
+                  }
+
+                  if (format === 'int' || format === 'float') {
+                    return (
+                      <NumberInput
+                        key={field.id}
+                        label={field.name}
+                        value={value ? parseFloat(value) : ''}
+                        onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
+                        required={field.is_required || field.required}
+                        decimalScale={format === 'float' ? 2 : 0}
+                      />
+                    );
+                  }
+
+                  return (
+                    <TextInput
+                      key={field.id}
+                      label={field.name}
+                      value={value}
+                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                      required={field.is_required || field.required}
+                      type={format === 'date' ? 'date' : 'text'}
+                    />
+                  );
+                })}
+              </Stack>
+            )}
+          </Stack>
+        </Grid.Col>
+      </Grid>
+
+      {submitResult && (
+        <Alert color={submitResult.success ? 'green' : 'red'} mt="md">
+          {submitResult.message}
+        </Alert>
+      )}
+
+      <Group justify="flex-end" mt="lg">
+        <Button variant="default" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          leftSection={submitResult?.success ? <IconCheck size={16} /> : <IconSend size={16} />}
+          onClick={handleSubmit}
+          disabled={isSubmitting || submitResult?.success}
+          loading={isSubmitting}
+          color={submitResult?.success ? 'green' : 'blue'}
+          size="md"
+        >
+          {submitResult?.success ? 'Submitted!' : 'Submit to Redmine'}
+        </Button>
+      </Group>
     </Modal>
   );
 };

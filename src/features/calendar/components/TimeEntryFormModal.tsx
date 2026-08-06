@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Button, Select, TextInput, NumberInput, Checkbox, Textarea, Group, Stack, Text, Divider, ActionIcon } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
@@ -28,6 +29,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   defaultDate,
   initialPresetId,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const { allProjects } = useProjects();
   const { presets, savePreset, deletePreset } = usePresets();
 
@@ -282,7 +284,9 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       opened={isOpen}
       onClose={onClose}
       title={<Text fw={600}>{isEditing ? 'Edit Time Entry' : 'Log Time'}</Text>}
-      size="lg"
+      size="80%"
+      fullScreen={isMobile}
+      centered
     >
       <Stack gap="md">
         {!isEditing && (
