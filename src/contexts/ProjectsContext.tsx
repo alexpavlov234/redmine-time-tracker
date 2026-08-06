@@ -41,6 +41,16 @@ export const ProjectsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
 
       setAllProjects(collected);
+
+      // Also fetch issue statuses globally
+      try {
+        const statusesResp = await redmineApiRequest('/issue_statuses.json');
+        if (Array.isArray(statusesResp.issue_statuses)) {
+          setIssueStatuses(statusesResp.issue_statuses);
+        }
+      } catch (e) {
+        console.error('Failed to fetch issue statuses:', e);
+      }
     } catch (err) {
       console.error('Failed to fetch projects:', err);
     } finally {

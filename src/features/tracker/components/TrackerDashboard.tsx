@@ -4,8 +4,10 @@ import { WorkQueue } from '../../queue/components/WorkQueue';
 import { AddTaskForm } from '../../queue/components/AddTaskForm';
 import { SummaryModal } from './SummaryModal';
 import { AssignedTasksPanel } from './AssignedTasksPanel';
+import { QuickLogPanel } from './QuickLogPanel';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
-import { Card, Button, TextInput, Group, Stack, Badge, Text, List, ThemeIcon } from '@mantine/core';
+import { useSettings } from '../../../contexts/SettingsContext';
+import { Card, Button, TextInput, Group, Stack, Badge, Text, List, ThemeIcon, Switch, Paper, Grid } from '@mantine/core';
 import { IconClipboardList, IconPlus, IconCheck } from '@tabler/icons-react';
 
 /** "Performed Tasks" panel showing activities logged during the timer session */
@@ -103,6 +105,7 @@ const PerformedTasks: React.FC = () => {
 
 export const TrackerDashboard: React.FC = () => {
   const timer = useQueueTimer();
+  const { usePerformedTasksList, setUsePerformedTasksList } = useSettings();
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
 
   // When timer stops, open the summary modal
@@ -114,16 +117,43 @@ export const TrackerDashboard: React.FC = () => {
   }, [timer]);
 
   return (
-    <Stack gap="xl">
-      <TimerBar onStop={handleStop} />
-      <PerformedTasks />
-      
-      <AssignedTasksPanel />
+    <Stack gap="lg">
+      <Grid>
+        {/* Left Column: Timer, Tracking Mode, Performed Tasks, Work Queue */}
+        <Grid.Col span={{ base: 12, md: 6 }}>
+          <Stack gap="lg">
+            <TimerBar onStop={handleStop} />
+            
+            <Paper p="xs" px="md" radius="md" withBorder bg="var(--mantine-color-default)">
+              <Group justify="space-between" align="center">
+                <Group gap="xs">
+                  <IconClipboardList size={18} color="var(--mantine-color-blue-filled)" />
+                  <Text size="sm" fw={600}>Tracking Mode:</Text>
+                </Group>
+                <Switch
+                  checked={usePerformedTasksList}
+                  onChange={(e) => setUsePerformedTasksList(e.currentTarget.checked)}
+                  label={usePerformedTasksList ? "Performed Tasks List (Enabled)" : "Direct Time Logging (No Sub-tasks)"}
+                  color="blue"
+                  size="md"
+                />
+              </Group>
+            </Paper>
 
-      <Stack gap="xl">
-        <WorkQueue />
-        <AddTaskForm />
-      </Stack>
+            {usePerformedTasksList && <PerformedTasks />}
+            <WorkQueue />
+          </Stack>
+        </Grid.Col>
+
+        {/* Right Column: Task Selection (Assigned Tasks, Presets, Add Task) */}
+        <Grid.Col span={{ base: 12, md: 6 }}>
+          <Stack gap="lg">
+            <AssignedTasksPanel />
+            <QuickLogPanel />
+            <AddTaskForm />
+          </Stack>
+        </Grid.Col>
+      </Grid>
 
       <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} />
     </Stack>

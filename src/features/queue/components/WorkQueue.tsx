@@ -6,8 +6,12 @@ import { IconGripVertical, IconTrash, IconListCheck, IconPlayerPlay, IconPlayerP
 import { formatTime } from '../../../utils/formatters';
 import { Card, Button, Group, Text, ActionIcon, Stack, Badge, Paper, Modal, TextInput } from '@mantine/core';
 
+import { useSettings } from '../../../contexts/SettingsContext';
+import { StatusPromptModal } from '../../tracker/components/StatusPromptModal';
+
 export const WorkQueue: React.FC = () => {
   const { todos, removeTodo, reorderTodos, activeTodoId } = useQueue();
+  const { promptStatusOnStart } = useSettings();
   const timer = useQueueTimer();
   const confirm = useConfirm();
 
@@ -20,6 +24,11 @@ export const WorkQueue: React.FC = () => {
   const [showPrompt, setShowPrompt] = useState(false);
   const [promptTodoId, setPromptTodoId] = useState<number | null>(null);
   const [promptText, setPromptText] = useState('');
+
+  // Status prompt state
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusTaskId, setStatusTaskId] = useState<string | null>(null);
+  const [statusTaskSubject, setStatusTaskSubject] = useState<string>('');
 
   const handlePlayPause = async (todoId: number) => {
     const todo = todos.find(t => t.id === todoId);
@@ -35,15 +44,26 @@ export const WorkQueue: React.FC = () => {
       setPromptTodoId(todoId);
       setPromptText(todo.note || '');
       setShowPrompt(true);
+    } else if (promptStatusOnStart && todo.taskId) {
+      setStatusTaskId(todo.taskId);
+      setStatusTaskSubject(todo.taskSubject);
+      setShowStatusModal(true);
     }
   };
 
   const handlePromptSubmit = () => {
     if (!promptText.trim() || promptTodoId === null) return;
+    const todo = todos.find(t => t.id === promptTodoId);
     (timer as any).startAfterPrompt(promptTodoId, promptText.trim());
     setShowPrompt(false);
     setPromptText('');
     setPromptTodoId(null);
+
+    if (promptStatusOnStart && todo?.taskId) {
+      setStatusTaskId(todo.taskId);
+      setStatusTaskSubject(todo.taskSubject);
+      setShowStatusModal(true);
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -203,6 +223,14 @@ export const WorkQueue: React.FC = () => {
           </Group>
         </Stack>
       </Modal>
+
+      <StatusPromptModal
+        isOpen={showStatusModal}
+        taskId={statusTaskId}
+        taskSubject={statusTaskSubject}
+        onClose={() => setShowStatusModal(false)}
+        onConfirmStart={() => {}}
+      />
     </>
   );
 };

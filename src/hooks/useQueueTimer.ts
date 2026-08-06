@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { Activity, Todo } from '../types';
 import { useQueue } from '../contexts/QueueContext';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface QueueTimerState {
   isRunning: boolean;
@@ -22,6 +23,7 @@ interface QueueTimerActions {
  * Refactored hook: uses QueueContext for consistent global state.
  */
 export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
+  const { usePerformedTasksList } = useSettings();
   const { 
     todos, 
     activeTodoId, 
@@ -79,11 +81,11 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
 
     const isFirstSession = (todo.activities?.length || 0) === 0 && (todo.elapsedMs || 0) === 0;
 
-    if (isFirstSession) {
+    if (usePerformedTasksList && isFirstSession) {
       return 'needs_prompt';
     }
 
-    // Resuming — start immediately
+    // Resuming or performed tasks list disabled — start immediately
     const now = Date.now();
     updateTodo(todoId, {
       isRunning: true,
@@ -92,7 +94,7 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
 
     document.title = '▶️ Tracking...';
     return null;
-  }, [todos, setActiveTodoId, updateTodo, getActiveTodo]);
+  }, [todos, setActiveTodoId, updateTodo, getActiveTodo, usePerformedTasksList]);
 
   const startAfterPrompt = useCallback((todoId: number, firstActivityText: string) => {
     const now = Date.now();

@@ -10,12 +10,15 @@ import { formatTime } from '../../../utils/formatters';
 import { IconSend, IconCheck, IconListCheck } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 
+import { useSettings } from '../../../contexts/SettingsContext';
+
 interface SummaryModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
 export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) => {
+  const { usePerformedTasksList } = useSettings();
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
   const { } = useQueue();
   const { issueStatuses, setIssueStatuses } = useProjects();
@@ -38,12 +41,16 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   // Populate form when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Build comments from activities
-      const detailsText = activities
-        .map(act => act.text.trim())
-        .filter(Boolean)
-        .join(' ');
-      setComments(detailsText);
+      // Build comments from activities or todo note
+      if (usePerformedTasksList && activities.length > 0) {
+        const detailsText = activities
+          .map(act => act.text.trim())
+          .filter(Boolean)
+          .join(' ');
+        setComments(detailsText);
+      } else {
+        setComments(activeTodo?.note || '');
+      }
       setSubmitResult(null);
       setChangeStatus(false);
       setStatusId(null);

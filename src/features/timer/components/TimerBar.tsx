@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle, IconArrowDown } from '@tabler/icons-react';
+import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle } from '@tabler/icons-react';
 import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack } from '@mantine/core';
 import { formatTime } from '../../../utils/formatters';
 
@@ -57,23 +57,11 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
     );
   }
 
-  // No tasks state
-  if (todos.length === 0 && !isRunning) {
-    return (
-      <Paper shadow="sm" p="md" radius="md" withBorder bg="var(--mantine-color-default)">
-        <Group justify="center" c="dimmed">
-          <IconArrowDown size={18} />
-          <Text size="sm">Add a task using the <Text component="span" fw={700}>Add Task Manually</Text> form to start tracking</Text>
-        </Group>
-      </Paper>
-    );
-  }
-
   // Active task info
-  const displayProject = activeTodo?.projectName || (todos.length > 0 ? todos[0].projectName : '');
+  const displayProject = activeTodo?.projectName || (todos.length > 0 ? todos[0].projectName : 'Time Tracker');
   const displayTask = activeTodo
     ? `#${activeTodo.taskId} - ${activeTodo.taskSubject}`
-    : (todos.length > 0 ? `#${todos[0].taskId} - ${todos[0].taskSubject}` : '');
+    : (todos.length > 0 ? `#${todos[0].taskId} - ${todos[0].taskSubject}` : 'No active task selected');
   const displayActivity = activeTodo?.activityName;
 
   return (

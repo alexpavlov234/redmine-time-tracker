@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
-import { Card, TextInput, PasswordInput, Button, Group, Stack, Alert, Title } from '@mantine/core';
+import { Card, TextInput, PasswordInput, Button, Group, Stack, Alert, Title, Switch, Text } from '@mantine/core';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { notifications } from '@mantine/notifications';
-import { IconSettings, IconDeviceFloppy, IconLink } from '@tabler/icons-react';
+import { IconSettings, IconDeviceFloppy, IconLink, IconClipboardList } from '@tabler/icons-react';
 import { getCurrentUser, detectBillableField } from '../../../services/redmine';
 
 export const SettingsForm: React.FC = () => {
-  const { apiKey, redmineUrl, setApiKey, setRedmineUrl } = useSettings();
+  const { 
+    apiKey, 
+    redmineUrl, 
+    usePerformedTasksList, 
+    promptStatusOnStart,
+    setApiKey, 
+    setRedmineUrl, 
+    setUsePerformedTasksList,
+    setPromptStatusOnStart
+  } = useSettings();
 
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localUrl, setLocalUrl] = useState(redmineUrl);
+  const [localUsePerformedTasks, setLocalUsePerformedTasks] = useState(usePerformedTasksList);
+  const [localPromptStatus, setLocalPromptStatus] = useState(promptStatusOnStart);
 
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -17,6 +28,8 @@ export const SettingsForm: React.FC = () => {
   const handleSave = () => {
     setApiKey(localApiKey.trim());
     setRedmineUrl(localUrl.trim().replace(/\/$/, ''));
+    setUsePerformedTasksList(localUsePerformedTasks);
+    setPromptStatusOnStart(localPromptStatus);
     setTestResult({ success: true, message: 'Settings saved. Projects will refresh automatically.' });
     notifications.show({ title: 'Success', message: 'Settings saved!', color: 'green' });
   };
@@ -28,6 +41,8 @@ export const SettingsForm: React.FC = () => {
     // Save first so the API service uses the new credentials
     setApiKey(localApiKey.trim());
     setRedmineUrl(localUrl.trim().replace(/\/$/, ''));
+    setUsePerformedTasksList(localUsePerformedTasks);
+    setPromptStatusOnStart(localPromptStatus);
 
     try {
       const user = await getCurrentUser();
@@ -77,6 +92,37 @@ export const SettingsForm: React.FC = () => {
           onChange={(e) => setLocalApiKey(e.target.value)}
           w="100%"
         />
+
+        <Group justify="space-between" align="center" mt="sm">
+          <Stack gap={2}>
+            <Group gap="xs">
+              <IconClipboardList size={16} color="var(--mantine-color-blue-filled)" />
+              <Text size="sm" fw={600}>Use Performed Tasks List</Text>
+            </Group>
+            <Text size="xs" c="dimmed">
+              Enabled: Prompts for sub-tasks on timer start & populates comments. Disabled: Direct time logging.
+            </Text>
+          </Stack>
+          <Switch
+            checked={localUsePerformedTasks}
+            onChange={(e) => setLocalUsePerformedTasks(e.currentTarget.checked)}
+            size="md"
+          />
+        </Group>
+
+        <Group justify="space-between" align="center" mt="xs">
+          <Stack gap={2}>
+            <Text size="sm" fw={600}>Prompt to update Status to "In Progress"</Text>
+            <Text size="xs" c="dimmed">
+              Ask to update task status in Redmine when starting a timer session.
+            </Text>
+          </Stack>
+          <Switch
+            checked={localPromptStatus}
+            onChange={(e) => setLocalPromptStatus(e.currentTarget.checked)}
+            size="md"
+          />
+        </Group>
 
         {testResult && (
           <Alert color={testResult.success ? 'green' : 'red'}>
