@@ -195,7 +195,7 @@ export const LoggedTimeDashboard: React.FC = () => {
         )}
 
         {isMultiSelectMode && selectedDays.size > 0 && (
-          <div style={{ width: '400px', flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <BulkLogForm
               selectedDays={selectedDays}
               onSuccess={handleBulkSuccess}

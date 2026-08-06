@@ -10,6 +10,7 @@ import { createTimeEntry, updateTimeEntry, getIssue } from '../../../services/re
 import type { TimeEntry, TimeLogPreset, RedmineIssue } from '../../../types';
 import { IconDeviceFloppy, IconSend, IconTrash, IconListCheck } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
+import { SavePresetModal } from './SavePresetModal';
 
 interface TimeEntryFormModalProps {
   isOpen: boolean;
@@ -208,10 +209,13 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     }
   };
 
-  const handleSavePreset = () => {
-    const name = prompt("Enter a name for this preset (e.g. 'Standard Day'):");
-    if (!name?.trim()) return;
+  const [isSavePresetModalOpen, setIsSavePresetModalOpen] = useState(false);
 
+  const handleSavePreset = () => {
+    setIsSavePresetModalOpen(true);
+  };
+
+  const handleExecuteSavePreset = (name: string) => {
     const { projectId, taskId, activityId, hours, comments } = form.values;
 
     const project = allProjects.find(p => p.id.toString() === projectId);
@@ -527,6 +531,12 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
           </Stack>
         </form>
       </Stack>
+
+      <SavePresetModal
+        isOpen={isSavePresetModalOpen}
+        onClose={() => setIsSavePresetModalOpen(false)}
+        onSave={handleExecuteSavePreset}
+      />
     </Modal>
   );
 };

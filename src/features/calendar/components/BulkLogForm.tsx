@@ -9,6 +9,7 @@ import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { usePresets } from '../../../hooks/usePresets';
+import { SavePresetModal } from './SavePresetModal';
 
 interface BulkLogFormProps {
   selectedDays: Set<string>;
@@ -29,6 +30,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
   const [statusResult, setStatusResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isSavePresetModalOpen, setIsSavePresetModalOpen] = useState(false);
 
   const { customFields } = useCustomFields();
 
@@ -151,9 +153,10 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   };
 
   const handleSavePreset = () => {
-    const name = prompt("Enter a name for this preset (e.g. 'Standard Day'):");
-    if (!name?.trim()) return;
+    setIsSavePresetModalOpen(true);
+  };
 
+  const handleExecuteSavePreset = (name: string) => {
     const { projectId, taskId, activityId, hours, comments } = form.values;
     const project = allProjects.find(p => p.id.toString() === projectId);
     const task = tasks.find(t => t.id.toString() === taskId);
@@ -175,6 +178,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
     savePreset(newPreset);
     setSelectedPresetId(newPreset.id);
+    setStatusResult({ success: true, message: `Preset "${name.trim()}" saved!` });
   };
 
   const handleDeletePreset = () => {
@@ -467,6 +471,12 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
           </Stack>
         </form>
       </Stack>
+
+      <SavePresetModal
+        isOpen={isSavePresetModalOpen}
+        onClose={() => setIsSavePresetModalOpen(false)}
+        onSave={handleExecuteSavePreset}
+      />
     </Card>
   );
 };
