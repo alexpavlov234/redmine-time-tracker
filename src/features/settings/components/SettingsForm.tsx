@@ -19,8 +19,6 @@ export const SettingsForm: React.FC = () => {
 
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localUrl, setLocalUrl] = useState(redmineUrl);
-  const [localUsePerformedTasks, setLocalUsePerformedTasks] = useState(usePerformedTasksList);
-  const [localPromptStatus, setLocalPromptStatus] = useState(promptStatusOnStart);
 
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -28,8 +26,6 @@ export const SettingsForm: React.FC = () => {
   const handleSave = () => {
     setApiKey(localApiKey.trim());
     setRedmineUrl(localUrl.trim().replace(/\/$/, ''));
-    setUsePerformedTasksList(localUsePerformedTasks);
-    setPromptStatusOnStart(localPromptStatus);
     setTestResult({ success: true, message: 'Settings saved. Projects will refresh automatically.' });
     notifications.show({ title: 'Success', message: 'Settings saved!', color: 'green' });
   };
@@ -41,8 +37,6 @@ export const SettingsForm: React.FC = () => {
     // Save first so the API service uses the new credentials
     setApiKey(localApiKey.trim());
     setRedmineUrl(localUrl.trim().replace(/\/$/, ''));
-    setUsePerformedTasksList(localUsePerformedTasks);
-    setPromptStatusOnStart(localPromptStatus);
 
     try {
       const user = await getCurrentUser();
@@ -101,8 +95,8 @@ export const SettingsForm: React.FC = () => {
             </Text>
           </Stack>
           <Switch
-            checked={localUsePerformedTasks}
-            onChange={(e) => setLocalUsePerformedTasks(e.currentTarget.checked)}
+            checked={usePerformedTasksList}
+            onChange={(e) => setUsePerformedTasksList(e.currentTarget.checked)}
             size="md"
           />
         </Group>
@@ -115,8 +109,8 @@ export const SettingsForm: React.FC = () => {
             </Text>
           </Stack>
           <Switch
-            checked={localPromptStatus}
-            onChange={(e) => setLocalPromptStatus(e.currentTarget.checked)}
+            checked={promptStatusOnStart}
+            onChange={(e) => setPromptStatusOnStart(e.currentTarget.checked)}
             size="md"
           />
         </Group>

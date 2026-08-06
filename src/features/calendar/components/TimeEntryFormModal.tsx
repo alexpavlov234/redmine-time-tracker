@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Button, Select, TextInput, NumberInput, Checkbox, Textarea, Group, Stack, Text, Divider, ActionIcon } from '@mantine/core';
+import { Modal, Button, Select, TextInput, NumberInput, Checkbox, Textarea, Group, Stack, Text, Divider, ActionIcon, Grid } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { useProjects } from '../../../contexts/ProjectsContext';
@@ -316,170 +316,191 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
-            <Select
-              label="Project"
-              placeholder="Search projects..."
-              data={[{ value: 'my_issues', label: '--- My Assigned Issues ---' }, ...projectOptions]}
-              searchable
-              {...form.getInputProps('projectId')}
-              onChange={(val) => {
-                form.setFieldValue('projectId', val || '');
-                if (!val) form.setFieldValue('taskId', '');
-                form.setFieldValue('activityId', '');
-              }}
-            />
+            <Grid>
+              {/* Left Column: Project, Activity, Task, Hours & Date */}
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Stack gap="md">
+                  <Select
+                    label="Project"
+                    placeholder="Search projects..."
+                    data={[{ value: 'my_issues', label: '--- My Assigned Issues ---' }, ...projectOptions]}
+                    searchable
+                    {...form.getInputProps('projectId')}
+                    onChange={(val) => {
+                      form.setFieldValue('projectId', val || '');
+                      if (!val) form.setFieldValue('taskId', '');
+                      form.setFieldValue('activityId', '');
+                    }}
+                  />
 
-            <Group align="flex-start" wrap="nowrap">
-              <TextInput
-                label="Task ID"
-                placeholder="ID..."
-                w={110}
-                {...form.getInputProps('taskId')}
-                onBlur={() => {
-                  if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
-                    handleQuickLoad(form.values.taskId);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (form.values.taskId) handleQuickLoad(form.values.taskId);
-                  }
-                }}
-                disabled={isLoadingIssue || isSubmitting}
-              />
-              <Select
-                label="Task Name"
-                placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-                data={taskOptions}
-                searchable
-                withAsterisk
-                {...form.getInputProps('taskId')}
-                onChange={handleTaskChange}
-                disabled={isLoadingTasks || isSubmitting}
-                style={{ flex: 1 }}
-              />
-            </Group>
+                  <Select
+                    label="Activity"
+                    placeholder={isLoadingActivities ? 'Loading...' : '-- Select activity --'}
+                    data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
+                    withAsterisk
+                    disabled={isLoadingActivities || !form.values.projectId}
+                    {...form.getInputProps('activityId')}
+                  />
 
-            <Select
-              label="Activity"
-              placeholder={isLoadingActivities ? 'Loading...' : '-- Select activity --'}
-              data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
-              withAsterisk
-              disabled={isLoadingActivities || !form.values.projectId}
-              {...form.getInputProps('activityId')}
-            />
+                  <Group align="flex-start" wrap="nowrap">
+                    <TextInput
+                      label="Task ID"
+                      placeholder="ID..."
+                      w={110}
+                      {...form.getInputProps('taskId')}
+                      onBlur={() => {
+                        if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
+                          handleQuickLoad(form.values.taskId);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (form.values.taskId) handleQuickLoad(form.values.taskId);
+                        }
+                      }}
+                      disabled={isLoadingIssue || isSubmitting}
+                    />
+                    <Select
+                      label="Task Name"
+                      placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
+                      data={taskOptions}
+                      searchable
+                      withAsterisk
+                      {...form.getInputProps('taskId')}
+                      onChange={handleTaskChange}
+                      disabled={isLoadingTasks || isSubmitting}
+                      style={{ flex: 1 }}
+                    />
+                  </Group>
 
-            <Group grow>
-              <NumberInput
-                label="Hours"
-                withAsterisk
-                min={0}
-                decimalScale={2}
-                step={0.5}
-                {...form.getInputProps('hours')}
-              />
-              <TextInput
-                label="Date"
-                type="date"
-                withAsterisk
-                {...form.getInputProps('spentOn')}
-              />
-            </Group>
+                  {/* Side-by-side: Hours & Date */}
+                  <Group align="flex-start" wrap="nowrap">
+                    <NumberInput
+                      label="Hours"
+                      withAsterisk
+                      min={0}
+                      decimalScale={2}
+                      step={0.5}
+                      w={120}
+                      {...form.getInputProps('hours')}
+                    />
+                    <TextInput
+                      label="Date"
+                      type="date"
+                      withAsterisk
+                      style={{ flex: 1 }}
+                      {...form.getInputProps('spentOn')}
+                    />
+                  </Group>
+                </Stack>
+              </Grid.Col>
 
-            {/* Dynamic Custom Fields */}
-            {customFields.length > 0 && (
-              <Stack gap="sm" pt="xs">
-                <Group gap="xs">
-                  <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
-                </Group>
-                <Group grow>
-                  {customFields.map(field => {
-                    const value = customFieldValues[field.id] || '';
-                    const format = field.field_format || (field as any).format;
-                    const isLikelyBool = format === 'bool' || 
-                                         format === 'boolean' ||
-                                         field.name.toLowerCase().includes('billable') ||
-                                         field.name.toLowerCase().includes('billing');
+              {/* Right Column: Comments & Custom Fields */}
+              <Grid.Col span={{ base: 12, md: 6 }} style={{ display: 'flex', flexDirection: 'column' }}>
+                <Stack gap="md" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Textarea
+                    label="Comments"
+                    placeholder="Optional detailed description..."
+                    minRows={5}
+                    styles={{
+                      root: { flex: 1, display: 'flex', flexDirection: 'column' },
+                      wrapper: { flex: 1, display: 'flex', flexDirection: 'column' },
+                      input: { flex: 1, height: '100%', minHeight: 120, resize: 'vertical' },
+                    }}
+                    {...form.getInputProps('comments')}
+                  />
 
-                    if (isLikelyBool) {
-                      return (
-                        <Checkbox
-                          key={field.id}
-                          label={field.name}
-                          checked={value === '1'}
-                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
-                        />
-                      );
-                    }
-                    
-                    if (format === 'list' || format === 'user' || format === 'version') {
-                      return (
-                        <Select
-                          key={field.id}
-                          label={field.name}
-                          placeholder={`-- Select ${field.name} --`}
-                          value={value}
-                          onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
-                          data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
-                          required={field.is_required || field.required}
-                        />
-                      );
-                    }
+                  {/* Dynamic Custom Fields */}
+                  {customFields.length > 0 && (
+                    <Stack gap="sm" pt="xs">
+                      <Group gap="xs">
+                        <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
+                        <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
+                      </Group>
+                      <Group grow>
+                        {customFields.map(field => {
+                          const value = customFieldValues[field.id] || '';
+                          const format = field.field_format || (field as any).format;
+                          const isLikelyBool = format === 'bool' || 
+                                               format === 'boolean' ||
+                                               field.name.toLowerCase().includes('billable') ||
+                                               field.name.toLowerCase().includes('billing');
 
-                    if (format === 'text') {
-                      return (
-                        <Textarea
-                          key={field.id}
-                          label={field.name}
-                          value={value}
-                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
-                          required={field.is_required || field.required}
-                          minRows={2}
-                          autosize
-                          style={{ flex: '1 1 100%' }}
-                        />
-                      );
-                    }
+                          if (isLikelyBool) {
+                            return (
+                              <Checkbox
+                                key={field.id}
+                                label={field.name}
+                                checked={value === '1'}
+                                onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
+                              />
+                            );
+                          }
+                          
+                          if (format === 'list' || format === 'user' || format === 'version') {
+                            return (
+                              <Select
+                                key={field.id}
+                                label={field.name}
+                                placeholder={`-- Select ${field.name} --`}
+                                value={value}
+                                onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
+                                data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
+                                required={field.is_required || field.required}
+                              />
+                            );
+                          }
 
-                    if (format === 'int' || format === 'float') {
-                      return (
-                        <NumberInput
-                          key={field.id}
-                          label={field.name}
-                          value={value ? parseFloat(value) : ''}
-                          onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
-                          required={field.is_required || field.required}
-                          decimalScale={format === 'float' ? 2 : 0}
-                        />
-                      );
-                    }
+                          if (format === 'text') {
+                            return (
+                              <Textarea
+                                key={field.id}
+                                label={field.name}
+                                value={value}
+                                onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                                required={field.is_required || field.required}
+                                minRows={2}
+                                autosize
+                                style={{ flex: '1 1 100%' }}
+                              />
+                            );
+                          }
 
-                    return (
-                      <TextInput
-                        key={field.id}
-                        label={field.name}
-                        value={value}
-                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
-                        required={field.is_required || field.required}
-                        type={format === 'date' ? 'date' : 'text'}
-                      />
-                    );
-                  })}
-                </Group>
-              </Stack>
-            )}
+                          if (format === 'int' || format === 'float') {
+                            return (
+                              <NumberInput
+                                key={field.id}
+                                label={field.name}
+                                value={value ? parseFloat(value) : ''}
+                                onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
+                                required={field.is_required || field.required}
+                                decimalScale={format === 'float' ? 2 : 0}
+                              />
+                            );
+                          }
 
-            <TextInput
-              label="Comments"
-              placeholder="Optional description"
-              {...form.getInputProps('comments')}
-            />
+                          return (
+                            <TextInput
+                              key={field.id}
+                              label={field.name}
+                              value={value}
+                              onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                              required={field.is_required || field.required}
+                              type={format === 'date' ? 'date' : 'text'}
+                            />
+                          );
+                        })}
+                      </Group>
+                    </Stack>
+                  )}
+                </Stack>
+              </Grid.Col>
+            </Grid>
 
             <Group justify="space-between" mt="md">
               <Button
-                variant="subtle"
+                variant="outline"
                 onClick={handleSavePreset}
                 disabled={isSubmitting}
               >

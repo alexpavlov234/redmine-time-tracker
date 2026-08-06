@@ -5,11 +5,13 @@ import { useConfirm } from '../../../contexts/ConfirmContext';
 import { IconGripVertical, IconTrash, IconListCheck, IconPlayerPlay, IconPlayerPause, IconExternalLink } from '@tabler/icons-react';
 import { formatTime } from '../../../utils/formatters';
 import { Card, Button, Group, Text, ActionIcon, Stack, Badge, Paper, Modal, TextInput, Anchor } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 
 import { useSettings } from '../../../contexts/SettingsContext';
 import { StatusPromptModal } from '../../tracker/components/StatusPromptModal';
 
 export const WorkQueue: React.FC = () => {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const { todos, removeTodo, reorderTodos, activeTodoId } = useQueue();
   const { promptStatusOnStart, redmineUrl } = useSettings();
   const timer = useQueueTimer();
@@ -208,6 +210,8 @@ export const WorkQueue: React.FC = () => {
         opened={showPrompt}
         onClose={() => setShowPrompt(false)}
         title={<Text fw={600}>What is your first performed task?</Text>}
+        size="80%"
+        fullScreen={isMobile}
         centered
       >
         <Stack gap="md">

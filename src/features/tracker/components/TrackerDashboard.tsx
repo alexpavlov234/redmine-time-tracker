@@ -140,8 +140,8 @@ export const TrackerDashboard: React.FC = () => {
                     {
                       label: (
                         <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
-                          <Text fw={700} size="sm">Direct Time Logging</Text>
-                          <Text size="xs" c="dimmed">No Sub-tasks</Text>
+                          <Text fw={700} size="sm" c={!usePerformedTasksList ? 'white' : undefined}>Direct Time Logging</Text>
+                          <Text size="xs" c={!usePerformedTasksList ? 'blue.1' : 'dimmed'} fw={!usePerformedTasksList ? 600 : 400}>No Sub-tasks</Text>
                         </Center>
                       ),
                       value: 'direct',
@@ -149,8 +149,8 @@ export const TrackerDashboard: React.FC = () => {
                     {
                       label: (
                         <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
-                          <Text fw={700} size="sm">Performed Tasks List</Text>
-                          <Text size="xs" c="dimmed">With Sub-tasks</Text>
+                          <Text fw={700} size="sm" c={usePerformedTasksList ? 'white' : undefined}>Performed Tasks List</Text>
+                          <Text size="xs" c={usePerformedTasksList ? 'blue.1' : 'dimmed'} fw={usePerformedTasksList ? 600 : 400}>With Sub-tasks</Text>
                         </Center>
                       ),
                       value: 'performed',

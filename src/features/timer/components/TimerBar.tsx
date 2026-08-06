@@ -4,6 +4,7 @@ import { useQueue } from '../../../contexts/QueueContext';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle, IconExternalLink } from '@tabler/icons-react';
 import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Anchor } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { formatTime } from '../../../utils/formatters';
 
 interface TimerBarProps {
@@ -11,6 +12,7 @@ interface TimerBarProps {
 }
 
 export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const { isConfigured, redmineUrl } = useSettings();
   const { todos } = useQueue();
   const timer = useQueueTimer();
@@ -134,6 +136,8 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
         opened={showFirstActivityModal}
         onClose={handleFirstActivityCancel}
         title={<Text fw={600}>What is your first performed task?</Text>}
+        size="80%"
+        fullScreen={isMobile}
         centered
       >
         <Stack gap="md">

@@ -1,5 +1,6 @@
 import React, { useState, createContext, useContext, useCallback } from 'react';
 import { Modal, Button, Text, Group } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 
 interface ConfirmOptions {
   message: string;
@@ -16,6 +17,7 @@ interface ConfirmContextProps {
 const ConfirmContext = createContext<ConfirmContextProps | undefined>(undefined);
 
 export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const [resolver, setResolver] = useState<((value: boolean) => void) | null>(null);
@@ -45,6 +47,8 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
         opened={isOpen}
         onClose={handleCancel}
         title={<Text fw={600}>Confirm Action</Text>}
+        size="80%"
+        fullScreen={isMobile}
         centered
       >
         <Text size="sm" style={{ lineHeight: 1.6 }}>{options?.message}</Text>

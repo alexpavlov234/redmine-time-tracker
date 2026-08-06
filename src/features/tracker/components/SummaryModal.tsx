@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor, Grid } from '@mantine/core';
+import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor, Grid, Paper } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
@@ -186,77 +186,87 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       centered
     >
       <Grid>
-        {/* Left Column: Hours, Task info, Activity, Status change */}
+        {/* Left Column: Hours, Activity, Task info, Status change */}
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Stack gap="md">
-            {/* Total Time */}
-            <Stack align="center" gap="xs" p="md" bg="var(--mantine-color-default)" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
-              <Text size="xs" tt="uppercase" c="dimmed" fw={600}>Logged Time (Hours)</Text>
+            {/* Task info */}
+            {activeTodo && (
+              <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-default)">
+                <Stack gap={2}>
+                  <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+                    {activeTodo.projectName}
+                  </Text>
+                  <Group gap={6} wrap="nowrap">
+                    <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="md" fw={700} underline="hover">
+                      #{activeTodo.taskId} - {activeTodo.taskSubject}
+                    </Anchor>
+                    <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
+                  </Group>
+                </Stack>
+              </Paper>
+            )}
+
+            {/* Side-by-side: Hours & Activity */}
+            <Group align="flex-start" wrap="nowrap">
               <NumberInput
+                label="Hours"
+                description={`Recorded: ${formatTime(totalElapsedTime)}`}
                 value={manualHours}
                 onChange={setManualHours}
                 decimalScale={2}
                 step={0.1}
                 min={0.1}
-                size="xl"
-                styles={{ input: { textAlign: 'center', fontWeight: 700 } }}
+                withAsterisk
                 w={120}
               />
-              <Text size="xs" c="dimmed">Timer recorded: {formatTime(totalElapsedTime)}</Text>
-            </Stack>
 
-            {/* Task info */}
-            {activeTodo && (
-              <Stack gap={2}>
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-                  {activeTodo.projectName}
-                </Text>
-                <Group gap={6} wrap="nowrap">
-                  <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="md" fw={700} underline="hover">
-                    #{activeTodo.taskId} - {activeTodo.taskSubject}
-                  </Anchor>
-                  <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
-                </Group>
-              </Stack>
-            )}
-
-            <Select
-              label="Activity"
-              placeholder="-- Select activity --"
-              value={activityId}
-              onChange={setActivityId}
-              data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
-              required
-            />
-
-            <Checkbox
-              label="Change issue status after submission"
-              checked={changeStatus}
-              onChange={e => setChangeStatus(e.currentTarget.checked)}
-              mt="xs"
-            />
-
-            {changeStatus && (
               <Select
-                placeholder="-- Select status --"
-                value={statusId}
-                onChange={setStatusId}
-                data={issueStatuses.map(s => ({ value: s.id.toString(), label: s.name }))}
+                label="Activity"
+                placeholder="-- Select activity --"
+                value={activityId}
+                onChange={setActivityId}
+                data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
+                required
+                style={{ flex: 1 }}
               />
-            )}
+            </Group>
+
+            {/* Status Change row */}
+            <Group align="flex-end" wrap="nowrap">
+              <Checkbox
+                label="Update Status"
+                checked={changeStatus}
+                onChange={e => setChangeStatus(e.currentTarget.checked)}
+                mb={8}
+              />
+
+              {changeStatus && (
+                <Select
+                  placeholder="-- Select status --"
+                  value={statusId}
+                  onChange={setStatusId}
+                  data={issueStatuses.map(s => ({ value: s.id.toString(), label: s.name }))}
+                  style={{ flex: 1 }}
+                />
+              )}
+            </Group>
           </Stack>
         </Grid.Col>
 
         {/* Right Column: Comments & Custom Fields */}
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <Stack gap="md">
+        <Grid.Col span={{ base: 12, md: 6 }} style={{ display: 'flex', flexDirection: 'column' }}>
+          <Stack gap="md" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <Textarea
               label="Comments"
               value={comments}
               onChange={(e) => setComments(e.currentTarget.value)}
-              minRows={5}
-              autosize
               placeholder="Detailed work summary..."
+              minRows={6}
+              styles={{
+                root: { flex: 1, display: 'flex', flexDirection: 'column' },
+                wrapper: { flex: 1, display: 'flex', flexDirection: 'column' },
+                input: { flex: 1, height: '100%', minHeight: 140, resize: 'vertical' },
+              }}
             />
 
             {/* Dynamic Custom Fields */}

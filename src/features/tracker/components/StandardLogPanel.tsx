@@ -34,7 +34,7 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
             </Group>
             <Button
               size="xs"
-              variant="light"
+              variant="outline"
               leftSection={<IconClock size={14} />}
               onClick={() => handleOpenModal()}
             >

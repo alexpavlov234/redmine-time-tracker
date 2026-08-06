@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Button, Group, Stack, Text, Select, Anchor } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { redmineApiRequest } from '../../../services/redmine';
@@ -21,6 +22,7 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
   onClose,
   onConfirmStart,
 }) => {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const { issueStatuses } = useProjects();
   const { redmineUrl } = useSettings();
   const [selectedStatusId, setSelectedStatusId] = useState<string | null>(() => {
@@ -72,6 +74,8 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
       opened={isOpen}
       onClose={onClose}
       title={<Text fw={600}>Update Task Status to "In Progress"?</Text>}
+      size="80%"
+      fullScreen={isMobile}
       centered
     >
       <Stack gap="md">
@@ -97,7 +101,7 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
         )}
 
         <Group justify="flex-end" mt="md">
-          <Button variant="subtle" onClick={handleSkipAndStart}>
+          <Button variant="outline" onClick={handleSkipAndStart}>
             Skip Status Change
           </Button>
           <Button
