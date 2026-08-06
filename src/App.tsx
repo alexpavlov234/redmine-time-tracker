@@ -7,9 +7,7 @@ import { ConfirmProvider } from './contexts/ConfirmContext';
 import { AppShell } from './components/layout/AppShell';
 import { SettingsForm } from './features/settings/components/SettingsForm';
 import '@mantine/core/styles.css';
-import '@mantine/notifications/styles.css';
 import { MantineProvider } from '@mantine/core';
-import { Notifications } from '@mantine/notifications';
 
 import { TrackerDashboard } from './features/tracker/components/TrackerDashboard';
 import { LoggedTimeDashboard } from './features/calendar/components/LoggedTimeDashboard';
@@ -17,7 +15,6 @@ import { LoggedTimeDashboard } from './features/calendar/components/LoggedTimeDa
 function App() {
   return (
     <MantineProvider defaultColorScheme="auto">
-      <Notifications />
       <SettingsProvider>
         <UserProvider>
           <ProjectsProvider>

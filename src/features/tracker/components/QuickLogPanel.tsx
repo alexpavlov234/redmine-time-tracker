@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Group, Text, Button, Stack, ActionIcon, Modal, Select, TextInput, NumberInput, Textarea, Tooltip, Paper } from '@mantine/core';
+import { Card, Group, Text, Button, Stack, ActionIcon, Modal, Select, TextInput, NumberInput, Textarea, Tooltip, Paper, Alert } from '@mantine/core';
 import { IconBolt, IconPlus, IconTrash, IconCheck, IconSend } from '@tabler/icons-react';
 import { usePresets } from '../../../hooks/usePresets';
 import { useQueue } from '../../../contexts/QueueContext';
@@ -7,7 +7,6 @@ import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { redmineApiRequest, getIssue } from '../../../services/redmine';
-import { notifications } from '@mantine/notifications';
 import type { TimeLogPreset, RedmineIssue } from '../../../types';
 
 const DEFAULT_PRESETS: TimeLogPreset[] = [
@@ -43,6 +42,7 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
   const [newPresetActivityId, setNewPresetActivityId] = useState('');
   const [newPresetHours, setNewPresetHours] = useState<number | string>(0.5);
   const [newPresetComments, setNewPresetComments] = useState('');
+  const [statusResult, setStatusResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const { tasks: projectTasks, isLoading: isLoadingProjectTasks } = useTasksForProject(selectedProjectId || null);
   const { activities: projectActivities, isLoading: isLoadingActivities } = useActivitiesForProject(selectedProjectId || null);
@@ -86,9 +86,8 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
       if (issue.project?.id) {
         setSelectedProjectId(issue.project.id.toString());
       }
-      notifications.show({ title: 'Success', message: `Loaded task #${issue.id}`, color: 'green' });
     } catch (error: any) {
-      notifications.show({ title: 'Error', message: `Failed to load task #${id}.`, color: 'red' });
+      // Ignore or handle error
     } finally {
       setIsLoadingIssue(false);
     }
@@ -132,17 +131,18 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
 
   const handleQuickSubmit = async () => {
     if (!selectedTaskId) {
-      notifications.show({ title: 'Error', message: 'Please select a task to log time against.', color: 'red' });
+      setStatusResult({ success: false, message: 'Please select a task to log time against.' });
       return;
     }
 
     const hoursFormatted = typeof hours === 'string' ? parseFloat(hours) : hours;
     if (isNaN(hoursFormatted) || hoursFormatted <= 0) {
-      notifications.show({ title: 'Error', message: 'Please enter valid hours.', color: 'red' });
+      setStatusResult({ success: false, message: 'Please enter valid hours.' });
       return;
     }
 
     setIsSubmitting(true);
+    setStatusResult(null);
     try {
       const timeEntryPayload = {
         time_entry: {
@@ -155,11 +155,13 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
       };
 
       await redmineApiRequest('/time_entries.json', 'POST', timeEntryPayload);
-      notifications.show({ title: 'Success', message: `Quick Logged ${hoursFormatted}h successfully!`, color: 'green' });
-      setIsLogModalOpen(false);
-      if (onLogSuccess) onLogSuccess();
+      setStatusResult({ success: true, message: `Quick Logged ${hoursFormatted}h successfully!` });
+      setTimeout(() => {
+        setIsLogModalOpen(false);
+        if (onLogSuccess) onLogSuccess();
+      }, 500);
     } catch (err: any) {
-      notifications.show({ title: 'Error', message: err.message || 'Failed to quick log time.', color: 'red' });
+      setStatusResult({ success: false, message: err.message || 'Failed to quick log time.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -185,7 +187,6 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
     };
 
     savePreset(newPreset);
-    notifications.show({ title: 'Success', message: `Preset "${newPresetName.trim()}" saved!`, color: 'green' });
     setIsAddModalOpen(false);
     setNewPresetName('');
     setNewPresetProjectId('');
@@ -273,6 +274,11 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
         size="md"
       >
         <Stack gap="md">
+          {statusResult && (
+            <Alert color={statusResult.success ? 'green' : 'red'}>
+              {statusResult.message}
+            </Alert>
+          )}
           <Select
             label="Project"
             placeholder="Search project..."

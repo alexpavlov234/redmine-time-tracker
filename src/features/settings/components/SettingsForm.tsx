@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Card, TextInput, PasswordInput, Button, Group, Stack, Alert, Title, Switch, Text } from '@mantine/core';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { notifications } from '@mantine/notifications';
 import { IconSettings, IconDeviceFloppy, IconLink } from '@tabler/icons-react';
 import { getCurrentUser, detectBillableField } from '../../../services/redmine';
 
@@ -27,7 +26,6 @@ export const SettingsForm: React.FC = () => {
     setApiKey(localApiKey.trim());
     setRedmineUrl(localUrl.trim().replace(/\/$/, ''));
     setTestResult({ success: true, message: 'Settings saved. Projects will refresh automatically.' });
-    notifications.show({ title: 'Success', message: 'Settings saved!', color: 'green' });
   };
 
   const handleTest = async () => {
@@ -40,23 +38,16 @@ export const SettingsForm: React.FC = () => {
 
     try {
       const user = await getCurrentUser();
+      const bf = await detectBillableField();
       setTestResult({
         success: true,
-        message: `Connection successful! Logged in as: ${user.firstname} ${user.lastname}`,
+        message: `Connection successful! Logged in as: ${user.firstname} ${user.lastname}${bf ? ` (Billable field: "${bf.name}")` : ''}`,
       });
-      notifications.show({ title: 'Success', message: `Connected as ${user.firstname} ${user.lastname}`, color: 'green' });
-
-      // Auto-detect billable field
-      const bf = await detectBillableField();
-      if (bf) {
-        notifications.show({ message: `Auto-detected billable field: "${bf.name}" (ID: ${bf.id})`, color: 'blue' });
-      }
     } catch (err: any) {
       setTestResult({
         success: false,
         message: err.message || 'Failed to connect.',
       });
-      notifications.show({ title: 'Error', message: err.message || 'Connection failed.', color: 'red' });
     } finally {
       setIsTesting(false);
     }

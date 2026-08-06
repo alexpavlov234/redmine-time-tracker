@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Modal, Button, Group, Stack, Text, Select, Anchor } from '@mantine/core';
+import { Modal, Button, Group, Stack, Text, Select, Anchor, Alert } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { redmineApiRequest } from '../../../services/redmine';
-import { notifications } from '@mantine/notifications';
 import { IconPlayerPlay, IconArrowRight, IconExternalLink } from '@tabler/icons-react';
 
 interface StatusPromptModalProps {
@@ -34,34 +33,30 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
     return inProgress ? String(inProgress.id) : (issueStatuses.length > 0 ? String(issueStatuses[0].id) : null);
   });
   const [isUpdating, setIsUpdating] = useState(false);
+  const [statusResult, setStatusResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleUpdateAndStart = async () => {
     if (!taskId) return;
 
     if (selectedStatusId) {
       setIsUpdating(true);
+      setStatusResult(null);
       try {
         await redmineApiRequest(`/issues/${taskId}.json`, 'PUT', {
           issue: { status_id: parseInt(selectedStatusId, 10) },
         });
-        notifications.show({
-          title: 'Status Updated',
-          message: `Task #${taskId} status updated in Redmine.`,
-          color: 'green',
-        });
+        setStatusResult({ success: true, message: `Task #${taskId} status updated in Redmine.` });
       } catch (err: any) {
-        notifications.show({
-          title: 'Warning',
-          message: 'Could not update task status in Redmine.',
-          color: 'orange',
-        });
+        setStatusResult({ success: false, message: 'Could not update task status in Redmine.' });
       } finally {
         setIsUpdating(false);
       }
     }
 
-    onConfirmStart();
-    onClose();
+    setTimeout(() => {
+      onConfirmStart();
+      onClose();
+    }, 500);
   };
 
   const handleSkipAndStart = () => {
@@ -79,6 +74,11 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
       centered
     >
       <Stack gap="md">
+        {statusResult && (
+          <Alert color={statusResult.success ? 'green' : 'red'}>
+            {statusResult.message}
+          </Alert>
+        )}
         <Text size="sm">
           You are starting tracking on{' '}
           {taskId ? (

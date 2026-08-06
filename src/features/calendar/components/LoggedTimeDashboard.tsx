@@ -9,7 +9,6 @@ import { TimeEntryFormModal } from './TimeEntryFormModal';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { deleteTimeEntry } from '../../../services/redmine';
 import type { TimeEntry } from '../../../types';
-import { notifications } from '@mantine/notifications';
 
 export const LoggedTimeDashboard: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -82,10 +81,9 @@ export const LoggedTimeDashboard: React.FC = () => {
 
     try {
       await deleteTimeEntry(entryId);
-      notifications.show({ title: 'Success', message: 'Time entry deleted.', color: 'green' });
       refetch();
     } catch (err: any) {
-      notifications.show({ title: 'Error', message: err.message || 'Failed to delete time entry.', color: 'red' });
+      alert(err.message || 'Failed to delete time entry.');
     }
   };
 

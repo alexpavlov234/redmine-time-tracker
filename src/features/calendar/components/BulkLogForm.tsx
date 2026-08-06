@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Card, TextInput, Button, Select, NumberInput, Checkbox, Textarea, Group, Stack, Text, Progress, Badge, ActionIcon, Divider } from '@mantine/core';
+import { Card, TextInput, Button, Select, NumberInput, Checkbox, Textarea, Group, Stack, Text, Progress, Badge, ActionIcon, Divider, Alert } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconSend, IconCheck, IconListCheck, IconTrash, IconCirclePlus } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
@@ -8,7 +8,6 @@ import type { RedmineIssue, TimeLogPreset } from '../../../types';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
-import { notifications } from '@mantine/notifications';
 import { usePresets } from '../../../hooks/usePresets';
 
 interface BulkLogFormProps {
@@ -29,6 +28,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
   const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
+  const [statusResult, setStatusResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const { customFields } = useCustomFields();
 
@@ -120,9 +120,8 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
       if (issue.project) {
         form.setFieldValue('projectId', issue.project.id.toString());
       }
-      notifications.show({ title: 'Success', message: `Loaded task #${issue.id}`, color: 'green' });
     } catch (error: any) {
-      notifications.show({ title: 'Error', message: `Failed to load task #${id}. It may not exist or you lack permission.`, color: 'red' });
+      // Ignore or handle error
     } finally {
       setIsLoadingIssue(false);
     }
@@ -176,7 +175,6 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
     savePreset(newPreset);
     setSelectedPresetId(newPreset.id);
-    notifications.show({ title: 'Success', message: `Preset "${name.trim()}" saved.`, color: 'green' });
   };
 
   const handleDeletePreset = () => {
@@ -184,7 +182,6 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     if (preset && confirm(`Delete preset "${preset.name}"?`)) {
       deletePreset(preset.id);
       setSelectedPresetId('');
-      notifications.show({ title: 'Success', message: 'Preset deleted.', color: 'green' });
     }
   };
 
@@ -230,9 +227,9 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     setIsDeploying(false);
 
     if (failCount === 0) {
-      notifications.show({ title: 'Success', message: `Successfully logged time for ${successCount} day${successCount > 1 ? 's' : ''}.`, color: 'green' });
+      setStatusResult({ success: true, message: `Successfully logged time for ${successCount} day${successCount > 1 ? 's' : ''}.` });
     } else {
-      notifications.show({ title: 'Warning', message: `${successCount} succeeded, ${failCount} failed.`, color: 'orange' });
+      setStatusResult({ success: false, message: `${successCount} succeeded, ${failCount} failed.` });
     }
 
     onSuccess();
@@ -251,6 +248,11 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
       </Card.Section>
 
       <Stack gap="md" mt="md">
+        {statusResult && (
+          <Alert color={statusResult.success ? 'green' : 'red'}>
+            {statusResult.message}
+          </Alert>
+        )}
         <Group align="flex-end">
           <Select
             label="Load Preset"

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Button, Select, TextInput, NumberInput, Checkbox, Textarea, Group, Stack, Text, Divider, ActionIcon, Grid } from '@mantine/core';
+import { Modal, Button, Select, TextInput, NumberInput, Checkbox, Textarea, Group, Stack, Text, Divider, ActionIcon, Grid, Alert } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { usePresets } from '../../../hooks/usePresets';
-import { notifications } from '@mantine/notifications';
 import { createTimeEntry, updateTimeEntry, getIssue } from '../../../services/redmine';
 import type { TimeEntry, TimeLogPreset, RedmineIssue } from '../../../types';
 import { IconDeviceFloppy, IconSend, IconTrash, IconListCheck } from '@tabler/icons-react';
@@ -33,11 +32,17 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   const { allProjects } = useProjects();
   const { presets, savePreset, deletePreset } = usePresets();
 
+  const isEditing = Boolean(editEntry);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>('');
-  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
+  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(initialPresetId || null);
+  const [formResult, setFormResult] = useState<{ success: boolean; message: string } | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (!isOpen) setFormResult(null);
+  }, [isOpen]);
 
   const { customFields } = useCustomFields();
   const billableFieldId = localStorage.getItem('billableFieldId');
@@ -61,8 +66,6 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
   const { tasks, isLoading: isLoadingTasks } = useTasksForProject(form.values.projectId || null);
   const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(form.values.projectId || null);
-
-  const isEditing = Boolean(editEntry);
 
   const projectOptions = useMemo(() => {
     return allProjects.map(p => ({
@@ -175,9 +178,8 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       if (issue.project) {
         form.setFieldValue('projectId', issue.project.id.toString());
       }
-      notifications.show({ title: 'Success', message: `Loaded task #${issue.id}`, color: 'green' });
     } catch (error: any) {
-      notifications.show({ title: 'Error', message: `Failed to load task #${id}. It may not exist or you lack permission.`, color: 'red' });
+      // Ignore or handle error
     } finally {
       setIsLoadingIssue(false);
     }
@@ -230,7 +232,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
     savePreset(newPreset);
     setSelectedPresetId(newPreset.id);
-    notifications.show({ title: 'Success', message: `Preset "${name.trim()}" saved.`, color: 'green' });
+    setFormResult({ success: true, message: `Preset "${name.trim()}" saved!` });
   };
 
   const handleDeletePreset = () => {
@@ -238,12 +240,13 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     if (preset && confirm(`Delete preset "${preset.name}"?`)) {
       deletePreset(preset.id);
       setSelectedPresetId('');
-      notifications.show({ title: 'Success', message: 'Preset deleted.', color: 'green' });
+      setFormResult({ success: true, message: 'Preset deleted.' });
     }
   };
 
   const handleSubmit = async (values: typeof form.values) => {
     setIsSubmitting(true);
+    setFormResult(null);
     try {
       const payloadCustomFields = Object.entries(customFieldValues)
         .filter(([_, value]) => value !== '')
@@ -264,16 +267,18 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
       if (isEditing && editEntry) {
         await updateTimeEntry(editEntry.id, data);
-        notifications.show({ title: 'Success', message: 'Time entry updated!', color: 'green' });
+        setFormResult({ success: true, message: 'Time entry updated successfully!' });
       } else {
         await createTimeEntry(data);
-        notifications.show({ title: 'Success', message: 'Time entry created!', color: 'green' });
+        setFormResult({ success: true, message: 'Time entry created successfully!' });
       }
 
-      onSuccess();
-      onClose();
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 600);
     } catch (err: any) {
-      notifications.show({ title: 'Error', message: err.message || 'Failed to save time entry.', color: 'red' });
+      setFormResult({ success: false, message: err.message || 'Failed to save time entry.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -289,6 +294,11 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       centered
     >
       <Stack gap="md">
+        {formResult && (
+          <Alert color={formResult.success ? 'green' : 'red'}>
+            {formResult.message}
+          </Alert>
+        )}
         {!isEditing && (
           <>
             <Group align="flex-end">

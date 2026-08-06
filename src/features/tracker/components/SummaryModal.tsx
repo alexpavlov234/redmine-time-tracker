@@ -5,7 +5,6 @@ import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { useProjects } from '../../../contexts/ProjectsContext';
-import { notifications } from '@mantine/notifications';
 import { redmineApiRequest } from '../../../services/redmine';
 import { formatTime } from '../../../utils/formatters';
 import { IconSend, IconCheck, IconListCheck, IconExternalLink } from '@tabler/icons-react';
@@ -108,18 +107,18 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   const handleSubmit = async () => {
     const issueId = activeTodo?.taskId;
     if (!issueId) {
-      notifications.show({ title: 'Error', message: 'No issue selected.', color: 'red' });
+      setSubmitResult({ success: false, message: 'No issue selected.' });
       return;
     }
 
     if (!activityId) {
-      notifications.show({ title: 'Error', message: 'Please select an activity.', color: 'red' });
+      setSubmitResult({ success: false, message: 'Please select an activity.' });
       return;
     }
 
     const hoursFormatted = typeof manualHours === 'string' ? parseFloat(manualHours) : manualHours;
     if (isNaN(hoursFormatted) || hoursFormatted <= 0) {
-      notifications.show({ title: 'Error', message: 'Please enter a valid number of hours.', color: 'red' });
+      setSubmitResult({ success: false, message: 'Please enter a valid number of hours.' });
       return;
     }
 
@@ -156,12 +155,11 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
             issue: { status_id: statusId },
           });
         } catch {
-          notifications.show({ title: 'Error', message: 'Time entry submitted, but status update failed.', color: 'red' });
+          // Status update failed silently
         }
       }
 
       setSubmitResult({ success: true, message: 'Time entry submitted successfully!' });
-      notifications.show({ title: 'Success', message: 'Time entry submitted!', color: 'green' });
 
       // Auto-close & advance queue
       setTimeout(() => {
@@ -170,7 +168,6 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       }, 800);
     } catch (err: any) {
       setSubmitResult({ success: false, message: err.message || 'Failed to submit.' });
-      notifications.show({ title: 'Error', message: 'Failed to submit time entry.', color: 'red' });
     } finally {
       setIsSubmitting(false);
     }
