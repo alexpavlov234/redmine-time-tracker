@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Button, Select, Input, Autocomplete, type AutocompleteItem } from '../../../components/ui';
+import { Modal, Button, Select, Input, type SelectItem } from '../../../components/ui';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
@@ -52,7 +52,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
   const isEditing = Boolean(editEntry);
 
-  const projectOptions = useMemo((): AutocompleteItem[] => {
+  const projectOptions = useMemo((): SelectItem[] => {
     return allProjects.map(p => ({
       id: p.id.toString(),
       label: p.name,
@@ -60,7 +60,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     }));
   }, [allProjects]);
 
-  const taskOptions = useMemo((): AutocompleteItem[] => {
+  const taskOptions = useMemo((): SelectItem[] => {
     const options = tasks.map(t => ({
       id: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
@@ -76,7 +76,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     if (isEditing && editEntry?.issue && !options.some(o => o.id === editEntry.issue!.id.toString())) {
       options.push({
         id: editEntry.issue.id.toString(),
-        label: `#${editEntry.issue.id} - ${editEntry.issue.name || editEntry.issue.subject}`,
+        label: `#${editEntry.issue.id} - ${editEntry.issue.subject || (editEntry.issue as any).name || ''}`,
         sublabel: editEntry.project?.name
       });
     }
@@ -144,7 +144,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     }
   }, [activities]);
 
-  const handleProjectChange = (item: AutocompleteItem | null) => {
+  const handleProjectChange = (item: SelectItem | null) => {
     setProjectId(item?.id.toString() || '');
     if (!item) {
       setTaskId('');
@@ -152,7 +152,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     setActivityId('');
   };
 
-  const handleTaskChange = (item: AutocompleteItem | null) => {
+  const handleTaskChange = (item: SelectItem | null) => {
     const newTaskId = item?.id.toString() || '';
     setTaskId(newTaskId);
     
@@ -340,13 +340,14 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         <hr style={{ opacity: 0.1 }} />
 
         <form ref={formRef} id="time-entry-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Autocomplete
+          <Select
+            enableAutocomplete
             label="Project"
             placeholder="Search projects..."
             items={projectOptions}
             value={projectId}
             displayValue={selectedProject?.label || ''}
-            onChange={handleProjectChange}
+            onItemChange={handleProjectChange}
             fullWidth
             required
           />
@@ -376,13 +377,14 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
               />
             </div>
             <div style={{ flex: '2 1 200px', minWidth: 0 }}>
-              <Autocomplete
+              <Select
+                enableAutocomplete
                 label="Task Name"
                 placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
                 items={taskOptions}
                 value={taskId}
                 displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
-                onChange={handleTaskChange}
+                onItemChange={handleTaskChange}
                 disabled={isLoadingTasks || isSubmitting}
                 loading={isLoadingTasks || isLoadingIssue}
                 fullWidth
@@ -489,8 +491,8 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                             width: '100%',
                             padding: '0.625rem',
                             borderRadius: '0.5rem',
-                            border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
-                            background: 'var(--color-surface, rgba(255,255,255,0.05))',
+                            border: '1px solid var(--border-color)',
+                            background: 'var(--surface-color)',
                             color: 'inherit',
                             fontFamily: 'inherit',
                             fontSize: '0.875rem',

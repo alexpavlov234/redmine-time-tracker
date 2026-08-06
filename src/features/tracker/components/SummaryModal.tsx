@@ -191,7 +191,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
           textAlign: 'center',
           padding: '1rem',
           borderRadius: '0.75rem',
-          background: 'var(--color-surface, rgba(255,255,255,0.05))',
+          background: 'var(--surface-color)',
         }}>
           <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', opacity: 0.6, marginBottom: '0.5rem' }}>Logged Time (Hours)</div>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -232,8 +232,8 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
               width: '100%',
               padding: '0.625rem',
               borderRadius: '0.5rem',
-              border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
-              background: 'var(--color-surface, rgba(255,255,255,0.05))',
+              border: '1px solid var(--border-color)',
+              background: 'var(--surface-color)',
               color: 'inherit',
               fontFamily: 'inherit',
               fontSize: '0.875rem',
@@ -320,8 +320,8 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                         width: '100%',
                         padding: '0.625rem',
                         borderRadius: '0.5rem',
-                        border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
-                        background: 'var(--color-surface, rgba(255,255,255,0.05))',
+                        border: '1px solid var(--border-color)',
+                        background: 'var(--surface-color)',
                         color: 'inherit',
                         fontFamily: 'inherit',
                         fontSize: '0.875rem',

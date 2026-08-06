@@ -13,7 +13,7 @@
 
 .label {
   font-size: $font-size-sm;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-color);
 }
 
@@ -32,11 +32,11 @@
   width: 100%;
   padding: 0.5rem 2rem 0.5rem 0.75rem;
   border-radius: $radius-md;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  background: var(--surface-color, rgba(255, 255, 255, 0.05));
-  color: var(--text-color, inherit);
+  border: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  color: var(--text-color);
   font-family: inherit;
-  font-size: $font-size-md;
+  font-size: $font-size-sm;
   transition: border-color 0.2s, box-shadow 0.2s;
 
   &:focus {
@@ -51,7 +51,7 @@
   }
 
   &::placeholder {
-    color: var(--text-muted, rgba(255, 255, 255, 0.4));
+    color: var(--text-muted);
   }
 }
 
@@ -60,7 +60,7 @@
   right: 0.5rem;
   background: none;
   border: none;
-  color: var(--text-muted, rgba(255, 255, 255, 0.4));
+  color: var(--text-muted);
   font-size: 1.25rem;
   cursor: pointer;
   padding: 0 0.25rem;
@@ -83,17 +83,11 @@
   max-height: 240px;
   overflow-y: auto;
   border-radius: $radius-md;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  background: var(--surface-color, #1e1e2e);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  box-shadow: $shadow-md;
   list-style: none;
   padding: 0.25rem;
-
-  // Themed background override
-  :global([data-theme="light"]) & {
-    background: #fff;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  }
 }
 
 .option {
@@ -112,7 +106,7 @@
 }
 
 .optionLabel {
-  font-size: $font-size-md;
+  font-size: $font-size-sm;
   font-weight: 500;
 }
 

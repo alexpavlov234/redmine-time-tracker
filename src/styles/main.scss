@@ -43,7 +43,10 @@ a {
 
 // Global utility classes for premium feel
 .glass-panel {
-  background: rgba(var(--surface-color), 0.7);
+  background: var(--surface-color);
+  @supports (background: color-mix(in srgb, white 90%, transparent)) {
+    background: color-mix(in srgb, var(--surface-color) 90%, transparent);
+  }
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-color);
   box-shadow: $shadow-md;

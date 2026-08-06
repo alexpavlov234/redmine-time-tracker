@@ -3,6 +3,7 @@ import { TimerBar } from '../../timer/components/TimerBar';
 import { WorkQueue } from '../../queue/components/WorkQueue';
 import { AddTaskForm } from '../../queue/components/AddTaskForm';
 import { SummaryModal } from './SummaryModal';
+import { AssignedTasksPanel } from './AssignedTasksPanel';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { Card, Button, Input } from '../../../components/ui';
 import { ClipboardList, Plus } from 'lucide-react';
@@ -106,6 +107,8 @@ export const TrackerDashboard: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <TimerBar onStop={handleStop} />
       <PerformedTasks />
+      
+      <AssignedTasksPanel />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
         <WorkQueue />

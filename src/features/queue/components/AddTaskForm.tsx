@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Select, Input, Button, Autocomplete, type AutocompleteItem } from '../../../components/ui';
+import { Card, Select, Input, Button, type SelectItem } from '../../../components/ui';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
@@ -24,8 +24,8 @@ export const AddTaskForm: React.FC = () => {
   const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
   const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
 
-  const projectOptions = useMemo((): AutocompleteItem[] => {
-    const options: AutocompleteItem[] = [
+  const projectOptions = useMemo((): SelectItem[] => {
+    const options: SelectItem[] = [
       { id: 'my_issues', label: '--- My Assigned Issues ---' }
     ];
     return [...options, ...allProjects.map(p => ({
@@ -35,7 +35,7 @@ export const AddTaskForm: React.FC = () => {
     }))];
   }, [allProjects]);
 
-  const taskOptions = useMemo((): AutocompleteItem[] => {
+  const taskOptions = useMemo((): SelectItem[] => {
     const options = tasks.map(t => ({
       id: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
@@ -54,7 +54,7 @@ export const AddTaskForm: React.FC = () => {
   const selectedProject = projectOptions.find(p => p.id === projectId);
   const selectedTask = taskOptions.find(t => t.id === taskId);
 
-  const handleProjectChange = (item: AutocompleteItem | null) => {
+  const handleProjectChange = (item: SelectItem | null) => {
     setProjectId(item?.id.toString() || '');
     if (!item) {
       setTaskId('');
@@ -62,7 +62,7 @@ export const AddTaskForm: React.FC = () => {
     setActivityId('');
   };
 
-  const handleTaskChange = (item: AutocompleteItem | null) => {
+  const handleTaskChange = (item: SelectItem | null) => {
     const newTaskId = item?.id.toString() || '';
     setTaskId(newTaskId);
     
@@ -133,13 +133,14 @@ export const AddTaskForm: React.FC = () => {
       {isExpanded && (
         <form onSubmit={handleSubmit} className={styles.formContainer}>
           <div className={styles.grid}>
-            <Autocomplete
+            <Select
+              enableAutocomplete
               label="Project"
               placeholder="Search projects..."
               items={projectOptions}
               value={projectId}
               displayValue={selectedProject?.label || ''}
-              onChange={handleProjectChange}
+              onItemChange={handleProjectChange}
               fullWidth
               required
             />
@@ -169,13 +170,14 @@ export const AddTaskForm: React.FC = () => {
               />
             </div>
             <div style={{ flex: '2 1 200px', minWidth: 0 }}>
-              <Autocomplete
+              <Select
+                enableAutocomplete
                 label="Task Name"
                 placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
                 items={taskOptions}
                 value={taskId}
                 displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
-                onChange={handleTaskChange}
+                onItemChange={handleTaskChange}
                 disabled={isLoadingTasks}
                 loading={isLoadingTasks || isLoadingIssue}
                 fullWidth

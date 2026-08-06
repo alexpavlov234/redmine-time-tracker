@@ -14,6 +14,26 @@ export interface RedmineIssue {
     id: number;
     name: string;
   };
+  tracker?: {
+    id: number;
+    name: string;
+  };
+  priority?: {
+    id: number;
+    name: string;
+  };
+  author?: {
+    id: number;
+    name: string;
+  };
+  category?: {
+    id: number;
+    name: string;
+  };
+  fixed_version?: {
+    id: number;
+    name: string;
+  };
 }
 
 export interface RedmineProject {

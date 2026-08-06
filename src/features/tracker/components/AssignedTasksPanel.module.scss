@@ -1,0 +1,121 @@
+.headerRow {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.taskList {
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: var(--radius-md);
+}
+
+.message {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background-color: var(--bg-hover);
+  }
+}
+
+.taskInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow: hidden;
+}
+
+.taskId {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.taskSubject {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.taskActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.link, .actionBtn {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
+  background: none;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--primary-color);
+    background-color: var(--primary-color-alpha);
+  }
+}
+
+.groupsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.group {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.groupHeader {
+  padding: 0.75rem 1rem;
+  background-color: var(--bg-hover);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.groupCount {
+  font-size: 0.8rem;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 0.15rem 0.6rem;
+  border-radius: 12px;
+  font-weight: 500;
+}

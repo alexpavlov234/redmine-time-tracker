@@ -3,4 +3,6 @@ export * from './Input';
 export * from './Select';
 export * from './Card';
 export * from './Modal';
-export * from './Autocomplete';
+
+export * from './Textarea';
+export * from './Checkbox';

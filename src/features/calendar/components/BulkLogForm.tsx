@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Input, Button, Select, Autocomplete, type AutocompleteItem } from '../../../components/ui';
+import { Card, Input, Button, Select, type SelectItem } from '../../../components/ui';
 import styles from './BulkLogForm.module.scss';
 import { Send, CheckCircle2, ListTodo, Trash2, Plus } from 'lucide-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
@@ -56,8 +56,8 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     }
   }, [customFields]);
 
-  const projectOptions = useMemo((): AutocompleteItem[] => {
-    const options: AutocompleteItem[] = [
+  const projectOptions = useMemo((): SelectItem[] => {
+    const options: SelectItem[] = [
       { id: 'my_issues', label: '--- My Assigned Issues ---' }
     ];
     return [...options, ...allProjects.map(p => ({
@@ -67,7 +67,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     }))];
   }, [allProjects]);
 
-  const taskOptions = useMemo((): AutocompleteItem[] => {
+  const taskOptions = useMemo((): SelectItem[] => {
     const options = tasks.map(t => ({
       id: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
@@ -94,7 +94,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   const selectedProject = projectOptions.find(p => p.id === projectId);
   const selectedTask = taskOptions.find(t => t.id === taskId);
 
-  const handleProjectChange = (item: AutocompleteItem | null) => {
+  const handleProjectChange = (item: SelectItem | null) => {
     setProjectId(item?.id.toString() || '');
     if (!item) {
       setTaskId('');
@@ -102,7 +102,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     setActivityId('');
   };
 
-  const handleTaskChange = (item: AutocompleteItem | null) => {
+  const handleTaskChange = (item: SelectItem | null) => {
     const newTaskId = item?.id.toString() || '';
     setTaskId(newTaskId);
     
@@ -277,13 +277,14 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.grid}>
-          <Autocomplete
+          <Select
+            enableAutocomplete
             label="Project"
             placeholder="Search projects..."
             items={projectOptions}
             value={projectId}
             displayValue={selectedProject?.label || ''}
-            onChange={handleProjectChange}
+            onItemChange={handleProjectChange}
             disabled={isDeploying}
             fullWidth
             required
@@ -314,13 +315,14 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
               />
             </div>
             <div style={{ flex: '2 1 200px', minWidth: 0 }}>
-              <Autocomplete
+              <Select
+                enableAutocomplete
                 label="Task Name"
                 placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
                 items={taskOptions}
                 value={taskId}
                 displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
-                onChange={handleTaskChange}
+                onItemChange={handleTaskChange}
                 disabled={isLoadingTasks || isDeploying}
                 loading={isLoadingTasks || isLoadingIssue}
                 fullWidth
@@ -432,8 +434,8 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
                           width: '100%',
                           padding: '0.625rem',
                           borderRadius: '0.5rem',
-                          border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
-                          background: 'var(--color-surface, rgba(255,255,255,0.05))',
+                          border: '1px solid var(--border-color)',
+                          background: 'var(--surface-color)',
                           color: 'inherit',
                           fontFamily: 'inherit',
                           fontSize: '0.875rem',
