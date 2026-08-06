@@ -2,16 +2,16 @@ import React, { useState, useRef } from 'react';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { IconGripVertical, IconTrash, IconListCheck, IconPlayerPlay, IconPlayerPause } from '@tabler/icons-react';
+import { IconGripVertical, IconTrash, IconListCheck, IconPlayerPlay, IconPlayerPause, IconExternalLink } from '@tabler/icons-react';
 import { formatTime } from '../../../utils/formatters';
-import { Card, Button, Group, Text, ActionIcon, Stack, Badge, Paper, Modal, TextInput } from '@mantine/core';
+import { Card, Button, Group, Text, ActionIcon, Stack, Badge, Paper, Modal, TextInput, Anchor } from '@mantine/core';
 
 import { useSettings } from '../../../contexts/SettingsContext';
 import { StatusPromptModal } from '../../tracker/components/StatusPromptModal';
 
 export const WorkQueue: React.FC = () => {
   const { todos, removeTodo, reorderTodos, activeTodoId } = useQueue();
-  const { promptStatusOnStart } = useSettings();
+  const { promptStatusOnStart, redmineUrl } = useSettings();
   const timer = useQueueTimer();
   const confirm = useConfirm();
 
@@ -160,7 +160,14 @@ export const WorkQueue: React.FC = () => {
 
                       <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
                         <Text size="xs" fw={700} c="dimmed" tt="uppercase" truncate>{todo.projectName}</Text>
-                        <Text size="sm" fw={600} truncate>#{todo.taskId} - {todo.taskSubject}</Text>
+                        <Group gap={4} wrap="nowrap">
+                          <Anchor href={`${redmineUrl}/issues/${todo.taskId}`} target="_blank" size="sm" fw={600} truncate underline="hover">
+                            #{todo.taskId} - {todo.taskSubject}
+                          </Anchor>
+                          <ActionIcon component="a" href={`${redmineUrl}/issues/${todo.taskId}`} target="_blank" size="xs" variant="subtle" color="gray" title="Open in Redmine">
+                            <IconExternalLink size={12} />
+                          </ActionIcon>
+                        </Group>
                         {todo.activityName && <Text size="xs" c="dimmed" truncate>{todo.activityName}</Text>}
                         {todo.note && <Text size="xs" mt={4} truncate>{todo.note}</Text>}
                       </Stack>

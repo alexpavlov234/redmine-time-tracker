@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle } from '@tabler/icons-react';
-import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack } from '@mantine/core';
+import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle, IconExternalLink } from '@tabler/icons-react';
+import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Anchor } from '@mantine/core';
 import { formatTime } from '../../../utils/formatters';
 
 interface TimerBarProps {
@@ -11,7 +11,7 @@ interface TimerBarProps {
 }
 
 export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
-  const { isConfigured } = useSettings();
+  const { isConfigured, redmineUrl } = useSettings();
   const { todos } = useQueue();
   const timer = useQueueTimer();
   const { isRunning, totalElapsedTime, activeTodo } = timer;
@@ -20,9 +20,28 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
   const [firstActivityText, setFirstActivityText] = useState('');
   const [pendingTodoId, setPendingTodoId] = useState<number | null>(null);
 
+  if (!isConfigured) {
+    return (
+      <Paper shadow="sm" p="md" radius="md" withBorder bg="var(--mantine-color-default)">
+        <Group justify="center" c="dimmed">
+          <IconAlertCircle size={18} />
+          <Text size="sm">Configure your Redmine connection in Settings to start tracking.</Text>
+        </Group>
+      </Paper>
+    );
+  }
+
+  // Active task info
+  const currentTaskId = activeTodo?.taskId || (todos.length > 0 ? todos[0].taskId : '');
+  const displayProject = activeTodo?.projectName || (todos.length > 0 ? todos[0].projectName : 'Time Tracker');
+  const displayTask = activeTodo
+    ? `#${activeTodo.taskId} - ${activeTodo.taskSubject}`
+    : (todos.length > 0 ? `#${todos[0].taskId} - ${todos[0].taskSubject}` : 'No active task selected');
+  const displayActivity = activeTodo?.activityName;
+
   const handleStart = async () => {
     if (todos.length === 0) return;
-    const firstTodo = todos[0];
+    const firstTodo = activeTodo || todos[0];
     const result = await timer.startTimerForTodo(firstTodo.id);
     if (result === 'needs_prompt') {
       setPendingTodoId(firstTodo.id);
@@ -45,28 +64,9 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
     setPendingTodoId(null);
   };
 
-  // Not configured state
-  if (!isConfigured) {
-    return (
-      <Paper shadow="sm" p="md" radius="md" withBorder bg="var(--mantine-color-default)">
-        <Group justify="center" c="dimmed">
-          <IconAlertCircle size={18} />
-          <Text size="sm">Configure your Redmine connection in Settings to start tracking.</Text>
-        </Group>
-      </Paper>
-    );
-  }
-
-  // Active task info
-  const displayProject = activeTodo?.projectName || (todos.length > 0 ? todos[0].projectName : 'Time Tracker');
-  const displayTask = activeTodo
-    ? `#${activeTodo.taskId} - ${activeTodo.taskSubject}`
-    : (todos.length > 0 ? `#${todos[0].taskId} - ${todos[0].taskSubject}` : 'No active task selected');
-  const displayActivity = activeTodo?.activityName;
-
   return (
     <>
-      <Paper shadow="sm" p="md" radius="md" withBorder>
+      <Paper shadow="sm" p="md" radius="md" withBorder bg="var(--mantine-color-default)">
         <Group justify="space-between" wrap="nowrap">
           <Stack gap={4} style={{ overflow: 'hidden' }}>
             <Group gap="xs" wrap="nowrap">
@@ -77,7 +77,19 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
                 </Text>
               )}
             </Group>
-            <Text size="lg" fw={700} truncate>{displayTask}</Text>
+
+            {currentTaskId ? (
+              <Group gap={6} wrap="nowrap">
+                <Anchor href={`${redmineUrl}/issues/${currentTaskId}`} target="_blank" size="lg" fw={700} truncate underline="hover">
+                  {displayTask}
+                </Anchor>
+                <ActionIcon component="a" href={`${redmineUrl}/issues/${currentTaskId}`} target="_blank" size="xs" variant="subtle" color="gray" title="Open in Redmine">
+                  <IconExternalLink size={14} />
+                </ActionIcon>
+              </Group>
+            ) : (
+              <Text size="lg" fw={700} truncate>{displayTask}</Text>
+            )}
           </Stack>
 
           <Group gap="md" wrap="nowrap">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert } from '@mantine/core';
+import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor } from '@mantine/core';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
@@ -7,7 +7,7 @@ import { useProjects } from '../../../contexts/ProjectsContext';
 import { notifications } from '@mantine/notifications';
 import { redmineApiRequest } from '../../../services/redmine';
 import { formatTime } from '../../../utils/formatters';
-import { IconSend, IconCheck, IconListCheck } from '@tabler/icons-react';
+import { IconSend, IconCheck, IconListCheck, IconExternalLink } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 
 import { useSettings } from '../../../contexts/SettingsContext';
@@ -18,7 +18,7 @@ interface SummaryModalProps {
 }
 
 export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) => {
-  const { usePerformedTasksList } = useSettings();
+  const { usePerformedTasksList, redmineUrl } = useSettings();
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
   const { } = useQueue();
   const { issueStatuses, setIssueStatuses } = useProjects();
@@ -200,11 +200,16 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
         {/* Task info */}
         {activeTodo && (
-          <Text size="sm" c="dimmed">
-            <Text component="span" fw={600}>{activeTodo.projectName}</Text>
-            <Text component="span" mx="xs">→</Text>
-            #{activeTodo.taskId} - {activeTodo.taskSubject}
-          </Text>
+          <Group gap="xs" wrap="nowrap">
+            <Text size="sm" c="dimmed">
+              <Text component="span" fw={600}>{activeTodo.projectName}</Text>
+              <Text component="span" mx="xs">→</Text>
+            </Text>
+            <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="sm" fw={600} underline="hover">
+              #{activeTodo.taskId} - {activeTodo.taskSubject}
+            </Anchor>
+            <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
+          </Group>
         )}
 
         <Textarea

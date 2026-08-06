@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, Group, Text, Button, Stack, ActionIcon, Modal, Select, TextInput, NumberInput, Textarea, Tooltip, Paper } from '@mantine/core';
 import { IconBolt, IconPlus, IconTrash, IconCheck, IconSend } from '@tabler/icons-react';
 import { usePresets } from '../../../hooks/usePresets';
 import { useQueue } from '../../../contexts/QueueContext';
+import { useProjects } from '../../../contexts/ProjectsContext';
+import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
-import { redmineApiRequest } from '../../../services/redmine';
+import { redmineApiRequest, getIssue } from '../../../services/redmine';
 import { notifications } from '@mantine/notifications';
-import type { TimeLogPreset } from '../../../types';
+import type { TimeLogPreset, RedmineIssue } from '../../../types';
 
 const DEFAULT_PRESETS: TimeLogPreset[] = [
   { id: 'default_standup', name: 'Daily Standup (15m)', hours: 0.25, comments: 'Daily team standup meeting', isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
@@ -17,6 +19,7 @@ const DEFAULT_PRESETS: TimeLogPreset[] = [
 export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSuccess }) => {
   const { presets, savePreset, deletePreset } = usePresets();
   const { todos } = useQueue();
+  const { allProjects } = useProjects();
 
   const [activePreset, setActivePreset] = useState<TimeLogPreset | null>(null);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -27,28 +30,104 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [selectedActivityId, setSelectedActivityId] = useState<string>('');
   const [hours, setHours] = useState<number | string>(0.25);
+  const [spentOn, setSpentOn] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [comments, setComments] = useState<string>('');
+  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
+  const [isLoadingIssue, setIsLoadingIssue] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states for Add Preset Modal
   const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetProjectId, setNewPresetProjectId] = useState('');
+  const [newPresetTaskId, setNewPresetTaskId] = useState('');
+  const [newPresetActivityId, setNewPresetActivityId] = useState('');
   const [newPresetHours, setNewPresetHours] = useState<number | string>(0.5);
   const [newPresetComments, setNewPresetComments] = useState('');
 
-  const { activities: projectActivities } = useActivitiesForProject(selectedProjectId || null);
+  const { tasks: projectTasks, isLoading: isLoadingProjectTasks } = useTasksForProject(selectedProjectId || null);
+  const { activities: projectActivities, isLoading: isLoadingActivities } = useActivitiesForProject(selectedProjectId || null);
+  const { tasks: newPresetTasks } = useTasksForProject(newPresetProjectId || null);
+  const { activities: newPresetActivities } = useActivitiesForProject(newPresetProjectId || null);
 
   const displayPresets = presets.length > 0 ? presets : DEFAULT_PRESETS;
 
-  const handleOpenLogModal = (preset: TimeLogPreset) => {
+  const projectOptions = useMemo(() => {
+    return allProjects.map(p => ({
+      value: p.id.toString(),
+      label: p.name,
+    }));
+  }, [allProjects]);
+
+  const taskOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    // From todos
+    todos.forEach(t => map.set(t.taskId, `#${t.taskId} - ${t.taskSubject}`));
+    // From project tasks
+    projectTasks.forEach(t => map.set(t.id.toString(), `#${t.id} - ${t.subject}`));
+    // From active preset
+    if (activePreset?.taskId) {
+      map.set(activePreset.taskId, `#${activePreset.taskId} - ${activePreset.taskSubject || activePreset.taskId}`);
+    }
+    // From loaded task
+    if (loadedTask) {
+      map.set(loadedTask.id.toString(), `#${loadedTask.id} - ${loadedTask.subject}`);
+    }
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+  }, [projectTasks, todos, activePreset, loadedTask]);
+
+  const handleQuickLoad = async (id: string) => {
+    if (!id) return;
+    setIsLoadingIssue(true);
+    try {
+      const cleanId = id.replace(/^#/, '').trim();
+      const issue = await getIssue(parseInt(cleanId, 10));
+      setLoadedTask(issue);
+      setSelectedTaskId(issue.id.toString());
+      if (issue.project?.id) {
+        setSelectedProjectId(issue.project.id.toString());
+      }
+      notifications.show({ title: 'Success', message: `Loaded task #${issue.id}`, color: 'green' });
+    } catch (error: any) {
+      notifications.show({ title: 'Error', message: `Failed to load task #${id}.`, color: 'red' });
+    } finally {
+      setIsLoadingIssue(false);
+    }
+  };
+
+  const handleOpenLogModal = async (preset: TimeLogPreset) => {
     setActivePreset(preset);
     const initialTask = preset.taskId || (todos.length > 0 ? todos[0].taskId : '');
     const initialProject = preset.projectId || (todos.length > 0 ? todos[0].projectId : '');
+    
     setSelectedProjectId(initialProject);
     setSelectedTaskId(initialTask);
     setSelectedActivityId(preset.activityId || '');
     setHours(preset.hours || 0.25);
     setComments(preset.comments || preset.name);
+    setSpentOn(new Date().toISOString().split('T')[0]);
+
+    if (preset.taskId && (!loadedTask || loadedTask.id.toString() !== preset.taskId)) {
+      handleQuickLoad(preset.taskId);
+    }
+
     setIsLogModalOpen(true);
+  };
+
+  const handleTaskChange = (val: string | null) => {
+    const newTaskId = val || '';
+    setSelectedTaskId(newTaskId);
+
+    if (val) {
+      const task = projectTasks.find(t => t.id.toString() === val) || 
+                   todos.find(t => t.taskId === val) || 
+                   (loadedTask?.id.toString() === val ? loadedTask : null);
+      
+      const pId = task && 'project' in task && task.project?.id ? task.project.id.toString() : 
+                  task && 'projectId' in task ? (task as any).projectId : null;
+      if (pId) {
+        setSelectedProjectId(pId);
+      }
+    }
   };
 
   const handleQuickSubmit = async () => {
@@ -67,11 +146,11 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
     try {
       const timeEntryPayload = {
         time_entry: {
-          issue_id: selectedTaskId,
+          issue_id: parseInt(selectedTaskId, 10),
           hours: hoursFormatted,
           comments: comments.trim(),
-          ...(selectedActivityId && { activity_id: parseInt(selectedActivityId) }),
-          spent_on: new Date().toISOString().split('T')[0],
+          ...(selectedActivityId && { activity_id: parseInt(selectedActivityId, 10) }),
+          spent_on: spentOn,
         },
       };
 
@@ -89,23 +168,29 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
   const handleSaveNewPreset = () => {
     if (!newPresetName.trim()) return;
     const hoursNum = typeof newPresetHours === 'string' ? parseFloat(newPresetHours) : newPresetHours;
+    const project = allProjects.find(p => p.id.toString() === newPresetProjectId);
+    const task = newPresetTasks.find(t => t.id.toString() === newPresetTaskId);
+
     const newPreset: TimeLogPreset = {
       id: 'preset_' + Date.now(),
       name: newPresetName.trim(),
+      projectId: newPresetProjectId,
+      projectName: project?.name || '',
+      taskId: newPresetTaskId,
+      taskSubject: task?.subject || '',
+      activityId: newPresetActivityId,
       hours: hoursNum || 0.5,
       comments: newPresetComments.trim(),
       isBillable: true,
-      projectId: '',
-      projectName: '',
-      taskId: '',
-      taskSubject: '',
-      activityId: '',
     };
 
     savePreset(newPreset);
     notifications.show({ title: 'Success', message: `Preset "${newPresetName.trim()}" saved!`, color: 'green' });
     setIsAddModalOpen(false);
     setNewPresetName('');
+    setNewPresetProjectId('');
+    setNewPresetTaskId('');
+    setNewPresetActivityId('');
     setNewPresetComments('');
     setNewPresetHours(0.5);
   };
@@ -153,7 +238,9 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
                   <IconBolt size={16} color="var(--mantine-color-orange-filled)" />
                   <Stack gap={0}>
                     <Text size="sm" fw={600}>{preset.name}</Text>
-                    <Text size="xs" c="dimmed">{preset.hours}h {preset.comments ? `• ${preset.comments}` : ''}</Text>
+                    <Text size="xs" c="dimmed">
+                      {preset.hours}h {preset.taskSubject ? `• #${preset.taskId}` : ''} {preset.comments ? `• ${preset.comments}` : ''}
+                    </Text>
                   </Stack>
                   {presets.some(p => p.id === preset.id) && (
                     <Tooltip label="Delete preset">
@@ -183,40 +270,78 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
         onClose={() => setIsLogModalOpen(false)}
         title={<Text fw={600}>Quick Log Time: {activePreset?.name}</Text>}
         centered
+        size="md"
       >
         <Stack gap="md">
           <Select
-            label="Select Task"
-            placeholder="-- Choose task to log time on --"
-            value={selectedTaskId}
+            label="Project"
+            placeholder="Search project..."
+            data={projectOptions}
+            value={selectedProjectId}
             onChange={v => {
-              setSelectedTaskId(v || '');
-              const todo = todos.find(t => t.taskId === v);
-              if (todo) setSelectedProjectId(todo.projectId);
+              setSelectedProjectId(v || '');
+              setSelectedActivityId('');
             }}
-            data={todos.map(t => ({ value: t.taskId, label: `#${t.taskId} - ${t.taskSubject}` }))}
-            required
+            searchable
+            clearable
           />
 
-          <NumberInput
-            label="Hours to Log"
-            value={hours}
-            onChange={setHours}
-            decimalScale={2}
-            step={0.25}
-            min={0.1}
-            required
-          />
-
-          {projectActivities.length > 0 && (
-            <Select
-              label="Activity"
-              placeholder="-- Select activity --"
-              value={selectedActivityId}
-              onChange={v => setSelectedActivityId(v || '')}
-              data={projectActivities.map(a => ({ value: a.id.toString(), label: a.name }))}
+          <Group grow align="flex-start">
+            <TextInput
+              label="Task ID"
+              placeholder="Paste ID..."
+              value={selectedTaskId}
+              onChange={e => setSelectedTaskId(e.target.value)}
+              onBlur={() => {
+                if (selectedTaskId) handleQuickLoad(selectedTaskId);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (selectedTaskId) handleQuickLoad(selectedTaskId);
+                }
+              }}
+              disabled={isLoadingIssue || isSubmitting}
+              style={{ flex: 1 }}
             />
-          )}
+            <Select
+              label="Task Name"
+              placeholder={isLoadingProjectTasks ? 'Loading tasks...' : 'Search tasks...'}
+              data={taskOptions}
+              value={selectedTaskId}
+              onChange={handleTaskChange}
+              searchable
+              required
+              style={{ flex: 2 }}
+            />
+          </Group>
+
+          <Select
+            label="Activity"
+            placeholder={isLoadingActivities ? 'Loading activities...' : '-- Select activity --'}
+            value={selectedActivityId}
+            onChange={v => setSelectedActivityId(v || '')}
+            data={projectActivities.map(a => ({ value: a.id.toString(), label: a.name }))}
+          />
+
+          <Group grow>
+            <NumberInput
+              label="Hours to Log"
+              value={hours}
+              onChange={setHours}
+              decimalScale={2}
+              step={0.25}
+              min={0.1}
+              required
+            />
+            <TextInput
+              label="Date"
+              type="date"
+              value={spentOn}
+              onChange={e => setSpentOn(e.target.value)}
+              required
+            />
+          </Group>
 
           <Textarea
             label="Comments"
@@ -246,6 +371,7 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
         onClose={() => setIsAddModalOpen(false)}
         title={<Text fw={600}>Add Quick Log Preset</Text>}
         centered
+        size="md"
       >
         <Stack gap="md">
           <TextInput
@@ -256,6 +382,42 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
             required
             data-autofocus
           />
+
+          <Select
+            label="Default Project"
+            placeholder="-- Optional: Choose Project --"
+            data={projectOptions}
+            value={newPresetProjectId}
+            onChange={v => {
+              setNewPresetProjectId(v || '');
+              setNewPresetTaskId('');
+              setNewPresetActivityId('');
+            }}
+            searchable
+            clearable
+          />
+
+          <Select
+            label="Default Task"
+            placeholder="-- Optional: Choose Task --"
+            data={newPresetTasks.map(t => ({ value: t.id.toString(), label: `#${t.id} - ${t.subject}` }))}
+            value={newPresetTaskId}
+            onChange={v => setNewPresetTaskId(v || '')}
+            searchable
+            clearable
+            disabled={!newPresetProjectId}
+          />
+
+          <Select
+            label="Default Activity"
+            placeholder="-- Optional: Choose Activity --"
+            data={newPresetActivities.map(a => ({ value: a.id.toString(), label: a.name }))}
+            value={newPresetActivityId}
+            onChange={v => setNewPresetActivityId(v || '')}
+            disabled={!newPresetProjectId}
+            clearable
+          />
+
           <NumberInput
             label="Default Hours"
             value={newPresetHours}
@@ -265,6 +427,7 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
             min={0.1}
             required
           />
+          
           <Textarea
             label="Default Comments"
             placeholder="e.g. Daily standup meeting with the team"

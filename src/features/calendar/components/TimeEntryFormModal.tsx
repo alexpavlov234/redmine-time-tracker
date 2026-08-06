@@ -17,6 +17,7 @@ interface TimeEntryFormModalProps {
   onSuccess: () => void;
   editEntry?: TimeEntry | null;
   defaultDate?: string;
+  initialPresetId?: string | null;
 }
 
 export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
@@ -25,6 +26,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   onSuccess,
   editEntry,
   defaultDate,
+  initialPresetId,
 }) => {
   const { allProjects } = useProjects();
   const { presets, savePreset, deletePreset } = usePresets();
@@ -134,9 +136,13 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         }
       });
       setCustomFieldValues(initialValues);
+
+      if (initialPresetId) {
+        handleApplyPreset(initialPresetId);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editEntry, defaultDate, customFields, billableFieldId]);
+  }, [isOpen, editEntry, defaultDate, initialPresetId, customFields, billableFieldId]);
 
   useEffect(() => {
     if (isOpen && editEntry?.activity?.id) {
@@ -319,10 +325,11 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
               }}
             />
 
-            <Group grow align="flex-start">
+            <Group align="flex-start" wrap="nowrap">
               <TextInput
                 label="Task ID"
-                placeholder="Paste ID..."
+                placeholder="ID..."
+                w={110}
                 {...form.getInputProps('taskId')}
                 onBlur={() => {
                   if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
@@ -336,7 +343,6 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                   }
                 }}
                 disabled={isLoadingIssue || isSubmitting}
-                style={{ flex: 1 }}
               />
               <Select
                 label="Task Name"
@@ -347,7 +353,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                 {...form.getInputProps('taskId')}
                 onChange={handleTaskChange}
                 disabled={isLoadingTasks || isSubmitting}
-                style={{ flex: 2 }}
+                style={{ flex: 1 }}
               />
             </Group>
 

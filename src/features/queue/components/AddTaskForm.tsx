@@ -138,10 +138,11 @@ export const AddTaskForm: React.FC = () => {
               }}
             />
 
-            <Group grow align="flex-start">
+            <Group align="flex-start" wrap="nowrap">
               <TextInput
                 label="Task ID"
-                placeholder="Paste ID..."
+                placeholder="ID..."
+                w={110}
                 {...form.getInputProps('taskId')}
                 onBlur={() => {
                   if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
@@ -155,7 +156,6 @@ export const AddTaskForm: React.FC = () => {
                   }
                 }}
                 disabled={isLoadingIssue}
-                style={{ flex: 1 }}
               />
               <Select
                 label="Task Name"
@@ -166,7 +166,7 @@ export const AddTaskForm: React.FC = () => {
                 disabled={isLoadingTasks}
                 {...form.getInputProps('taskId')}
                 onChange={handleTaskSelect}
-                style={{ flex: 2 }}
+                style={{ flex: 1 }}
               />
             </Group>
 

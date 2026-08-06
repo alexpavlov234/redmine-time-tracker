@@ -1,7 +1,8 @@
 import React from 'react';
 import type { TimeEntry } from '../../../types';
-import { Card, Button, Group, Text, Progress, Stack, ActionIcon, Badge, Paper } from '@mantine/core';
-import { IconClock, IconEdit, IconTrash, IconPlus } from '@tabler/icons-react';
+import { Card, Button, Group, Text, Progress, Stack, ActionIcon, Badge, Paper, Anchor } from '@mantine/core';
+import { IconClock, IconEdit, IconTrash, IconPlus, IconExternalLink } from '@tabler/icons-react';
+import { useSettings } from '../../../contexts/SettingsContext';
 
 interface DayDetailsViewProps {
   dateStr: string;
@@ -20,6 +21,7 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
   onDelete,
   onAdd,
 }) => {
+  const { redmineUrl } = useSettings();
   const dateObj = new Date(dateStr + 'T00:00:00');
   const formattedDate = dateObj.toLocaleDateString(undefined, {
     weekday: 'long',
@@ -78,7 +80,18 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
                       <Text size="sm" fw={600} truncate>{entry.project?.name || 'Unknown Project'}</Text>
                       <Badge variant="light">{entry.hours}h</Badge>
                     </Group>
-                    <Text size="sm" c="dimmed" truncate>#{entry.issue?.id} - {entry.issue?.subject || 'Unknown Task'}</Text>
+                    {entry.issue?.id ? (
+                      <Group gap={4} wrap="nowrap">
+                        <Anchor href={`${redmineUrl}/issues/${entry.issue.id}`} target="_blank" size="sm" fw={600} truncate underline="hover">
+                          #{entry.issue.id} - {entry.issue.subject || 'Unknown Task'}
+                        </Anchor>
+                        <ActionIcon component="a" href={`${redmineUrl}/issues/${entry.issue.id}`} target="_blank" size="xs" variant="subtle" color="gray" title="Open in Redmine">
+                          <IconExternalLink size={12} />
+                        </ActionIcon>
+                      </Group>
+                    ) : (
+                      <Text size="sm" c="dimmed" truncate>General Time Entry</Text>
+                    )}
                     {entry.comments && <Text size="sm" mt="xs" style={{ whiteSpace: 'pre-wrap' }}>{entry.comments}</Text>}
                     <Text size="xs" c="dimmed" mt="xs">Activity: {entry.activity?.name || 'General'}</Text>
                   </div>

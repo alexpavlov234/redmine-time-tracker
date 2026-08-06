@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Modal, Button, Group, Stack, Text, Select } from '@mantine/core';
+import { Modal, Button, Group, Stack, Text, Select, Anchor } from '@mantine/core';
 import { useProjects } from '../../../contexts/ProjectsContext';
+import { useSettings } from '../../../contexts/SettingsContext';
 import { redmineApiRequest } from '../../../services/redmine';
 import { notifications } from '@mantine/notifications';
-import { IconPlayerPlay, IconArrowRight } from '@tabler/icons-react';
+import { IconPlayerPlay, IconArrowRight, IconExternalLink } from '@tabler/icons-react';
 
 interface StatusPromptModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
   onConfirmStart,
 }) => {
   const { issueStatuses } = useProjects();
+  const { redmineUrl } = useSettings();
   const [selectedStatusId, setSelectedStatusId] = useState<string | null>(() => {
     const inProgress = issueStatuses.find(s => 
       s.name.toLowerCase().includes('in progress') || 
@@ -74,7 +76,14 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
     >
       <Stack gap="md">
         <Text size="sm">
-          You are starting tracking on <Text component="span" fw={700}>#{taskId} {taskSubject ? `- ${taskSubject}` : ''}</Text>.
+          You are starting tracking on{' '}
+          {taskId ? (
+            <Anchor href={`${redmineUrl}/issues/${taskId}`} target="_blank" fw={700} underline="hover">
+              #{taskId} {taskSubject ? `- ${taskSubject}` : ''} <IconExternalLink size={12} />
+            </Anchor>
+          ) : (
+            <Text component="span" fw={700}>Task #{taskId}</Text>
+          )}.
           Would you like to update its status in Redmine?
         </Text>
 

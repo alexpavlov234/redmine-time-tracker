@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, TextInput, PasswordInput, Button, Group, Stack, Alert, Title, Switch, Text } from '@mantine/core';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { notifications } from '@mantine/notifications';
-import { IconSettings, IconDeviceFloppy, IconLink, IconClipboardList } from '@tabler/icons-react';
+import { IconSettings, IconDeviceFloppy, IconLink } from '@tabler/icons-react';
 import { getCurrentUser, detectBillableField } from '../../../services/redmine';
 
 export const SettingsForm: React.FC = () => {
@@ -95,10 +95,7 @@ export const SettingsForm: React.FC = () => {
 
         <Group justify="space-between" align="center" mt="sm">
           <Stack gap={2}>
-            <Group gap="xs">
-              <IconClipboardList size={16} color="var(--mantine-color-blue-filled)" />
-              <Text size="sm" fw={600}>Use Performed Tasks List</Text>
-            </Group>
+            <Text size="sm" fw={600}>Use Performed Tasks List</Text>
             <Text size="xs" c="dimmed">
               Enabled: Prompts for sub-tasks on timer start & populates comments. Disabled: Direct time logging.
             </Text>

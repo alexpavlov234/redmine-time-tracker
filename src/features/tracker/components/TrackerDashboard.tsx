@@ -4,10 +4,10 @@ import { WorkQueue } from '../../queue/components/WorkQueue';
 import { AddTaskForm } from '../../queue/components/AddTaskForm';
 import { SummaryModal } from './SummaryModal';
 import { AssignedTasksPanel } from './AssignedTasksPanel';
-import { QuickLogPanel } from './QuickLogPanel';
+import { StandardLogPanel } from './StandardLogPanel';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { Card, Button, TextInput, Group, Stack, Badge, Text, List, ThemeIcon, Switch, Paper, Grid } from '@mantine/core';
+import { Card, Button, TextInput, Group, Stack, Badge, Text, List, ThemeIcon, Paper, Grid, SegmentedControl, Center } from '@mantine/core';
 import { IconClipboardList, IconPlus, IconCheck } from '@tabler/icons-react';
 
 /** "Performed Tasks" panel showing activities logged during the timer session */
@@ -124,20 +124,40 @@ export const TrackerDashboard: React.FC = () => {
           <Stack gap="lg">
             <TimerBar onStop={handleStop} />
             
-            <Paper p="xs" px="md" radius="md" withBorder bg="var(--mantine-color-default)">
-              <Group justify="space-between" align="center">
-                <Group gap="xs">
-                  <IconClipboardList size={18} color="var(--mantine-color-blue-filled)" />
-                  <Text size="sm" fw={600}>Tracking Mode:</Text>
-                </Group>
-                <Switch
-                  checked={usePerformedTasksList}
-                  onChange={(e) => setUsePerformedTasksList(e.currentTarget.checked)}
-                  label={usePerformedTasksList ? "Performed Tasks List (Enabled)" : "Direct Time Logging (No Sub-tasks)"}
+            <Paper p="xs" radius="md" withBorder bg="var(--mantine-color-default)">
+              <Stack gap="xs">
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" ta="center" style={{ letterSpacing: '0.5px' }}>
+                  Tracking Mode
+                </Text>
+                <SegmentedControl
+                  fullWidth
+                  size="lg"
+                  radius="md"
                   color="blue"
-                  size="md"
+                  value={usePerformedTasksList ? 'performed' : 'direct'}
+                  onChange={(val) => setUsePerformedTasksList(val === 'performed')}
+                  data={[
+                    {
+                      label: (
+                        <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
+                          <Text fw={700} size="sm">Direct Time Logging</Text>
+                          <Text size="xs" c="dimmed">No Sub-tasks</Text>
+                        </Center>
+                      ),
+                      value: 'direct',
+                    },
+                    {
+                      label: (
+                        <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
+                          <Text fw={700} size="sm">Performed Tasks List</Text>
+                          <Text size="xs" c="dimmed">With Sub-tasks</Text>
+                        </Center>
+                      ),
+                      value: 'performed',
+                    },
+                  ]}
                 />
-              </Group>
+              </Stack>
             </Paper>
 
             {usePerformedTasksList && <PerformedTasks />}
@@ -149,7 +169,7 @@ export const TrackerDashboard: React.FC = () => {
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Stack gap="lg">
             <AssignedTasksPanel />
-            <QuickLogPanel />
+            <StandardLogPanel />
             <AddTaskForm />
           </Stack>
         </Grid.Col>
