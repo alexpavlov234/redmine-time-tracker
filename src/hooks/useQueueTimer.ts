@@ -12,6 +12,7 @@ interface QueueTimerState {
 
 interface QueueTimerActions {
   startTimerForTodo: (todoId: number) => Promise<string | null>;
+  startWithoutTask: (initialNote?: string) => void;
   pauseTimer: () => void;
   stopTimer: () => void;
   addActivity: (text: string) => void;
@@ -27,6 +28,7 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
   const { 
     todos, 
     activeTodoId, 
+    addTodo,
     setActiveTodoId, 
     updateTodo, 
     removeTodo, 
@@ -37,6 +39,40 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
   const activeTodo = getActiveTodo();
   const isRunning = activeTodo?.isRunning || false;
   const activities = activeTodo?.activities || [];
+
+  const startWithoutTask = useCallback((initialNote?: string) => {
+    // Auto-pause existing active todo if running
+    const currentActive = getActiveTodo();
+    if (currentActive && currentActive.isRunning) {
+      const now = Date.now();
+      const startedAt = currentActive.startTime || now;
+      const sessionMs = Math.max(0, now - startedAt);
+      const newElapsedMs = (currentActive.elapsedMs || 0) + sessionMs;
+      updateTodo(currentActive.id, {
+        elapsedMs: newElapsedMs,
+        startTime: null,
+        isRunning: false,
+      });
+    }
+
+    const now = Date.now();
+    const adHocTodo: Todo = {
+      id: now,
+      taskId: '',
+      taskSubject: 'General Work (No Task)',
+      projectId: '',
+      projectName: 'General Work',
+      note: initialNote || '',
+      elapsedMs: 0,
+      startTime: now,
+      isRunning: true,
+      activities: initialNote ? [{ text: initialNote, timestamp: new Date(now) }] : [],
+    };
+
+    addTodo(adHocTodo);
+    setActiveTodoId(adHocTodo.id);
+    document.title = '▶️ Tracking General...';
+  }, [getActiveTodo, updateTodo, addTodo, setActiveTodoId]);
 
   const pauseTimer = useCallback(() => {
     if (activeTodoId == null) return;
@@ -183,6 +219,7 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
     activities,
     activeTodo,
     startTimerForTodo,
+    startWithoutTask,
     pauseTimer,
     stopTimer,
     addActivity,

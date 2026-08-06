@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Card, Group, Text, Button, Stack, Paper, Tooltip, ActionIcon } from '@mantine/core';
-import { IconBolt, IconTrash, IconClock } from '@tabler/icons-react';
+import { Card, Group, Text, Button, Stack, Paper, Tooltip, ActionIcon, Divider } from '@mantine/core';
+import { IconBolt, IconTrash, IconClock, IconPlayerPlay } from '@tabler/icons-react';
 import { usePresets } from '../../../hooks/usePresets';
+import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { TimeEntryFormModal } from '../../calendar/components/TimeEntryFormModal';
 import type { TimeLogPreset } from '../../../types';
 
@@ -13,6 +14,7 @@ const DEFAULT_PRESETS: TimeLogPreset[] = [
 
 export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSuccess }) => {
   const { presets, deletePreset } = usePresets();
+  const timer = useQueueTimer();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 
@@ -27,25 +29,39 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
     <>
       <Card shadow="sm" padding="lg" radius="md" withBorder>
         <Card.Section withBorder inheritPadding py="xs">
-          <Group justify="space-between">
-            <Group gap="xs">
-              <IconBolt size={20} color="var(--mantine-color-orange-filled)" />
-              <Text fw={600}>Direct Time Log & Presets</Text>
-            </Group>
+          <Group gap="xs">
+            <IconBolt size={20} color="var(--mantine-color-orange-filled)" />
+            <Text fw={600}>Quick Actions & Presets</Text>
+          </Group>
+        </Card.Section>
+
+        <Stack mt="md" gap="sm">
+          {/* Prominent Action Buttons in Card Body */}
+          <Group grow>
             <Button
-              size="xs"
+              size="sm"
+              variant="light"
+              color="teal"
+              leftSection={<IconPlayerPlay size={16} fill="currentColor" />}
+              onClick={() => timer.startWithoutTask()}
+            >
+              Start without Task
+            </Button>
+            <Button
+              size="sm"
               variant="outline"
-              leftSection={<IconClock size={14} />}
+              color="blue"
+              leftSection={<IconClock size={16} />}
               onClick={() => handleOpenModal()}
             >
               Log Time
             </Button>
           </Group>
-        </Card.Section>
 
-        <Stack mt="md" gap="xs">
+          <Divider my="xs" label="Presets" labelPosition="center" />
+
           <Text size="xs" c="dimmed">
-            Click any preset shortcut or "Log Time" to open the standard time logging modal.
+            Click any preset shortcut to open the standard time logging modal.
           </Text>
 
           <Group gap="xs" wrap="wrap">

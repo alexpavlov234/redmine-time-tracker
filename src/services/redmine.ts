@@ -42,7 +42,11 @@ function mapHttpError(status: number, statusText: string, errorText: string) {
     if (status === 401) readable += ' (Unauthorized: check your API key)';
     if (status === 403) readable += ' (Forbidden: your API key might not have permissions)';
     if (status === 404) readable += ' (Not found: verify the Redmine URL or endpoint)';
-    return new Error(readable);
+
+    const err = new Error(readable);
+    (err as any).isHttpError = true;
+    (err as any).status = status;
+    return err;
 }
 
 function mapNetworkError(e: unknown, context: 'proxy' | 'direct') {
@@ -101,8 +105,13 @@ export async function redmineApiRequest(endpoint: string, method: string = 'GET'
         }
         if (proxyResp.status === 204 || proxyResp.status === 201) return {};
         return proxyResp.json();
-    } catch (e) {
+    } catch (e: any) {
         clearProxyTimeout();
+
+        // If Redmine responded through proxy with an HTTP error (422, 403, etc.), rethrow directly
+        if (e?.isHttpError) {
+            throw e;
+        }
         // Only consider direct fallback for HTTPS Redmine to avoid mixed-content and to give a chance if CORS is enabled
         const isHttps = /^https:\/\//i.test(redmineUrl);
         const shouldTryDirect = isHttps;

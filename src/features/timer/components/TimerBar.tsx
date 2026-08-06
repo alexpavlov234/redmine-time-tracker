@@ -3,7 +3,7 @@ import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle, IconExternalLink } from '@tabler/icons-react';
-import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Anchor } from '@mantine/core';
+import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Anchor, Tooltip } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { formatTime } from '../../../utils/formatters';
 
@@ -42,13 +42,17 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
   const displayActivity = activeTodo?.activityName;
 
   const handleStart = async () => {
-    if (todos.length === 0) return;
-    const firstTodo = activeTodo || todos[0];
-    const result = await timer.startTimerForTodo(firstTodo.id);
-    if (result === 'needs_prompt') {
-      setPendingTodoId(firstTodo.id);
-      setFirstActivityText(firstTodo.note || '');
-      setShowFirstActivityModal(true);
+    const targetTodo = activeTodo || (todos.length > 0 ? todos[0] : null);
+
+    if (targetTodo) {
+      const result = await timer.startTimerForTodo(targetTodo.id);
+      if (result === 'needs_prompt') {
+        setPendingTodoId(targetTodo.id);
+        setFirstActivityText(targetTodo.note || '');
+        setShowFirstActivityModal(true);
+      }
+    } else {
+      timer.startWithoutTask();
     }
   };
 
@@ -107,9 +111,11 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
 
             <Group gap="xs" wrap="nowrap">
               {!isRunning ? (
-                <ActionIcon variant="filled" color="blue" size="xl" radius="xl" onClick={handleStart}>
-                  <IconPlayerPlay size={24} fill="currentColor" />
-                </ActionIcon>
+                <Tooltip label={todos.length === 0 ? "Start tracking (General / No Task)" : "Start tracking"}>
+                  <ActionIcon variant="filled" color="blue" size="xl" radius="xl" onClick={handleStart}>
+                    <IconPlayerPlay size={24} fill="currentColor" />
+                  </ActionIcon>
+                </Tooltip>
               ) : (
                 <ActionIcon variant="filled" color="orange" size="xl" radius="xl" onClick={timer.pauseTimer}>
                   <IconPlayerPause size={24} fill="currentColor" />

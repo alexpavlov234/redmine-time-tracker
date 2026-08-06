@@ -46,17 +46,19 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
           issue: { status_id: parseInt(selectedStatusId, 10) },
         });
         setStatusResult({ success: true, message: `Task #${taskId} status updated in Redmine.` });
+        setTimeout(() => {
+          onConfirmStart();
+          onClose();
+        }, 600);
       } catch (err: any) {
-        setStatusResult({ success: false, message: 'Could not update task status in Redmine.' });
+        setStatusResult({ success: false, message: err.message || 'Could not update task status in Redmine.' });
       } finally {
         setIsUpdating(false);
       }
-    }
-
-    setTimeout(() => {
+    } else {
       onConfirmStart();
       onClose();
-    }, 500);
+    }
   };
 
   const handleSkipAndStart = () => {

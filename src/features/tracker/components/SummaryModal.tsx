@@ -22,9 +22,12 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   const { usePerformedTasksList, redmineUrl } = useSettings();
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
   const { } = useQueue();
-  const { issueStatuses, setIssueStatuses } = useProjects();
+  const { allProjects, issueStatuses, setIssueStatuses } = useProjects();
 
-  const projectId = activeTodo?.projectId || '';
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+
+  const projectId = activeTodo?.projectId || selectedProjectId || '';
   const { activities: projectActivities, defaultActivityId } = useActivitiesForProject(projectId || null);
 
   const [comments, setComments] = useState('');
@@ -42,6 +45,9 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   // Populate form when modal opens
   useEffect(() => {
     if (isOpen) {
+      setSelectedProjectId(activeTodo?.projectId || (allProjects.length > 0 ? allProjects[0].id.toString() : ''));
+      setSelectedTaskId(activeTodo?.taskId || '');
+
       // Build comments from activities or todo note
       if (usePerformedTasksList && activities.length > 0) {
         const detailsText = activities
@@ -93,7 +99,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       setCustomFieldValues(initialValues);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activities, activeTodo, defaultActivityId, issueStatuses.length, setIssueStatuses, customFields, billableFieldId]);
+  }, [isOpen, activities, activeTodo, defaultActivityId, issueStatuses.length, setIssueStatuses, customFields, billableFieldId, allProjects]);
 
   // Update activity when project activities load
   useEffect(() => {
@@ -105,9 +111,11 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   }, [projectActivities, defaultActivityId, activeTodo?.activityId]);
 
   const handleSubmit = async () => {
-    const issueId = activeTodo?.taskId;
-    if (!issueId) {
-      setSubmitResult({ success: false, message: 'No issue selected.' });
+    const issueId = selectedTaskId || activeTodo?.taskId;
+    const targetProjectId = selectedProjectId || activeTodo?.projectId;
+
+    if (!issueId && !targetProjectId) {
+      setSubmitResult({ success: false, message: 'Please select a project or task.' });
       return;
     }
 
@@ -136,7 +144,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
       const timeEntryPayload: any = {
         time_entry: {
-          issue_id: issueId,
+          ...(issueId ? { issue_id: issueId } : { project_id: targetProjectId }),
           hours: hoursFormatted,
           comments: comments.trim(),
           activity_id: parseInt(activityId),
@@ -186,8 +194,8 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
         {/* Left Column: Hours, Activity, Task info, Status change */}
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Stack gap="md">
-            {/* Task info */}
-            {activeTodo && (
+            {/* Task or Project info */}
+            {activeTodo?.taskId ? (
               <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-default)">
                 <Stack gap={2}>
                   <Text size="xs" fw={700} c="dimmed" tt="uppercase">
@@ -201,6 +209,23 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                   </Group>
                 </Stack>
               </Paper>
+            ) : (
+              <Stack gap="xs">
+                <Select
+                  label="Project"
+                  placeholder="-- Select project --"
+                  value={selectedProjectId}
+                  onChange={val => setSelectedProjectId(val || '')}
+                  data={allProjects.map(p => ({ value: p.id.toString(), label: p.name }))}
+                  required
+                />
+                <TextInput
+                  label="Issue # (Optional)"
+                  placeholder="e.g. 12345"
+                  value={selectedTaskId}
+                  onChange={e => setSelectedTaskId(e.currentTarget.value)}
+                />
+              </Stack>
             )}
 
             {/* Side-by-side: Hours & Activity */}

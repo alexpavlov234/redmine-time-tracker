@@ -12,9 +12,56 @@ export const AssignedTasksPanel: React.FC = () => {
   const { redmineUrl } = useSettings();
   const { addTodo } = useQueue();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [recentProjectIds, setRecentProjectIds] = useState<string[]>([]);
   const [groupBy, setGroupBy] = useState<string | null>('none');
   const [tasks, setTasks] = useState<RedmineIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch recent time entries to identify recently used projects
+  useEffect(() => {
+    let cancelled = false;
+    redmineApiRequest('/time_entries.json?user_id=me&limit=50')
+      .then(data => {
+        if (cancelled) return;
+        const entries = data.time_entries || [];
+        const orderedIds: string[] = [];
+        entries.forEach((e: any) => {
+          const pid = e.project?.id?.toString();
+          if (pid && !orderedIds.includes(pid)) {
+            orderedIds.push(pid);
+          }
+        });
+        setRecentProjectIds(orderedIds);
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Build grouped project options with "Recently Used" at the top
+  const projectOptions = React.useMemo(() => {
+    if (recentProjectIds.length === 0) {
+      return allProjects.map(p => ({ value: p.id.toString(), label: p.name }));
+    }
+
+    const recentSet = new Set(recentProjectIds);
+    const recentProjects = recentProjectIds
+      .map(id => allProjects.find(p => p.id.toString() === id))
+      .filter((p): p is typeof allProjects[0] => Boolean(p));
+
+    const otherProjects = allProjects.filter(p => !recentSet.has(p.id.toString()));
+
+    return [
+      {
+        group: 'Recently Used',
+        items: recentProjects.map(p => ({ value: p.id.toString(), label: p.name })),
+      },
+      {
+        group: 'All Projects',
+        items: otherProjects.map(p => ({ value: p.id.toString(), label: p.name })),
+      },
+    ];
+  }, [allProjects, recentProjectIds]);
 
   const handleAddToQueue = (task: RedmineIssue) => {
     const project = allProjects.find(p => p.id.toString() === selectedProjectId);
@@ -111,7 +158,7 @@ export const AssignedTasksPanel: React.FC = () => {
             placeholder="-- Select a Project --"
             value={selectedProjectId}
             onChange={setSelectedProjectId}
-            data={allProjects.map(p => ({ value: p.id.toString(), label: p.name }))}
+            data={projectOptions}
             searchable
           />
           <Select
