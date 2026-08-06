@@ -11,6 +11,45 @@ This app was developed with AI agents. We developed this project for work in par
 
 ---
 
+## Technologies
+
+The application is built using a modern frontend stack geared towards performance, maintainability, and clean UI design:
+
+*   **Core:** React 19, TypeScript
+*   **Build Tool:** Vite
+*   **UI Framework:** [Mantine v7](https://mantine.dev/) (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/notifications`)
+*   **Icons:** `@tabler/icons-react`
+*   **Routing:** `react-router-dom`
+*   **Proxy/Network:** Express, `http-proxy-middleware` (for local CORS bypass)
+
+> [!NOTE]  
+> All UI components utilize Mantine v7's built-in flex and grid systems (`Stack`, `Group`, `SimpleGrid`). Custom SCSS has been intentionally removed in favor of Mantine's standardized component styling.
+
+---
+
+## Project Structure
+
+The codebase is organized by feature to ensure modularity and separation of concerns.
+
+```text
+src/
+├── assets/         # Static assets and global resources
+├── components/     # Reusable structural layout components (AppShell, Header)
+├── contexts/       # React Context providers (TimerContext, QueueContext, etc.)
+├── features/       # Feature-driven modules (Core application logic)
+│   ├── calendar/   # Calendar grid, bulk logging, and day details
+│   ├── queue/      # Task queue list and task addition forms
+│   ├── settings/   # Application configuration and API keys
+│   ├── timer/      # Live timer bar and micro-activity logging
+│   └── tracker/    # Aggregated dashboard views and summary modals
+├── hooks/          # Shared custom React hooks for Redmine data fetching
+├── services/       # External API communications (redmine.ts)
+├── types/          # TypeScript interface declarations
+└── utils/          # Helper functions and formatters
+```
+
+---
+
 ## Technical Architecture & Core Patterns
 
 The application is structured to minimize friction. We want to keep the UI snappy and ensure no timer progress gets lost if you refresh your browser.
@@ -79,6 +118,9 @@ If you want to modify features or add new endpoints, use the following guide.
 *   **API Integrations:** All endpoint calls are declared inside [redmine.ts](./src/services/redmine.ts).
 *   **Time Aggregation:** The log modal is in [SummaryModal.tsx](./src/features/tracker/components/SummaryModal.tsx).
 *   **Calendar Dashboard:** View log history grids in [CalendarGrid.tsx](./src/features/calendar/components/CalendarGrid.tsx) and [LoggedTimeDashboard.tsx](./src/features/calendar/components/LoggedTimeDashboard.tsx).
+
+> [!TIP]
+> When creating new UI components or modifying existing ones, always rely on `@mantine/core` and `@mantine/form` components instead of rolling bespoke SCSS styles. 
 
 ### Quality Checks
 We enforce lint rules and type safety using ESLint and the TypeScript compiler. Make sure to run these checks before creating commits:

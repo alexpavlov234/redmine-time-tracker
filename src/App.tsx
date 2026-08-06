@@ -3,22 +3,25 @@ import { SettingsProvider } from './contexts/SettingsContext';
 import { UserProvider } from './contexts/UserContext';
 import { ProjectsProvider } from './contexts/ProjectsContext';
 import { QueueProvider } from './contexts/QueueContext';
-import { ToastProvider } from './contexts/ToastContext';
 import { ConfirmProvider } from './contexts/ConfirmContext';
 import { AppShell } from './components/layout/AppShell';
 import { SettingsForm } from './features/settings/components/SettingsForm';
-import './styles/main.scss';
+import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
+import { MantineProvider } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 
 import { TrackerDashboard } from './features/tracker/components/TrackerDashboard';
 import { LoggedTimeDashboard } from './features/calendar/components/LoggedTimeDashboard';
 
 function App() {
   return (
-    <SettingsProvider>
-      <UserProvider>
-        <ProjectsProvider>
-          <QueueProvider>
-            <ToastProvider>
+    <MantineProvider defaultColorScheme="auto">
+      <Notifications />
+      <SettingsProvider>
+        <UserProvider>
+          <ProjectsProvider>
+            <QueueProvider>
               <ConfirmProvider>
                 <Router>
                   <Routes>
@@ -30,11 +33,11 @@ function App() {
                   </Routes>
                 </Router>
               </ConfirmProvider>
-            </ToastProvider>
-          </QueueProvider>
-        </ProjectsProvider>
-      </UserProvider>
-    </SettingsProvider>
+            </QueueProvider>
+          </ProjectsProvider>
+        </UserProvider>
+      </SettingsProvider>
+    </MantineProvider>
   );
 }
 

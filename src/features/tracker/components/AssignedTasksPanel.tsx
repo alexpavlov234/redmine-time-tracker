@@ -1,26 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Select } from '../../../components/ui';
+import { Card, Select, Group, Text, Stack, ActionIcon, Loader, Badge, Anchor, Paper } from '@mantine/core';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { redmineApiRequest } from '../../../services/redmine';
 import type { RedmineIssue } from '../../../types';
-import { ExternalLink, ListChecks, Play } from 'lucide-react';
+import { IconExternalLink, IconListCheck, IconPlayerPlay } from '@tabler/icons-react';
 import { useQueue } from '../../../contexts/QueueContext';
-import styles from './AssignedTasksPanel.module.scss';
 
 export const AssignedTasksPanel: React.FC = () => {
   const { allProjects } = useProjects();
   const { redmineUrl } = useSettings();
   const { addTodo } = useQueue();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [groupBy, setGroupBy] = useState<string>('none');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<string | null>('none');
   const [tasks, setTasks] = useState<RedmineIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAddToQueue = (task: RedmineIssue) => {
     const project = allProjects.find(p => p.id.toString() === selectedProjectId);
     addTodo({
-      projectId: selectedProjectId,
+      projectId: selectedProjectId || '',
       projectName: project?.name || `Project ${selectedProjectId}`,
       taskId: task.id.toString(),
       taskSubject: task.subject,
@@ -61,7 +60,7 @@ export const AssignedTasksPanel: React.FC = () => {
   }, [selectedProjectId]);
 
   const groupedTasks = React.useMemo(() => {
-    if (groupBy === 'none') {
+    if (groupBy === 'none' || !groupBy) {
       return { 'All Tasks': tasks };
     }
 
@@ -97,96 +96,93 @@ export const AssignedTasksPanel: React.FC = () => {
   }, [tasks, groupBy]);
 
   return (
-    <Card
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ListChecks size={20} className="text-primary" />
-          My Assigned Tasks
-        </div>
-      }
-    >
-      <div className={styles.headerRow}>
-        <div style={{ flex: 1 }}>
-          <Select
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            fullWidth
-          >
-            <option value="">-- Select a Project --</option>
-            {allProjects.map(p => (
-              <option key={p.id} value={p.id.toString()}>{p.name}</option>
-            ))}
-          </Select>
-        </div>
-        <div style={{ flex: 1 }}>
-          <Select
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value)}
-            fullWidth
-            disabled={!selectedProjectId || isLoading}
-          >
-            <option value="none">-- Group By: None --</option>
-            <option value="status">Status</option>
-            <option value="tracker">Tracker</option>
-            <option value="priority">Priority</option>
-            <option value="author">Author</option>
-            <option value="category">Category</option>
-            <option value="fixed_version">Target Version</option>
-          </Select>
-        </div>
-      </div>
+    <Card shadow="sm" padding="lg" radius="md" withBorder>
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group gap="xs">
+          <IconListCheck size={20} />
+          <Text fw={500}>My Assigned Tasks</Text>
+        </Group>
+      </Card.Section>
 
-      <div className={styles.taskList}>
-        {isLoading && <div className={styles.message}>Loading tasks...</div>}
-        {!isLoading && selectedProjectId && tasks.length === 0 && (
-          <div className={styles.message}>No tasks assigned to you in this project.</div>
+      <Stack mt="md">
+        <Group grow align="flex-end">
+          <Select
+            label="Project"
+            placeholder="-- Select a Project --"
+            value={selectedProjectId}
+            onChange={setSelectedProjectId}
+            data={allProjects.map(p => ({ value: p.id.toString(), label: p.name }))}
+            searchable
+          />
+          <Select
+            label="Group By"
+            value={groupBy}
+            onChange={setGroupBy}
+            disabled={!selectedProjectId || isLoading}
+            data={[
+              { value: 'none', label: '-- Group By: None --' },
+              { value: 'status', label: 'Status' },
+              { value: 'tracker', label: 'Tracker' },
+              { value: 'priority', label: 'Priority' },
+              { value: 'author', label: 'Author' },
+              { value: 'category', label: 'Category' },
+              { value: 'fixed_version', label: 'Target Version' },
+            ]}
+          />
+        </Group>
+
+        {isLoading && (
+          <Group justify="center" py="xl">
+            <Loader size="sm" />
+            <Text c="dimmed">Loading tasks...</Text>
+          </Group>
         )}
+        
+        {!isLoading && selectedProjectId && tasks.length === 0 && (
+          <Text c="dimmed" ta="center" py="xl">No tasks assigned to you in this project.</Text>
+        )}
+        
         {!isLoading && !selectedProjectId && (
-          <div className={styles.message}>Please select a project to view tasks.</div>
+          <Text c="dimmed" ta="center" py="xl">Please select a project to view tasks.</Text>
         )}
         
         {!isLoading && tasks.length > 0 && (
-          <div className={styles.groupsContainer}>
+          <Stack gap="md">
             {Object.entries(groupedTasks).map(([groupName, groupTasks]) => (
-              <div key={groupName} className={styles.group}>
+              <Paper key={groupName} withBorder p="sm" radius="md" bg="var(--mantine-color-default)">
                 {groupBy !== 'none' && (
-                  <div className={styles.groupHeader}>
-                    {groupName} <span className={styles.groupCount}>({groupTasks.length})</span>
-                  </div>
+                  <Group justify="space-between" mb="xs">
+                    <Text fw={600} size="sm">{groupName}</Text>
+                    <Badge size="sm" variant="light">{groupTasks.length}</Badge>
+                  </Group>
                 )}
-                <ul className={styles.list}>
+                
+                <Stack gap="xs">
                   {groupTasks.map(task => (
-                    <li key={task.id} className={styles.listItem}>
-                      <div className={styles.taskInfo}>
-                        <span className={styles.taskId}>#{task.id}</span>
-                        <span className={styles.taskSubject}>{task.subject}</span>
-                      </div>
-                      <div className={styles.taskActions}>
-                        <button
-                          onClick={() => handleAddToQueue(task)}
-                          className={styles.actionBtn}
-                          title="Add to Timer Queue"
-                        >
-                          <Play size={16} />
-                        </button>
-                        <a
-                          href={`${redmineUrl}/issues/${task.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={styles.link}
-                          title="Open in Redmine"
-                        >
-                          <ExternalLink size={16} />
-                        </a>
-                      </div>
-                    </li>
+                    <Group key={task.id} justify="space-between" wrap="nowrap" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', paddingBottom: '0.25rem' }}>
+                      <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                        <Anchor href={`${redmineUrl}/issues/${task.id}`} target="_blank" size="sm" fw={500} style={{ whiteSpace: 'nowrap' }}>
+                          #{task.id}
+                        </Anchor>
+                        <Text size="sm" truncate>{task.subject}</Text>
+                      </Group>
+                      
+                      <Group gap={4}>
+                        <ActionIcon variant="subtle" color="blue" onClick={() => handleAddToQueue(task)} title="Add to Timer Queue">
+                          <IconPlayerPlay size={16} />
+                        </ActionIcon>
+                        <ActionIcon variant="subtle" color="gray" component="a" href={`${redmineUrl}/issues/${task.id}`} target="_blank" title="Open in Redmine">
+                          <IconExternalLink size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Group>
                   ))}
-                </ul>
-              </div>
+                </Stack>
+              </Paper>
             ))}
-          </div>
+          </Stack>
         )}
-      </div>
+      </Stack>
     </Card>
   );
 };

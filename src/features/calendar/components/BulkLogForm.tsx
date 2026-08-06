@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Input, Button, Select, type SelectItem } from '../../../components/ui';
-import styles from './BulkLogForm.module.scss';
-import { Send, CheckCircle2, ListTodo, Trash2, Plus } from 'lucide-react';
+import { Card, TextInput, Button, Select, NumberInput, Checkbox, Textarea, Group, Stack, Text, Progress, Badge, ActionIcon, Divider } from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { IconSend, IconCheck, IconListCheck, IconTrash, IconCirclePlus } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 import { createTimeEntry, getIssue } from '../../../services/redmine';
 import type { RedmineIssue, TimeLogPreset } from '../../../types';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
-import { useToast } from '../../../contexts/ToastContext';
+import { notifications } from '@mantine/notifications';
 import { usePresets } from '../../../hooks/usePresets';
 
 interface BulkLogFormProps {
@@ -19,15 +19,9 @@ interface BulkLogFormProps {
 
 export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSuccess, onCancel }) => {
   const { allProjects } = useProjects();
-  const { showSuccess, showError } = useToast();
   const { presets, savePreset, deletePreset } = usePresets();
 
-  const [selectedPresetId, setSelectedPresetId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [taskId, setTaskId] = useState('');
-  const [activityId, setActivityId] = useState('');
-  const [hours, setHours] = useState('');
-  const [comments, setComments] = useState('');
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>('');
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   const [isDeploying, setIsDeploying] = useState(false);
@@ -36,9 +30,25 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
 
-  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
-  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
   const { customFields } = useCustomFields();
+
+  const form = useForm({
+    initialValues: {
+      projectId: '',
+      taskId: '',
+      activityId: '',
+      hours: '' as string | number,
+      comments: '',
+    },
+    validate: {
+      taskId: (value) => (value ? null : 'Task is required'),
+      activityId: (value) => (value ? null : 'Activity is required'),
+      hours: (value) => (value && Number(value) > 0 ? null : 'Valid hours are required'),
+    },
+  });
+
+  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(form.values.projectId || null);
+  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(form.values.projectId || null);
 
   // Initialize custom fields when they load
   React.useEffect(() => {
@@ -56,60 +66,45 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     }
   }, [customFields]);
 
-  const projectOptions = useMemo((): SelectItem[] => {
-    const options: SelectItem[] = [
-      { id: 'my_issues', label: '--- My Assigned Issues ---' }
+  const projectOptions = useMemo(() => {
+    return [
+      { value: 'my_issues', label: '--- My Assigned Issues ---' },
+      ...allProjects.map(p => ({
+        value: p.id.toString(),
+        label: p.name,
+      }))
     ];
-    return [...options, ...allProjects.map(p => ({
-      id: p.id.toString(),
-      label: p.name,
-      sublabel: `ID: ${p.id}`
-    }))];
   }, [allProjects]);
 
-  const taskOptions = useMemo((): SelectItem[] => {
+  const taskOptions = useMemo(() => {
     const options = tasks.map(t => ({
-      id: t.id.toString(),
+      value: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
-      sublabel: t.project?.name
     }));
-    if (loadedTask && !options.some(o => o.id === loadedTask.id.toString())) {
+    if (loadedTask && !options.some(o => o.value === loadedTask.id.toString())) {
       options.push({
-        id: loadedTask.id.toString(),
+        value: loadedTask.id.toString(),
         label: `#${loadedTask.id} - ${loadedTask.subject}`,
-        sublabel: loadedTask.project?.name
       });
     }
     const preset = presets.find(p => p.id === selectedPresetId);
-    if (preset && preset.taskId && preset.taskSubject && !options.some(o => o.id === preset.taskId)) {
+    if (preset && preset.taskId && preset.taskSubject && !options.some(o => o.value === preset.taskId)) {
       options.push({
-        id: preset.taskId,
+        value: preset.taskId,
         label: `#${preset.taskId} - ${preset.taskSubject}`,
-        sublabel: preset.projectName
       });
     }
     return options;
   }, [tasks, loadedTask, presets, selectedPresetId]);
 
-  const selectedProject = projectOptions.find(p => p.id === projectId);
-  const selectedTask = taskOptions.find(t => t.id === taskId);
-
-  const handleProjectChange = (item: SelectItem | null) => {
-    setProjectId(item?.id.toString() || '');
-    if (!item) {
-      setTaskId('');
-    }
-    setActivityId('');
-  };
-
-  const handleTaskChange = (item: SelectItem | null) => {
-    const newTaskId = item?.id.toString() || '';
-    setTaskId(newTaskId);
+  const handleTaskChange = (val: string | null) => {
+    const newTaskId = val || '';
+    form.setFieldValue('taskId', newTaskId);
     
-    if (item && !projectId) {
-      const task = tasks.find(t => t.id.toString() === item.id) || (loadedTask?.id.toString() === item.id ? loadedTask : null);
+    if (val && !form.values.projectId) {
+      const task = tasks.find(t => t.id.toString() === val) || (loadedTask?.id.toString() === val ? loadedTask : null);
       if (task?.project?.id) {
-        setProjectId(task.project.id.toString());
+        form.setFieldValue('projectId', task.project.id.toString());
       }
     }
   };
@@ -121,31 +116,29 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
       const cleanId = id.replace(/^#/, '').trim();
       const issue = await getIssue(parseInt(cleanId, 10));
       setLoadedTask(issue);
-      setTaskId(issue.id.toString());
+      form.setFieldValue('taskId', issue.id.toString());
       if (issue.project) {
-        setProjectId(issue.project.id.toString());
+        form.setFieldValue('projectId', issue.project.id.toString());
       }
-      showSuccess(`Loaded task #${issue.id}`);
+      notifications.show({ title: 'Success', message: `Loaded task #${issue.id}`, color: 'green' });
     } catch (error: any) {
-      showError(`Failed to load task #${id}. It may not exist or you lack permission.`);
+      notifications.show({ title: 'Error', message: `Failed to load task #${id}. It may not exist or you lack permission.`, color: 'red' });
     } finally {
       setIsLoadingIssue(false);
     }
   };
 
-  const handleApplyPreset = (presetId: string) => {
+  const handleApplyPreset = (presetId: string | null) => {
     setSelectedPresetId(presetId);
     if (!presetId) return;
 
     const preset = presets.find(p => p.id === presetId);
     if (preset) {
-      if (preset.projectId) setProjectId(preset.projectId);
-      if (preset.taskId) {
-        setTaskId(preset.taskId);
-      }
-      if (preset.activityId) setActivityId(preset.activityId);
-      if (preset.hours) setHours(preset.hours.toString());
-      if (preset.comments !== undefined) setComments(preset.comments);
+      if (preset.projectId) form.setFieldValue('projectId', preset.projectId);
+      if (preset.taskId) form.setFieldValue('taskId', preset.taskId);
+      if (preset.activityId) form.setFieldValue('activityId', preset.activityId);
+      if (preset.hours) form.setFieldValue('hours', preset.hours);
+      if (preset.comments !== undefined) form.setFieldValue('comments', preset.comments);
       if (preset.isBillable !== undefined) {
         const bId = localStorage.getItem('billableFieldId');
         if (bId) {
@@ -162,6 +155,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     const name = prompt("Enter a name for this preset (e.g. 'Standard Day'):");
     if (!name?.trim()) return;
 
+    const { projectId, taskId, activityId, hours, comments } = form.values;
     const project = allProjects.find(p => p.id.toString() === projectId);
     const task = tasks.find(t => t.id.toString() === taskId);
 
@@ -175,28 +169,27 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
       taskId,
       taskSubject: task?.subject || '',
       activityId,
-      hours: parseFloat(hours) || 0,
+      hours: typeof hours === 'string' ? parseFloat(hours) || 0 : hours,
       comments,
       isBillable: customFieldValues[Number(billableFieldId)] === '1',
     };
 
     savePreset(newPreset);
     setSelectedPresetId(newPreset.id);
-    showSuccess(`Preset "${name.trim()}" saved.`);
+    notifications.show({ title: 'Success', message: `Preset "${name.trim()}" saved.`, color: 'green' });
   };
 
   const handleDeletePreset = () => {
     const preset = presets.find(p => p.id === selectedPresetId);
     if (preset && confirm(`Delete preset "${preset.name}"?`)) {
-      deletePreset(selectedPresetId);
+      deletePreset(preset.id);
       setSelectedPresetId('');
-      showSuccess('Preset deleted.');
+      notifications.show({ title: 'Success', message: 'Preset deleted.', color: 'green' });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskId || !activityId || !hours || selectedDays.size === 0) return;
+  const handleSubmit = async (values: typeof form.values) => {
+    if (selectedDays.size === 0) return;
 
     setIsDeploying(true);
     setProgress(0);
@@ -205,7 +198,6 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     let successCount = 0;
     let failCount = 0;
 
-    // Build custom fields
     const payloadCustomFields = Object.entries(customFieldValues)
       .filter(([_, value]) => value !== '')
       .map(([id, value]) => ({
@@ -213,15 +205,17 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
         value: value,
       }));
 
+    const hoursNum = typeof values.hours === 'string' ? parseFloat(values.hours) : values.hours;
+
     for (const dateStr of days) {
       try {
         await createTimeEntry({
-          hours: parseFloat(hours),
-          comments,
-          activity_id: parseInt(activityId),
+          hours: hoursNum,
+          comments: values.comments.trim(),
+          activity_id: parseInt(values.activityId),
           spent_on: dateStr,
-          issue_id: parseInt(taskId),
-          project_id: projectId && projectId !== 'my_issues' ? parseInt(projectId) : undefined,
+          issue_id: parseInt(values.taskId),
+          project_id: values.projectId && values.projectId !== 'my_issues' ? parseInt(values.projectId) : undefined,
           ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
         });
         successCount++;
@@ -236,265 +230,241 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     setIsDeploying(false);
 
     if (failCount === 0) {
-      showSuccess(`Successfully logged time for ${successCount} day${successCount > 1 ? 's' : ''}.`);
+      notifications.show({ title: 'Success', message: `Successfully logged time for ${successCount} day${successCount > 1 ? 's' : ''}.`, color: 'green' });
     } else {
-      showError(`${successCount} succeeded, ${failCount} failed.`);
+      notifications.show({ title: 'Warning', message: `${successCount} succeeded, ${failCount} failed.`, color: 'orange' });
     }
 
     onSuccess();
   };
 
   return (
-    <Card
-      title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={20} className="text-primary" /> Bulk Log Time</div>}
-      headerAction={<span className={styles.badge}>{selectedDays.size} Days Selected</span>}
-      className={styles.bulkCard}
-    >
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '1rem' }}>
-        <Select
-          label="Load Preset"
-          value={selectedPresetId}
-          onChange={e => handleApplyPreset(e.target.value)}
-          fullWidth
-        >
-          <option value="">-- Choose preset --</option>
-          {presets.map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </Select>
-        <Button
-          variant="danger"
-          icon={Trash2}
-          onClick={handleDeletePreset}
-          disabled={!selectedPresetId || isDeploying}
-          title="Delete selected preset"
-          size="sm"
-          style={{ marginBottom: '0.25rem' }}
-        />
-      </div>
+    <Card shadow="sm" padding="lg" radius="md" withBorder>
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group justify="space-between">
+          <Group gap="xs">
+            <IconCheck size={20} color="var(--mantine-color-blue-filled)" />
+            <Text fw={600}>Bulk Log Time</Text>
+          </Group>
+          <Badge size="lg" color="blue">{selectedDays.size} Days Selected</Badge>
+        </Group>
+      </Card.Section>
 
-      <hr style={{ opacity: 0.1, marginBottom: '1rem' }} />
-
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.grid}>
+      <Stack gap="md" mt="md">
+        <Group align="flex-end">
           <Select
-            enableAutocomplete
-            label="Project"
-            placeholder="Search projects..."
-            items={projectOptions}
-            value={projectId}
-            displayValue={selectedProject?.label || ''}
-            onItemChange={handleProjectChange}
-            disabled={isDeploying}
-            fullWidth
-            required
+            label="Load Preset"
+            placeholder="-- Choose preset --"
+            value={selectedPresetId}
+            onChange={handleApplyPreset}
+            data={presets.map(p => ({ value: p.id, label: p.name }))}
+            style={{ flex: 1 }}
           />
+          <ActionIcon
+            variant="light"
+            color="red"
+            size="input-sm"
+            onClick={handleDeletePreset}
+            disabled={!selectedPresetId || isDeploying}
+          >
+            <IconTrash size={16} />
+          </ActionIcon>
+        </Group>
 
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
-              <Input
+        <Divider />
+
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Stack gap="md">
+            <Select
+              label="Project"
+              placeholder="Search projects..."
+              data={projectOptions}
+              searchable
+              disabled={isDeploying}
+              withAsterisk
+              {...form.getInputProps('projectId')}
+              onChange={(val) => {
+                form.setFieldValue('projectId', val || '');
+                if (!val) form.setFieldValue('taskId', '');
+                form.setFieldValue('activityId', '');
+              }}
+            />
+
+            <Group grow align="flex-start">
+              <TextInput
                 label="Task ID"
                 placeholder="Paste ID..."
-                value={taskId}
-                onChange={e => {
-                  setTaskId(e.target.value);
-                }}
+                {...form.getInputProps('taskId')}
                 onBlur={() => {
-                  if (taskId && taskId !== loadedTask?.id?.toString()) {
-                    handleQuickLoad(taskId);
+                  if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
+                    handleQuickLoad(form.values.taskId);
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (taskId) handleQuickLoad(taskId);
+                    if (form.values.taskId) handleQuickLoad(form.values.taskId);
                   }
                 }}
                 disabled={isLoadingIssue || isDeploying}
-                fullWidth
+                style={{ flex: 1 }}
               />
-            </div>
-            <div style={{ flex: '2 1 200px', minWidth: 0 }}>
               <Select
-                enableAutocomplete
                 label="Task Name"
                 placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-                items={taskOptions}
-                value={taskId}
-                displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
-                onItemChange={handleTaskChange}
+                data={taskOptions}
+                searchable
+                withAsterisk
                 disabled={isLoadingTasks || isDeploying}
-                loading={isLoadingTasks || isLoadingIssue}
-                fullWidth
-                required
+                {...form.getInputProps('taskId')}
+                onChange={handleTaskChange}
+                style={{ flex: 2 }}
               />
-            </div>
-          </div>
+            </Group>
 
-          <Select
-            label={isLoadingActivities ? 'Loading...' : 'Activity'}
-            value={activityId}
-            onChange={e => setActivityId(e.target.value)}
-            fullWidth
-            disabled={isLoadingActivities || isDeploying}
-            required
-          >
-            <option value="">-- Select activity --</option>
-            {activities.map(a => (
-              <option key={a.id} value={a.id.toString()}>{a.name}</option>
-            ))}
-          </Select>
+            <Group grow>
+              <Select
+                label="Activity"
+                placeholder={isLoadingActivities ? 'Loading...' : '-- Select activity --'}
+                data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
+                disabled={isLoadingActivities || isDeploying || !form.values.projectId}
+                withAsterisk
+                {...form.getInputProps('activityId')}
+              />
+              <NumberInput
+                label="Hours per day"
+                placeholder="e.g. 8"
+                min={0}
+                decimalScale={2}
+                step={0.5}
+                disabled={isDeploying}
+                withAsterisk
+                {...form.getInputProps('hours')}
+              />
+            </Group>
 
-          <Input
-            label="Hours per day"
-            type="number"
-            step="any"
-            min="0"
-            placeholder="e.g. 8"
-            value={hours}
-            onChange={e => setHours(e.target.value)}
-            disabled={isDeploying}
-            required
-            fullWidth
-          />
-        </div>
-
-        <Input
-          label="Comments"
-          placeholder="What did you work on?"
-          value={comments}
-          onChange={e => setComments(e.target.value)}
-          disabled={isDeploying}
-          fullWidth
-        />
-
-        {/* Dynamic Custom Fields */}
-        {customFields.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <ListTodo size={14} /> Custom Fields
-            </div>
-            <div className={styles.grid}>
-              {customFields.map(field => {
-                const value = customFieldValues[field.id] || '';
-                
-                const format = field.field_format || (field as any).format;
-                const isLikelyBool = format === 'bool' || 
-                                     format === 'boolean' ||
-                                     field.name.toLowerCase().includes('billable') ||
-                                     field.name.toLowerCase().includes('billing');
-
-                if (isLikelyBool) {
-                  return (
-                    <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={value === '1'}
-                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.checked ? '1' : '0' }))}
-                        disabled={isDeploying}
-                        style={{ width: '1rem', height: '1rem' }}
-                      />
-                      <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{field.name}</span>
-                    </label>
-                  );
-                }
-                
-                if (field.field_format === 'list' || field.field_format === 'user' || field.field_format === 'version') {
-                  return (
-                    <Select
-                      key={field.id}
-                      label={field.name}
-                      value={value}
-                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                      disabled={isDeploying}
-                      fullWidth
-                      required={field.is_required || field.required}
-                    >
-                      <option value="">-- Select {field.name} --</option>
-                      {field.possible_values?.map(v => (
-                        <option key={v} value={v}>{v}</option>
-                      ))}
-                    </Select>
-                  );
-                }
-
-                if (field.field_format === 'text') {
-                  return (
-                    <div key={field.id} style={{ gridColumn: '1 / -1' }}>
-                      <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.375rem', fontSize: '0.875rem' }}>
-                        {field.name}{field.is_required ? ' *' : ''}
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={value}
-                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                        disabled={isDeploying}
-                        required={field.is_required || field.required}
-                        style={{
-                          width: '100%',
-                          padding: '0.625rem',
-                          borderRadius: '0.5rem',
-                          border: '1px solid var(--border-color)',
-                          background: 'var(--surface-color)',
-                          color: 'inherit',
-                          fontFamily: 'inherit',
-                          fontSize: '0.875rem',
-                          resize: 'vertical',
-                        }}
-                      />
-                    </div>
-                  );
-                }
-
-                const inputType = 
-                  field.field_format === 'int' ? 'number' :
-                  field.field_format === 'float' ? 'number' :
-                  field.field_format === 'date' ? 'date' : 'text';
-
-                return (
-                  <Input
-                    key={field.id}
-                    label={field.name}
-                    type={inputType}
-                    step={field.field_format === 'float' ? 'any' : undefined}
-                    value={value}
-                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                    disabled={isDeploying}
-                    fullWidth
-                    required={field.is_required || field.required}
-                    placeholder={`Enter ${field.name.toLowerCase()}...`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {isDeploying && (
-          <div className={styles.progressContainer}>
-            <div className={styles.progressBar} style={{ width: `${progress}%` }} />
-            <span className={styles.progressText}>Logging {progress}%...</span>
-          </div>
-        )}
-
-        <div className={styles.actions}>
-          <div style={{ marginRight: 'auto' }}>
-            <Button
-              variant="ghost"
-              icon={Plus}
-              onClick={handleSavePreset}
+            <TextInput
+              label="Comments"
+              placeholder="What did you work on?"
               disabled={isDeploying}
-              type="button"
-            >
-              Save Preset
-            </Button>
-          </div>
-          <Button variant="ghost" onClick={onCancel} disabled={isDeploying} type="button">Cancel</Button>
-          <Button variant="primary" icon={Send} type="submit" disabled={isDeploying || !taskId || !activityId || !hours}>
-            {isDeploying ? 'Deploying...' : `Submit across ${selectedDays.size} days`}
-          </Button>
-        </div>
-      </form>
+              {...form.getInputProps('comments')}
+            />
+
+            {/* Dynamic Custom Fields */}
+            {customFields.length > 0 && (
+              <Stack gap="sm" pt="xs">
+                <Group gap="xs">
+                  <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
+                  <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
+                </Group>
+                <Group grow>
+                  {customFields.map(field => {
+                    const value = customFieldValues[field.id] || '';
+                    const format = field.field_format || (field as any).format;
+                    const isLikelyBool = format === 'bool' || 
+                                         format === 'boolean' ||
+                                         field.name.toLowerCase().includes('billable') ||
+                                         field.name.toLowerCase().includes('billing');
+
+                    if (isLikelyBool) {
+                      return (
+                        <Checkbox
+                          key={field.id}
+                          label={field.name}
+                          checked={value === '1'}
+                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
+                          disabled={isDeploying}
+                        />
+                      );
+                    }
+                    
+                    if (format === 'list' || format === 'user' || format === 'version') {
+                      return (
+                        <Select
+                          key={field.id}
+                          label={field.name}
+                          placeholder={`-- Select ${field.name} --`}
+                          value={value}
+                          onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
+                          data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
+                          required={field.is_required || field.required}
+                          disabled={isDeploying}
+                        />
+                      );
+                    }
+
+                    if (format === 'text') {
+                      return (
+                        <Textarea
+                          key={field.id}
+                          label={field.name}
+                          value={value}
+                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                          required={field.is_required || field.required}
+                          minRows={2}
+                          autosize
+                          disabled={isDeploying}
+                          style={{ flex: '1 1 100%' }}
+                        />
+                      );
+                    }
+
+                    if (format === 'int' || format === 'float') {
+                      return (
+                        <NumberInput
+                          key={field.id}
+                          label={field.name}
+                          value={value ? parseFloat(value) : ''}
+                          onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
+                          required={field.is_required || field.required}
+                          decimalScale={format === 'float' ? 2 : 0}
+                          disabled={isDeploying}
+                        />
+                      );
+                    }
+
+                    return (
+                      <TextInput
+                        key={field.id}
+                        label={field.name}
+                        value={value}
+                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                        required={field.is_required || field.required}
+                        type={format === 'date' ? 'date' : 'text'}
+                        disabled={isDeploying}
+                      />
+                    );
+                  })}
+                </Group>
+              </Stack>
+            )}
+
+            {isDeploying && (
+              <Stack gap={4} mt="sm">
+                <Progress value={progress} size="xl" striped animated />
+                <Text size="sm" c="dimmed" ta="center">Logging {progress}%...</Text>
+              </Stack>
+            )}
+
+            <Group justify="space-between" mt="md">
+              <Button
+                variant="subtle"
+                leftSection={<IconCirclePlus size={16} />}
+                onClick={handleSavePreset}
+                disabled={isDeploying}
+              >
+                Save Preset
+              </Button>
+              <Group>
+                <Button variant="default" onClick={onCancel} disabled={isDeploying}>Cancel</Button>
+                <Button type="submit" leftSection={<IconSend size={16} />} loading={isDeploying}>
+                  {isDeploying ? 'Deploying...' : `Submit across ${selectedDays.size} days`}
+                </Button>
+              </Group>
+            </Group>
+          </Stack>
+        </form>
+      </Stack>
     </Card>
   );
 };

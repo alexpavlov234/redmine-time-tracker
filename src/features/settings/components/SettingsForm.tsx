@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
-import { Card, Input, Button } from '../../../components/ui';
+import { Card, TextInput, PasswordInput, Button, Group, Stack, Alert, Title } from '@mantine/core';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { useToast } from '../../../contexts/ToastContext';
-import styles from './SettingsForm.module.scss';
-import { Settings, Save, Link2 } from 'lucide-react';
+import { notifications } from '@mantine/notifications';
+import { IconSettings, IconDeviceFloppy, IconLink } from '@tabler/icons-react';
 import { getCurrentUser, detectBillableField } from '../../../services/redmine';
 
 export const SettingsForm: React.FC = () => {
   const { apiKey, redmineUrl, setApiKey, setRedmineUrl } = useSettings();
-  const { showSuccess, showError, showInfo } = useToast();
 
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localUrl, setLocalUrl] = useState(redmineUrl);
@@ -20,7 +18,7 @@ export const SettingsForm: React.FC = () => {
     setApiKey(localApiKey.trim());
     setRedmineUrl(localUrl.trim().replace(/\/$/, ''));
     setTestResult({ success: true, message: 'Settings saved. Projects will refresh automatically.' });
-    showSuccess('Settings saved!');
+    notifications.show({ title: 'Success', message: 'Settings saved!', color: 'green' });
   };
 
   const handleTest = async () => {
@@ -37,61 +35,64 @@ export const SettingsForm: React.FC = () => {
         success: true,
         message: `Connection successful! Logged in as: ${user.firstname} ${user.lastname}`,
       });
-      showSuccess(`Connected as ${user.firstname} ${user.lastname}`);
+      notifications.show({ title: 'Success', message: `Connected as ${user.firstname} ${user.lastname}`, color: 'green' });
 
       // Auto-detect billable field
       const bf = await detectBillableField();
       if (bf) {
-        showInfo(`Auto-detected billable field: "${bf.name}" (ID: ${bf.id})`);
+        notifications.show({ message: `Auto-detected billable field: "${bf.name}" (ID: ${bf.id})`, color: 'blue' });
       }
     } catch (err: any) {
       setTestResult({
         success: false,
         message: err.message || 'Failed to connect.',
       });
-      showError(err.message || 'Connection failed.');
+      notifications.show({ title: 'Error', message: err.message || 'Connection failed.', color: 'red' });
     } finally {
       setIsTesting(false);
     }
   };
 
   return (
-    <Card
-      title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Settings size={20} style={{ color: 'var(--color-primary)' }} /> Redmine Configuration</div>}
-      className={styles.settingsCard}
-    >
-      <div className={styles.formContainer}>
-        <Input
+    <Card shadow="sm" padding="lg" radius="md" withBorder>
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group gap="xs">
+          <IconSettings size={20} />
+          <Title order={4}>Redmine Configuration</Title>
+        </Group>
+      </Card.Section>
+
+      <Stack mt="md">
+        <TextInput
           label="Redmine URL"
           placeholder="https://your-redmine-instance.com"
           value={localUrl}
           onChange={(e) => setLocalUrl(e.target.value)}
-          fullWidth
+          w="100%"
         />
-        <Input
+        <PasswordInput
           label="API Access Key"
-          type="password"
           placeholder="Your personal Redmine API Key"
           value={localApiKey}
           onChange={(e) => setLocalApiKey(e.target.value)}
-          fullWidth
+          w="100%"
         />
 
         {testResult && (
-          <div className={`${styles.alert} ${testResult.success ? styles.alertSuccess : styles.alertError}`}>
+          <Alert color={testResult.success ? 'green' : 'red'}>
             {testResult.message}
-          </div>
+          </Alert>
         )}
 
-        <div className={styles.actions}>
-          <Button icon={Save} onClick={handleSave} variant="primary">
+        <Group mt="md">
+          <Button leftSection={<IconDeviceFloppy size={16} />} onClick={handleSave}>
             Save Settings
           </Button>
-          <Button icon={Link2} onClick={handleTest} variant="secondary" isLoading={isTesting}>
+          <Button leftSection={<IconLink size={16} />} onClick={handleTest} variant="light" loading={isTesting}>
             Test Connection
           </Button>
-        </div>
-      </div>
+        </Group>
+      </Stack>
     </Card>
   );
 };

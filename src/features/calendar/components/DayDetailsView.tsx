@@ -1,8 +1,7 @@
 import React from 'react';
 import type { TimeEntry } from '../../../types';
-import { Card, Button } from '../../../components/ui';
-import styles from './DayDetailsView.module.scss';
-import { Clock, Edit2, Trash2, Plus } from 'lucide-react';
+import { Card, Button, Group, Text, Progress, Stack, ActionIcon, Badge, Paper } from '@mantine/core';
+import { IconClock, IconEdit, IconTrash, IconPlus } from '@tabler/icons-react';
 
 interface DayDetailsViewProps {
   dateStr: string;
@@ -31,7 +30,6 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
 
   const totalHours = entries.reduce((sum, e) => sum + e.hours, 0);
 
-  // Group entries by project for summary
   const projectSummary = entries.reduce<Record<string, number>>((acc, e) => {
     const name = e.project?.name || 'Unknown';
     acc[name] = (acc[name] || 0) + e.hours;
@@ -39,86 +37,74 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
   }, {});
 
   return (
-    <Card
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Clock size={20} className="text-primary" />
-          {formattedDate}
-        </div>
-      }
-      headerAction={<span className={styles.badge}>{totalHours.toFixed(1)}h Total</span>}
-      className={styles.detailsCard}
-    >
-      {/* Project summary stats */}
-      {Object.keys(projectSummary).length > 0 && (
-        <div className={styles.projectSummaryStats}>
-          {Object.entries(projectSummary).map(([name, hours]) => {
-            const percentage = totalHours > 0 ? (hours / totalHours) * 100 : 0;
-            return (
-              <div key={name} className={styles.projectStatItem}>
-                <div className={styles.projectStatHeader}>
-                  <span className={styles.projectStatName}>{name}</span>
-                  <span className={styles.projectStatHours}>{hours.toFixed(1)}h</span>
-                </div>
-                <div className={styles.projectProgressBar}>
-                  <div 
-                    className={styles.projectProgressFill} 
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <Card shadow="sm" padding="lg" radius="md" withBorder>
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group justify="space-between">
+          <Group gap="xs">
+            <IconClock size={20} color="var(--mantine-color-blue-filled)" />
+            <Text fw={600}>{formattedDate}</Text>
+          </Group>
+          <Badge size="lg" color="blue">{totalHours.toFixed(1)}h Total</Badge>
+        </Group>
+      </Card.Section>
 
-      {entries.length === 0 ? (
-        <div className={styles.emptyState}>No time logged on this day.</div>
-      ) : (
-        <ul className={styles.entryList}>
-          {entries.map((entry) => (
-            <li key={entry.id} className={styles.entryItem}>
-              <div className={styles.content}>
-                <div className={styles.header}>
-                  <span className={styles.project}>{entry.project?.name || 'Unknown Project'}</span>
-                  <span className={styles.hours}>{entry.hours}h</span>
+      <Stack gap="md" mt="md">
+        {Object.keys(projectSummary).length > 0 && (
+          <Stack gap="sm">
+            {Object.entries(projectSummary).map(([name, hours]) => {
+              const percentage = totalHours > 0 ? (hours / totalHours) * 100 : 0;
+              return (
+                <div key={name}>
+                  <Group justify="space-between" mb={4}>
+                    <Text size="sm" fw={500}>{name}</Text>
+                    <Text size="sm" c="dimmed">{hours.toFixed(1)}h</Text>
+                  </Group>
+                  <Progress value={percentage} color="blue" size="sm" />
                 </div>
-                <div className={styles.issue}>
-                  #{entry.issue?.id} - {entry.issue?.subject || 'Unknown Task'}
-                </div>
-                {entry.comments && <div className={styles.comments}>{entry.comments}</div>}
-                <div className={styles.meta}>Activity: {entry.activity?.name || 'General'}</div>
-              </div>
-              <div className={styles.actions}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={Edit2}
-                  onClick={() => onEdit(entry)}
-                  aria-label="Edit entry"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={Trash2}
-                  onClick={() => onDelete(entry.id)}
-                  aria-label="Delete entry"
-                  className={styles.deleteBtn}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+              );
+            })}
+          </Stack>
+        )}
 
-      <div className={styles.footer}>
-        <Button variant="secondary" onClick={onClose}>
-          Close Details
-        </Button>
-        <Button variant="primary" icon={Plus} onClick={() => onAdd(dateStr)}>
-          Log Time Here
-        </Button>
-      </div>
+        {entries.length === 0 ? (
+          <Text c="dimmed" ta="center" py="xl">No time logged on this day.</Text>
+        ) : (
+          <Stack gap="sm">
+            {entries.map((entry) => (
+              <Paper key={entry.id} withBorder p="sm" radius="md">
+                <Group justify="space-between" align="flex-start" wrap="nowrap">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Group justify="space-between" mb={4}>
+                      <Text size="sm" fw={600} truncate>{entry.project?.name || 'Unknown Project'}</Text>
+                      <Badge variant="light">{entry.hours}h</Badge>
+                    </Group>
+                    <Text size="sm" c="dimmed" truncate>#{entry.issue?.id} - {entry.issue?.subject || 'Unknown Task'}</Text>
+                    {entry.comments && <Text size="sm" mt="xs" style={{ whiteSpace: 'pre-wrap' }}>{entry.comments}</Text>}
+                    <Text size="xs" c="dimmed" mt="xs">Activity: {entry.activity?.name || 'General'}</Text>
+                  </div>
+                  <Stack gap="xs" style={{ flexShrink: 0 }}>
+                    <ActionIcon variant="light" onClick={() => onEdit(entry)} aria-label="Edit entry">
+                      <IconEdit size={16} />
+                    </ActionIcon>
+                    <ActionIcon variant="light" color="red" onClick={() => onDelete(entry.id)} aria-label="Delete entry">
+                      <IconTrash size={16} />
+                    </ActionIcon>
+                  </Stack>
+                </Group>
+              </Paper>
+            ))}
+          </Stack>
+        )}
+
+        <Group justify="space-between" mt="md">
+          <Button variant="default" onClick={onClose}>
+            Close
+          </Button>
+          <Button leftSection={<IconPlus size={16} />} onClick={() => onAdd(dateStr)}>
+            Log Time Here
+          </Button>
+        </Group>
+      </Stack>
     </Card>
   );
 };

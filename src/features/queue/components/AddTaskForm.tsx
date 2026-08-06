@@ -1,78 +1,61 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Select, Input, Button, type SelectItem } from '../../../components/ui';
+import { Card, Select, TextInput, Button, Group, Stack, ActionIcon, Text } from '@mantine/core';
+import { useForm } from '@mantine/form';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { getIssue } from '../../../services/redmine';
 import type { RedmineIssue } from '../../../types';
-import styles from './AddTaskForm.module.scss';
-import { PlusCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { IconCirclePlus, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 
 export const AddTaskForm: React.FC = () => {
   const { addTodo } = useQueue();
   const { allProjects } = useProjects();
-  const [projectId, setProjectId] = useState('');
-  const [taskId, setTaskId] = useState('');
-  const [activityId, setActivityId] = useState('');
-  const [note, setNote] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
 
   const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
 
-  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
-  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
+  const form = useForm({
+    initialValues: {
+      projectId: '',
+      taskId: '',
+      activityId: '',
+      note: '',
+    },
+    validate: {
+      projectId: (value) => (value ? null : 'Project is required'),
+      taskId: (value) => (value ? null : 'Task is required'),
+    },
+  });
 
-  const projectOptions = useMemo((): SelectItem[] => {
-    const options: SelectItem[] = [
-      { id: 'my_issues', label: '--- My Assigned Issues ---' }
+  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(form.values.projectId || null);
+  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(form.values.projectId || null);
+
+  const projectOptions = useMemo(() => {
+    return [
+      { value: 'my_issues', label: '--- My Assigned Issues ---' },
+      ...allProjects.map(p => ({
+        value: p.id.toString(),
+        label: p.name,
+      }))
     ];
-    return [...options, ...allProjects.map(p => ({
-      id: p.id.toString(),
-      label: p.name,
-      sublabel: `ID: ${p.id}`
-    }))];
   }, [allProjects]);
 
-  const taskOptions = useMemo((): SelectItem[] => {
+  const taskOptions = useMemo(() => {
     const options = tasks.map(t => ({
-      id: t.id.toString(),
+      value: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
-      sublabel: t.project?.name
     }));
-    if (loadedTask && !options.some(o => o.id === loadedTask.id.toString())) {
+    if (loadedTask && !options.some(o => o.value === loadedTask.id.toString())) {
       options.push({
-        id: loadedTask.id.toString(),
+        value: loadedTask.id.toString(),
         label: `#${loadedTask.id} - ${loadedTask.subject}`,
-        sublabel: loadedTask.project?.name
       });
     }
     return options;
   }, [tasks, loadedTask]);
-
-  const selectedProject = projectOptions.find(p => p.id === projectId);
-  const selectedTask = taskOptions.find(t => t.id === taskId);
-
-  const handleProjectChange = (item: SelectItem | null) => {
-    setProjectId(item?.id.toString() || '');
-    if (!item) {
-      setTaskId('');
-    }
-    setActivityId('');
-  };
-
-  const handleTaskChange = (item: SelectItem | null) => {
-    const newTaskId = item?.id.toString() || '';
-    setTaskId(newTaskId);
-    
-    if (item && !projectId) {
-      const task = tasks.find(t => t.id.toString() === item.id) || (loadedTask?.id.toString() === item.id ? loadedTask : null);
-      if (task?.project?.id) {
-        setProjectId(task.project.id.toString());
-      }
-    }
-  };
 
   const handleQuickLoad = async (id: string) => {
     if (!id) return;
@@ -81,9 +64,9 @@ export const AddTaskForm: React.FC = () => {
       const cleanId = id.replace(/^#/, '').trim();
       const issue = await getIssue(parseInt(cleanId, 10));
       setLoadedTask(issue);
-      setTaskId(issue.id.toString());
+      form.setFieldValue('taskId', issue.id.toString());
       if (issue.project) {
-        setProjectId(issue.project.id.toString());
+        form.setFieldValue('projectId', issue.project.id.toString());
       }
     } catch (error: any) {
       // ignore
@@ -92,9 +75,20 @@ export const AddTaskForm: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!projectId || !taskId) return;
+  const handleTaskSelect = (val: string | null) => {
+    const newTaskId = val || '';
+    form.setFieldValue('taskId', newTaskId);
+    
+    if (val && !form.values.projectId) {
+      const task = tasks.find(t => t.id.toString() === val) || (loadedTask?.id.toString() === val ? loadedTask : null);
+      if (task?.project?.id) {
+        form.setFieldValue('projectId', task.project.id.toString());
+      }
+    }
+  };
+
+  const handleSubmit = (values: typeof form.values) => {
+    const { projectId, taskId, activityId, note } = values;
 
     const project = allProjects.find(p => p.id.toString() === projectId);
     const issue = tasks.find(t => t.id.toString() === taskId) || (loadedTask?.id.toString() === taskId ? loadedTask : null);
@@ -105,115 +99,99 @@ export const AddTaskForm: React.FC = () => {
       projectName: project?.name || (projectId === 'my_issues' ? 'My Issues' : `Project ${projectId}`),
       taskId,
       taskSubject: issue?.subject || `Task ${taskId}`,
-      activityId: activity?.id,
+      activityId: activity?.id ? Number(activity.id) : undefined,
       activityName: activity?.name,
       note,
     });
 
-    setProjectId('');
-    setTaskId('');
-    setActivityId('');
-    setNote('');
+    form.reset();
   };
 
   return (
-    <Card
-      title={
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' }}
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          <PlusCircle size={20} className="text-primary" />
-          Add Task Manually
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </div>
-      }
-      className={styles.addCard}
-    >
+    <Card shadow="sm" padding="lg" radius="md" withBorder>
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group justify="space-between" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setIsExpanded(!isExpanded)}>
+          <Group gap="xs">
+            <IconCirclePlus size={20} />
+            <Text fw={500}>Add Task Manually</Text>
+          </Group>
+          <ActionIcon variant="subtle" color="gray">
+            {isExpanded ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+          </ActionIcon>
+        </Group>
+      </Card.Section>
+
       {isExpanded && (
-        <form onSubmit={handleSubmit} className={styles.formContainer}>
-          <div className={styles.grid}>
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Stack gap="md">
             <Select
-              enableAutocomplete
               label="Project"
               placeholder="Search projects..."
-              items={projectOptions}
-              value={projectId}
-              displayValue={selectedProject?.label || ''}
-              onItemChange={handleProjectChange}
-              fullWidth
-              required
+              data={projectOptions}
+              searchable
+              withAsterisk
+              {...form.getInputProps('projectId')}
+              onChange={(val) => {
+                form.setFieldValue('projectId', val || '');
+                if (!val) form.setFieldValue('taskId', '');
+                form.setFieldValue('activityId', '');
+              }}
             />
 
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
-              <Input
+            <Group grow align="flex-start">
+              <TextInput
                 label="Task ID"
                 placeholder="Paste ID..."
-                value={taskId}
-                onChange={e => {
-                  setTaskId(e.target.value);
-                }}
+                {...form.getInputProps('taskId')}
                 onBlur={() => {
-                  if (taskId && taskId !== loadedTask?.id?.toString()) {
-                    handleQuickLoad(taskId);
+                  if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
+                    handleQuickLoad(form.values.taskId);
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (taskId) handleQuickLoad(taskId);
+                    if (form.values.taskId) handleQuickLoad(form.values.taskId);
                   }
                 }}
                 disabled={isLoadingIssue}
-                fullWidth
+                style={{ flex: 1 }}
               />
-            </div>
-            <div style={{ flex: '2 1 200px', minWidth: 0 }}>
               <Select
-                enableAutocomplete
                 label="Task Name"
                 placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-                items={taskOptions}
-                value={taskId}
-                displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
-                onItemChange={handleTaskChange}
+                data={taskOptions}
+                searchable
+                withAsterisk
                 disabled={isLoadingTasks}
-                loading={isLoadingTasks || isLoadingIssue}
-                fullWidth
-                required
+                {...form.getInputProps('taskId')}
+                onChange={handleTaskSelect}
+                style={{ flex: 2 }}
               />
-            </div>
-          </div>
+            </Group>
 
             <Select
-              label={isLoadingActivities ? 'Loading activities...' : 'Activity'}
-              value={activityId}
-              onChange={(e) => setActivityId(e.target.value)}
-              fullWidth
-              disabled={isLoadingActivities || !projectId}
-            >
-              <option value="">-- Select activity (optional) --</option>
-              {activities.map(a => (
-                <option key={a.id} value={a.id.toString()}>{a.name}</option>
-              ))}
-            </Select>
-          </div>
+              label="Activity"
+              placeholder={isLoadingActivities ? 'Loading activities...' : '-- Select activity (optional) --'}
+              data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
+              disabled={isLoadingActivities || !form.values.projectId}
+              {...form.getInputProps('activityId')}
+            />
 
-          <Input
-            label="Note (optional)"
-            placeholder="Add a personal note..."
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            fullWidth
-          />
+            <TextInput
+              label="Note (optional)"
+              placeholder="Add a personal note..."
+              {...form.getInputProps('note')}
+            />
 
-          <Button type="submit" variant="primary" disabled={!projectId || !taskId || isLoadingTasks}>
-            Add to Queue
-          </Button>
+            <Group justify="flex-end">
+              <Button type="submit" disabled={!form.values.projectId || !form.values.taskId || isLoadingTasks}>
+                Add to Queue
+              </Button>
+            </Group>
+          </Stack>
         </form>
       )}
     </Card>
   );
 };
-

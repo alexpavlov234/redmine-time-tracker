@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { Button } from '../../../components/ui';
-import { Calendar as CalendarIcon, RefreshCw, CheckSquare, XSquare } from 'lucide-react';
-import styles from './LoggedTimeDashboard.module.scss';
+import { Button, Group, Title, ActionIcon, Stack } from '@mantine/core';
+import { IconCalendar, IconRefresh, IconChecklist, IconSquareX } from '@tabler/icons-react';
 import { useCalendarEntries } from '../hooks/useCalendarEntries';
 import { CalendarGrid } from './CalendarGrid';
 import { DayDetailsView } from './DayDetailsView';
 import { BulkLogForm } from './BulkLogForm';
 import { TimeEntryFormModal } from './TimeEntryFormModal';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { useToast } from '../../../contexts/ToastContext';
 import { deleteTimeEntry } from '../../../services/redmine';
 import type { TimeEntry } from '../../../types';
+import { notifications } from '@mantine/notifications';
 
 export const LoggedTimeDashboard: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -25,7 +24,6 @@ export const LoggedTimeDashboard: React.FC = () => {
 
   const { entriesByDate, isLoading, refetch } = useCalendarEntries(currentMonth);
   const confirm = useConfirm();
-  const { showSuccess, showError } = useToast();
 
   const handlePrevMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -84,10 +82,10 @@ export const LoggedTimeDashboard: React.FC = () => {
 
     try {
       await deleteTimeEntry(entryId);
-      showSuccess('Time entry deleted.');
+      notifications.show({ title: 'Success', message: 'Time entry deleted.', color: 'green' });
       refetch();
     } catch (err: any) {
-      showError(err.message || 'Failed to delete time entry.');
+      notifications.show({ title: 'Error', message: err.message || 'Failed to delete time entry.', color: 'red' });
     }
   };
 
@@ -105,59 +103,64 @@ export const LoggedTimeDashboard: React.FC = () => {
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.topActions}>
-        <h2 className={styles.pageTitle}>
-          <CalendarIcon size={24} className="text-primary" />
-          Calendar Log
-        </h2>
+    <Stack gap="lg">
+      <Group justify="space-between">
+        <Group gap="xs">
+          <IconCalendar size={28} color="var(--mantine-color-blue-filled)" />
+          <Title order={2}>Calendar Log</Title>
+        </Group>
 
-        <div className={styles.toolbar}>
+        <Group>
           <Button
             size="sm"
-            variant={isMultiSelectMode ? 'primary' : 'secondary'}
-            icon={isMultiSelectMode ? XSquare : CheckSquare}
+            variant={isMultiSelectMode ? 'filled' : 'light'}
+            leftSection={isMultiSelectMode ? <IconSquareX size={16} /> : <IconChecklist size={16} />}
             onClick={toggleMultiSelectMode}
           >
             {isMultiSelectMode ? 'Cancel Multi-Select' : 'Select Multiple Days'}
           </Button>
 
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={RefreshCw}
+          <ActionIcon
+            size="lg"
+            variant="light"
             onClick={refetch}
-            isLoading={isLoading}
+            loading={isLoading}
             aria-label="Refresh calendar"
+          >
+            <IconRefresh size={20} />
+          </ActionIcon>
+        </Group>
+      </Group>
+
+      <Group align="flex-start" wrap="nowrap" style={{ gap: '1.5rem' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <CalendarGrid
+            currentMonth={currentMonth}
+            onPrevMonth={handlePrevMonth}
+            onNextMonth={handleNextMonth}
+            entriesByDate={entriesByDate}
+            selectedDays={isMultiSelectMode ? selectedDays : new Set(activeDayStr ? [activeDayStr] : [])}
+            onDayClick={handleDayClick}
+            isLoading={isLoading}
+            isMultiSelectMode={isMultiSelectMode}
           />
         </div>
-      </div>
-
-      <div className={styles.grid}>
-        <CalendarGrid
-          currentMonth={currentMonth}
-          onPrevMonth={handlePrevMonth}
-          onNextMonth={handleNextMonth}
-          entriesByDate={entriesByDate}
-          selectedDays={isMultiSelectMode ? selectedDays : new Set(activeDayStr ? [activeDayStr] : [])}
-          onDayClick={handleDayClick}
-          isLoading={isLoading}
-          isMultiSelectMode={isMultiSelectMode}
-        />
 
         {!isMultiSelectMode && activeDayStr && (
-          <DayDetailsView
-            dateStr={activeDayStr}
-            entries={entriesByDate[activeDayStr] || []}
-            onClose={() => setActiveDayStr(null)}
-            onEdit={handleEditEntry}
-            onDelete={handleDeleteEntry}
-            onAdd={handleAddEntry}
-          />
+          <div style={{ width: '350px', flexShrink: 0 }}>
+            <DayDetailsView
+              dateStr={activeDayStr}
+              entries={entriesByDate[activeDayStr] || []}
+              onClose={() => setActiveDayStr(null)}
+              onEdit={handleEditEntry}
+              onDelete={handleDeleteEntry}
+              onAdd={handleAddEntry}
+            />
+          </div>
         )}
 
         {isMultiSelectMode && selectedDays.size > 0 && (
-          <div className={styles.bulkFormContainer}>
+          <div style={{ width: '400px', flexShrink: 0 }}>
             <BulkLogForm
               selectedDays={selectedDays}
               onSuccess={handleBulkSuccess}
@@ -165,9 +168,8 @@ export const LoggedTimeDashboard: React.FC = () => {
             />
           </div>
         )}
-      </div>
+      </Group>
 
-      {/* Time Entry Form Modal (Edit / Add) */}
       <TimeEntryFormModal
         isOpen={isFormModalOpen}
         onClose={() => { setIsFormModalOpen(false); setEditingEntry(null); setAddForDate(undefined); }}
@@ -175,6 +177,6 @@ export const LoggedTimeDashboard: React.FC = () => {
         editEntry={editingEntry}
         defaultDate={addForDate}
       />
-    </div>
+    </Stack>
   );
 };

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Select, Input } from '../../../components/ui';
+import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert } from '@mantine/core';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { useProjects } from '../../../contexts/ProjectsContext';
-import { useToast } from '../../../contexts/ToastContext';
+import { notifications } from '@mantine/notifications';
 import { redmineApiRequest } from '../../../services/redmine';
 import { formatTime } from '../../../utils/formatters';
-import { Send, CheckCircle, ListTodo } from 'lucide-react';
+import { IconSend, IconCheck, IconListCheck } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 
 interface SummaryModalProps {
@@ -19,19 +19,18 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
   const { } = useQueue();
   const { issueStatuses, setIssueStatuses } = useProjects();
-  const { showSuccess, showError } = useToast();
 
   const projectId = activeTodo?.projectId || '';
   const { activities: projectActivities, defaultActivityId } = useActivitiesForProject(projectId || null);
 
   const [comments, setComments] = useState('');
-  const [activityId, setActivityId] = useState('');
+  const [activityId, setActivityId] = useState<string | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [changeStatus, setChangeStatus] = useState(false);
-  const [statusId, setStatusId] = useState('');
+  const [statusId, setStatusId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [manualHours, setManualHours] = useState('');
+  const [manualHours, setManualHours] = useState<number | string>(0);
 
   const { customFields } = useCustomFields();
   const billableFieldId = localStorage.getItem('billableFieldId');
@@ -47,7 +46,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       setComments(detailsText);
       setSubmitResult(null);
       setChangeStatus(false);
-      setStatusId('');
+      setStatusId(null);
       setIsSubmitting(false);
 
       const rawHours = totalElapsedTime / 3600;
@@ -58,7 +57,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
         hoursCalc = Math.ceil(rawHours * 20) / 20;
         hoursCalc = Math.max(0.1, hoursCalc);
       }
-      setManualHours(parseFloat(hoursCalc.toFixed(2)).toString());
+      setManualHours(parseFloat(hoursCalc.toFixed(2)));
 
       // Set activity from todo or default
       if (activeTodo?.activityId) {
@@ -100,18 +99,18 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   const handleSubmit = async () => {
     const issueId = activeTodo?.taskId;
     if (!issueId) {
-      showError('No issue selected.');
+      notifications.show({ title: 'Error', message: 'No issue selected.', color: 'red' });
       return;
     }
 
     if (!activityId) {
-      showError('Please select an activity.');
+      notifications.show({ title: 'Error', message: 'Please select an activity.', color: 'red' });
       return;
     }
 
-    const hoursFormatted = parseFloat(manualHours);
+    const hoursFormatted = typeof manualHours === 'string' ? parseFloat(manualHours) : manualHours;
     if (isNaN(hoursFormatted) || hoursFormatted <= 0) {
-      showError('Please enter a valid number of hours.');
+      notifications.show({ title: 'Error', message: 'Please enter a valid number of hours.', color: 'red' });
       return;
     }
 
@@ -148,12 +147,12 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
             issue: { status_id: statusId },
           });
         } catch {
-          showError('Time entry submitted, but status update failed.');
+          notifications.show({ title: 'Error', message: 'Time entry submitted, but status update failed.', color: 'red' });
         }
       }
 
       setSubmitResult({ success: true, message: 'Time entry submitted successfully!' });
-      showSuccess('Time entry submitted!');
+      notifications.show({ title: 'Success', message: 'Time entry submitted!', color: 'green' });
 
       // Auto-close & advance queue
       setTimeout(() => {
@@ -162,7 +161,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       }, 800);
     } catch (err: any) {
       setSubmitResult({ success: false, message: err.message || 'Failed to submit.' });
-      showError('Failed to submit time entry.');
+      notifications.show({ title: 'Error', message: 'Failed to submit time entry.', color: 'red' });
     } finally {
       setIsSubmitting(false);
     }
@@ -170,103 +169,63 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
   return (
     <Modal
-      isOpen={isOpen}
+      opened={isOpen}
       onClose={onClose}
-      title="Submit Time Entry"
-      footer={
-        <Button
-          variant="primary"
-          icon={submitResult?.success ? CheckCircle : Send}
-          onClick={handleSubmit}
-          disabled={isSubmitting || submitResult?.success}
-          isLoading={isSubmitting}
-        >
-          {submitResult?.success ? 'Submitted!' : 'Submit to Redmine'}
-        </Button>
-      }
+      title={<Text fw={600}>Submit Time Entry</Text>}
+      size="md"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <Stack gap="md">
         {/* Total Time */}
-        <div style={{
-          textAlign: 'center',
-          padding: '1rem',
-          borderRadius: '0.75rem',
-          background: 'var(--surface-color)',
-        }}>
-          <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', opacity: 0.6, marginBottom: '0.5rem' }}>Logged Time (Hours)</div>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <Input
-              type="number"
-              step="any"
-              min="0.1"
-              value={manualHours}
-              onChange={(e) => setManualHours(e.target.value)}
-              style={{ fontSize: '1.5rem', fontWeight: 700, textAlign: 'center', width: '120px' }}
-              fullWidth={false}
-            />
-          </div>
-          <div style={{ fontSize: '0.75rem', opacity: 0.5, marginTop: '0.5rem' }}>
-            Timer recorded: {formatTime(totalElapsedTime)}
-          </div>
-        </div>
+        <Stack align="center" gap="xs" p="md" bg="var(--mantine-color-default)" style={{ borderRadius: 'var(--mantine-radius-md)' }}>
+          <Text size="xs" tt="uppercase" c="dimmed" fw={600}>Logged Time (Hours)</Text>
+          <NumberInput
+            value={manualHours}
+            onChange={setManualHours}
+            decimalScale={2}
+            step={0.1}
+            min={0.1}
+            size="xl"
+            styles={{ input: { textAlign: 'center', fontWeight: 700 } }}
+            w={120}
+          />
+          <Text size="xs" c="dimmed">Timer recorded: {formatTime(totalElapsedTime)}</Text>
+        </Stack>
 
         {/* Task info */}
         {activeTodo && (
-          <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>
-            <strong>{activeTodo.projectName}</strong>
-            <span style={{ margin: '0 0.5rem' }}>→</span>
+          <Text size="sm" c="dimmed">
+            <Text component="span" fw={600}>{activeTodo.projectName}</Text>
+            <Text component="span" mx="xs">→</Text>
             #{activeTodo.taskId} - {activeTodo.taskSubject}
-          </div>
+          </Text>
         )}
 
-        {/* Comments */}
-        <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.375rem', fontSize: '0.875rem' }}>
-            Comments
-          </label>
-          <textarea
-            rows={3}
-            value={comments}
-            onChange={e => setComments(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.625rem',
-              borderRadius: '0.5rem',
-              border: '1px solid var(--border-color)',
-              background: 'var(--surface-color)',
-              color: 'inherit',
-              fontFamily: 'inherit',
-              fontSize: '0.875rem',
-              resize: 'vertical',
-            }}
-          />
-        </div>
+        <Textarea
+          label="Comments"
+          value={comments}
+          onChange={(e) => setComments(e.currentTarget.value)}
+          minRows={3}
+          autosize
+        />
 
-        {/* Activity */}
         <Select
           label="Activity"
+          placeholder="-- Select activity --"
           value={activityId}
-          onChange={e => setActivityId(e.target.value)}
-          fullWidth
+          onChange={setActivityId}
+          data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
           required
-        >
-          <option value="">-- Select activity --</option>
-          {projectActivities.map(a => (
-            <option key={a.id} value={a.id.toString()}>
-              {a.name}{a.is_default ? ' (default)' : ''}
-            </option>
-          ))}
-        </Select>
+        />
 
         {/* Dynamic Custom Fields */}
         {customFields.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <ListTodo size={14} /> Custom Fields
-            </div>
+          <Stack gap="sm" pt="xs">
+            <Group gap="xs">
+              <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
+              <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
+            </Group>
             {customFields.map(field => {
               const value = customFieldValues[field.id] || '';
-              
               const format = field.field_format || (field as any).format;
               const isLikelyBool = format === 'bool' || 
                                    format === 'boolean' ||
@@ -275,124 +234,104 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
               if (isLikelyBool) {
                 return (
-                  <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={value === '1'}
-                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.checked ? '1' : '0' }))}
-                      style={{ width: '1rem', height: '1rem' }}
-                    />
-                    <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{field.name}</span>
-                  </label>
+                  <Checkbox
+                    key={field.id}
+                    label={field.name}
+                    checked={value === '1'}
+                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
+                  />
                 );
               }
               
-              if (field.field_format === 'list' || field.field_format === 'user' || field.field_format === 'version') {
+              if (format === 'list' || format === 'user' || format === 'version') {
                 return (
                   <Select
                     key={field.id}
                     label={field.name}
+                    placeholder={`-- Select ${field.name} --`}
                     value={value}
-                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                    fullWidth
+                    onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
+                    data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
                     required={field.is_required || field.required}
-                  >
-                    <option value="">-- Select {field.name} --</option>
-                    {field.possible_values?.map(v => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </Select>
+                  />
                 );
               }
 
-              if (field.field_format === 'text') {
+              if (format === 'text') {
                 return (
-                  <div key={field.id} style={{ gridColumn: '1 / -1' }}>
-                    <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.375rem', fontSize: '0.875rem' }}>
-                      {field.name}{field.is_required ? ' *' : ''}
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={value}
-                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                      required={field.is_required || field.required}
-                      style={{
-                        width: '100%',
-                        padding: '0.625rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid var(--border-color)',
-                        background: 'var(--surface-color)',
-                        color: 'inherit',
-                        fontFamily: 'inherit',
-                        fontSize: '0.875rem',
-                        resize: 'vertical',
-                      }}
-                    />
-                  </div>
+                  <Textarea
+                    key={field.id}
+                    label={field.name}
+                    value={value}
+                    onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                    required={field.is_required || field.required}
+                    minRows={2}
+                    autosize
+                  />
                 );
               }
 
-              const inputType = 
-                field.field_format === 'int' ? 'number' :
-                field.field_format === 'float' ? 'number' :
-                field.field_format === 'date' ? 'date' : 'text';
+              if (format === 'int' || format === 'float') {
+                return (
+                  <NumberInput
+                    key={field.id}
+                    label={field.name}
+                    value={value ? parseFloat(value) : ''}
+                    onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
+                    required={field.is_required || field.required}
+                    decimalScale={format === 'float' ? 2 : 0}
+                  />
+                );
+              }
 
               return (
-                <Input
+                <TextInput
                   key={field.id}
                   label={field.name}
-                  type={inputType}
-                  step={field.field_format === 'float' ? 'any' : undefined}
                   value={value}
-                  onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                  fullWidth
+                  onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
                   required={field.is_required || field.required}
-                  placeholder={`Enter ${field.name.toLowerCase()}...`}
+                  type={format === 'date' ? 'date' : 'text'}
                 />
               );
             })}
-          </div>
+          </Stack>
         )}
 
-        {/* Change Status */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={changeStatus}
-            onChange={e => setChangeStatus(e.target.checked)}
-            style={{ width: '1rem', height: '1rem' }}
-          />
-          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Change issue status after submission</span>
-        </label>
+        <Checkbox
+          label="Change issue status after submission"
+          checked={changeStatus}
+          onChange={e => setChangeStatus(e.currentTarget.checked)}
+          mt="md"
+        />
 
         {changeStatus && (
           <Select
+            placeholder="-- Select status --"
             value={statusId}
-            onChange={e => setStatusId(e.target.value)}
-            fullWidth
-          >
-            <option value="">-- Select status --</option>
-            {issueStatuses.map(s => (
-              <option key={s.id} value={s.id.toString()}>{s.name}</option>
-            ))}
-          </Select>
+            onChange={setStatusId}
+            data={issueStatuses.map(s => ({ value: s.id.toString(), label: s.name }))}
+          />
         )}
 
-        {/* Status message */}
         {submitResult && (
-          <div style={{
-            padding: '0.75rem',
-            borderRadius: '0.5rem',
-            background: submitResult.success
-              ? 'rgba(34, 197, 94, 0.15)'
-              : 'rgba(239, 68, 68, 0.15)',
-            color: submitResult.success ? '#22c55e' : '#ef4444',
-            fontSize: '0.875rem',
-          }}>
+          <Alert color={submitResult.success ? 'green' : 'red'}>
             {submitResult.message}
-          </div>
+          </Alert>
         )}
-      </div>
+
+        <Group justify="flex-end" mt="md">
+          <Button
+            leftSection={submitResult?.success ? <IconCheck size={16} /> : <IconSend size={16} />}
+            onClick={handleSubmit}
+            disabled={isSubmitting || submitResult?.success}
+            loading={isSubmitting}
+            color={submitResult?.success ? 'green' : 'blue'}
+          >
+            {submitResult?.success ? 'Submitted!' : 'Submit to Redmine'}
+          </Button>
+        </Group>
+      </Stack>
     </Modal>
   );
 };

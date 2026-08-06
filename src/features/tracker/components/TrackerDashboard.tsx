@@ -5,9 +5,8 @@ import { AddTaskForm } from '../../queue/components/AddTaskForm';
 import { SummaryModal } from './SummaryModal';
 import { AssignedTasksPanel } from './AssignedTasksPanel';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
-import { Card, Button, Input } from '../../../components/ui';
-import { ClipboardList, Plus } from 'lucide-react';
-import styles from './TrackerDashboard.module.scss';
+import { Card, Button, TextInput, Group, Stack, Badge, Text, List, ThemeIcon } from '@mantine/core';
+import { IconClipboardList, IconPlus, IconCheck } from '@tabler/icons-react';
 
 /** "Performed Tasks" panel showing activities logged during the timer session */
 const PerformedTasks: React.FC = () => {
@@ -37,56 +36,67 @@ const PerformedTasks: React.FC = () => {
   };
 
   return (
-    <Card
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ClipboardList size={20} className="text-primary" />
-          Performed Tasks
-        </div>
-      }
-      headerAction={
-        <span className={styles.activityCount}>{timer.activities.length}</span>
-      }
-    >
-      {timer.activities.length === 0 ? (
-        <div className={styles.emptyActivities}>
-          No performed tasks recorded yet. Add one below.
-        </div>
-      ) : (
-        <ul className={styles.activityList}>
-          {timer.activities.map((act, i) => (
-            <li key={i} className={styles.activityItem}>
-              <span className={styles.activityText}>{act.text}</span>
-              {act.durationSeconds !== undefined && act.durationSeconds > 0 && (
-                <span className={styles.activityDuration}>
-                  {formatDuration(act.durationSeconds)}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+    <Card shadow="sm" padding="lg" radius="md" withBorder>
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group justify="space-between">
+          <Group gap="xs">
+            <IconClipboardList size={20} />
+            <Text fw={500}>Performed Tasks</Text>
+          </Group>
+          <Badge size="lg" circle>{timer.activities.length}</Badge>
+        </Group>
+      </Card.Section>
 
-      {timer.isRunning && (
-        <div className={styles.addActivityRow}>
-          <Input
-            placeholder="What are you working on now?"
-            value={newActivityText}
-            onChange={(e) => setNewActivityText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            fullWidth
-          />
-          <Button
-            variant="primary"
+      <Stack mt="md">
+        {timer.activities.length === 0 ? (
+          <Text c="dimmed" size="sm" ta="center" py="md">
+            No performed tasks recorded yet. Add one below.
+          </Text>
+        ) : (
+          <List
+            spacing="sm"
             size="sm"
-            icon={Plus}
-            onClick={handleAddActivity}
-            disabled={!newActivityText.trim()}
+            center
+            icon={
+              <ThemeIcon color="teal" size={24} radius="xl">
+                <IconCheck size={16} />
+              </ThemeIcon>
+            }
           >
-            Add
-          </Button>
-        </div>
-      )}
+            {timer.activities.map((act, i) => (
+              <List.Item key={i}>
+                <Group justify="space-between">
+                  <Text>{act.text}</Text>
+                  {act.durationSeconds !== undefined && act.durationSeconds > 0 && (
+                    <Text size="xs" c="dimmed" fw={500}>
+                      {formatDuration(act.durationSeconds)}
+                    </Text>
+                  )}
+                </Group>
+              </List.Item>
+            ))}
+          </List>
+        )}
+
+        {timer.isRunning && (
+          <Group align="flex-end">
+            <TextInput
+              placeholder="What are you working on now?"
+              value={newActivityText}
+              onChange={(e) => setNewActivityText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              style={{ flex: 1 }}
+            />
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={handleAddActivity}
+              disabled={!newActivityText.trim()}
+            >
+              Add
+            </Button>
+          </Group>
+        )}
+      </Stack>
     </Card>
   );
 };
@@ -104,18 +114,18 @@ export const TrackerDashboard: React.FC = () => {
   }, [timer]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <Stack gap="xl">
       <TimerBar onStop={handleStop} />
       <PerformedTasks />
       
       <AssignedTasksPanel />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
+      <Stack gap="xl">
         <WorkQueue />
         <AddTaskForm />
-      </div>
+      </Stack>
 
       <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} />
-    </div>
+    </Stack>
   );
 };

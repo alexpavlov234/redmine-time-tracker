@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext, useCallback } from 'react';
-import { Modal, Button } from '../components/ui';
+import { Modal, Button, Text, Group } from '@mantine/core';
 
 interface ConfirmOptions {
   message: string;
@@ -42,26 +42,26 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
       <Modal
-        isOpen={isOpen}
+        opened={isOpen}
         onClose={handleCancel}
-        title="Confirm Action"
-        footer={
-          <>
-            <Button variant="secondary" onClick={handleCancel}>
-              {options?.cancelText || 'Cancel'}
-            </Button>
-            <Button variant={options?.variant || 'primary'} onClick={handleConfirm}>
-              {options?.confirmText || 'Confirm'}
-            </Button>
-          </>
-        }
+        title={<Text fw={600}>Confirm Action</Text>}
+        centered
       >
-        <p style={{ margin: 0, lineHeight: 1.6 }}>{options?.message}</p>
+        <Text size="sm" style={{ lineHeight: 1.6 }}>{options?.message}</Text>
         {options?.subtitle && (
-          <p style={{ margin: '0.5rem 0 0', opacity: 0.7, fontSize: '0.875rem' }}>
+          <Text size="xs" c="dimmed" mt="xs">
             {options.subtitle}
-          </p>
+          </Text>
         )}
+
+        <Group justify="flex-end" mt="xl">
+          <Button variant="default" onClick={handleCancel}>
+            {options?.cancelText || 'Cancel'}
+          </Button>
+          <Button color={options?.variant === 'danger' ? 'red' : 'blue'} onClick={handleConfirm}>
+            {options?.confirmText || 'Confirm'}
+          </Button>
+        </Group>
       </Modal>
     </ConfirmContext.Provider>
   );

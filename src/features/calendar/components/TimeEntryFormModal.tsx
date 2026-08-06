@@ -1,22 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Button, Select, Input, type SelectItem } from '../../../components/ui';
+import { Modal, Button, Select, TextInput, NumberInput, Checkbox, Textarea, Group, Stack, Text, Divider, ActionIcon } from '@mantine/core';
+import { useForm } from '@mantine/form';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useTasksForProject } from '../../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { usePresets } from '../../../hooks/usePresets';
-import { useToast } from '../../../contexts/ToastContext';
+import { notifications } from '@mantine/notifications';
 import { createTimeEntry, updateTimeEntry, getIssue } from '../../../services/redmine';
 import type { TimeEntry, TimeLogPreset, RedmineIssue } from '../../../types';
-import { Save, Send, Trash2, Plus, ListTodo } from 'lucide-react';
+import { IconDeviceFloppy, IconSend, IconTrash, IconListCheck } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 
 interface TimeEntryFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  /** If provided, we're editing an existing entry. Otherwise, creating a new one. */
   editEntry?: TimeEntry | null;
-  /** Default date in YYYY-MM-DD format (used when adding a new entry for a specific day) */
   defaultDate?: string;
 }
 
@@ -28,85 +27,86 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   defaultDate,
 }) => {
   const { allProjects } = useProjects();
-  const { showSuccess, showError } = useToast();
   const { presets, savePreset, deletePreset } = usePresets();
-  const formRef = React.useRef<HTMLFormElement>(null);
 
-  const [projectId, setProjectId] = useState('');
-  const [taskId, setTaskId] = useState('');
-  const [activityId, setActivityId] = useState('');
-  const [hours, setHours] = useState('');
-  const [spentOn, setSpentOn] = useState('');
-  const [comments, setComments] = useState('');
-  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>('');
   const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   const { customFields } = useCustomFields();
   const billableFieldId = localStorage.getItem('billableFieldId');
 
-  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
-  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(projectId || null);
+  const form = useForm({
+    initialValues: {
+      projectId: '',
+      taskId: '',
+      activityId: '',
+      hours: '' as string | number,
+      spentOn: '',
+      comments: '',
+    },
+    validate: {
+      taskId: (value) => (value ? null : 'Task is required'),
+      activityId: (value) => (value ? null : 'Activity is required'),
+      hours: (value) => (value && Number(value) > 0 ? null : 'Valid hours are required'),
+      spentOn: (value) => (value ? null : 'Date is required'),
+    },
+  });
+
+  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(form.values.projectId || null);
+  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(form.values.projectId || null);
 
   const isEditing = Boolean(editEntry);
 
-  const projectOptions = useMemo((): SelectItem[] => {
+  const projectOptions = useMemo(() => {
     return allProjects.map(p => ({
-      id: p.id.toString(),
+      value: p.id.toString(),
       label: p.name,
-      sublabel: `ID: ${p.id}`
     }));
   }, [allProjects]);
 
-  const taskOptions = useMemo((): SelectItem[] => {
+  const taskOptions = useMemo(() => {
     const options = tasks.map(t => ({
-      id: t.id.toString(),
+      value: t.id.toString(),
       label: `#${t.id} - ${t.subject}`,
-      sublabel: t.project?.name
     }));
-    if (loadedTask && !options.some(o => o.id === loadedTask.id.toString())) {
+    if (loadedTask && !options.some(o => o.value === loadedTask.id.toString())) {
       options.push({
-        id: loadedTask.id.toString(),
+        value: loadedTask.id.toString(),
         label: `#${loadedTask.id} - ${loadedTask.subject}`,
-        sublabel: loadedTask.project?.name
       });
     }
-    if (isEditing && editEntry?.issue && !options.some(o => o.id === editEntry.issue!.id.toString())) {
+    if (isEditing && editEntry?.issue && !options.some(o => o.value === editEntry.issue!.id.toString())) {
       options.push({
-        id: editEntry.issue.id.toString(),
+        value: editEntry.issue.id.toString(),
         label: `#${editEntry.issue.id} - ${editEntry.issue.subject || (editEntry.issue as any).name || ''}`,
-        sublabel: editEntry.project?.name
       });
     }
     const preset = presets.find(p => p.id === selectedPresetId);
-    if (preset && preset.taskId && preset.taskSubject && !options.some(o => o.id === preset.taskId)) {
+    if (preset && preset.taskId && preset.taskSubject && !options.some(o => o.value === preset.taskId)) {
       options.push({
-        id: preset.taskId,
+        value: preset.taskId,
         label: `#${preset.taskId} - ${preset.taskSubject}`,
-        sublabel: preset.projectName
       });
     }
     return options;
   }, [tasks, loadedTask, isEditing, editEntry, presets, selectedPresetId]);
 
-  const selectedProject = projectOptions.find(p => p.id === projectId);
-  const selectedTask = taskOptions.find(t => t.id === taskId);
-
-  // Populate form when modal opens or entry changes
   useEffect(() => {
     if (!isOpen) return;
 
     if (editEntry) {
-      setProjectId(editEntry.project?.id?.toString() || '');
-      setTaskId(editEntry.issue?.id?.toString() || '');
-      setActivityId(editEntry.activity?.id?.toString() || '');
-      setHours(editEntry.hours.toString());
-      setSpentOn(editEntry.spent_on);
-      setComments(editEntry.comments || '');
+      form.setValues({
+        projectId: editEntry.project?.id?.toString() || '',
+        taskId: editEntry.issue?.id?.toString() || '',
+        activityId: editEntry.activity?.id?.toString() || '',
+        hours: editEntry.hours,
+        spentOn: editEntry.spent_on,
+        comments: editEntry.comments || '',
+      });
 
-      // Check custom fields
       if (editEntry.custom_fields) {
         const initialValues: Record<number, string> = {};
         editEntry.custom_fields.forEach(f => {
@@ -115,16 +115,16 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         setCustomFieldValues(prev => ({ ...prev, ...initialValues }));
       }
     } else {
-      // New entry
-      setProjectId('');
-      setTaskId('');
-      setActivityId('');
-      setHours('');
-      setSpentOn(defaultDate || new Date().toISOString().split('T')[0]);
-      setComments('');
+      form.setValues({
+        projectId: '',
+        taskId: '',
+        activityId: '',
+        hours: '',
+        spentOn: defaultDate || new Date().toISOString().split('T')[0],
+        comments: '',
+      });
       setSelectedPresetId('');
 
-      // Initialize custom field values
       const initialValues: Record<number, string> = {};
       customFields.forEach(field => {
         if (field.id === Number(billableFieldId)) {
@@ -135,32 +135,23 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       });
       setCustomFieldValues(initialValues);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editEntry, defaultDate, customFields, billableFieldId]);
 
-  // Update activity dropdown when project changes and activities load
   useEffect(() => {
     if (isOpen && editEntry?.activity?.id) {
-      setActivityId(editEntry.activity.id.toString());
+      form.setFieldValue('activityId', editEntry.activity.id.toString());
     }
   }, [activities]);
 
-  const handleProjectChange = (item: SelectItem | null) => {
-    setProjectId(item?.id.toString() || '');
-    if (!item) {
-      setTaskId('');
-    }
-    setActivityId('');
-  };
-
-  const handleTaskChange = (item: SelectItem | null) => {
-    const newTaskId = item?.id.toString() || '';
-    setTaskId(newTaskId);
+  const handleTaskChange = (val: string | null) => {
+    const newTaskId = val || '';
+    form.setFieldValue('taskId', newTaskId);
     
-    // If a task is selected and no project is currently selected, auto-select the project
-    if (item && !projectId) {
-      const task = tasks.find(t => t.id.toString() === item.id) || (loadedTask?.id.toString() === item.id ? loadedTask : null);
+    if (val && !form.values.projectId) {
+      const task = tasks.find(t => t.id.toString() === val) || (loadedTask?.id.toString() === val ? loadedTask : null);
       if (task?.project?.id) {
-        setProjectId(task.project.id.toString());
+        form.setFieldValue('projectId', task.project.id.toString());
       }
     }
   };
@@ -172,31 +163,29 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       const cleanId = id.replace(/^#/, '').trim();
       const issue = await getIssue(parseInt(cleanId, 10));
       setLoadedTask(issue);
-      setTaskId(issue.id.toString());
+      form.setFieldValue('taskId', issue.id.toString());
       if (issue.project) {
-        setProjectId(issue.project.id.toString());
+        form.setFieldValue('projectId', issue.project.id.toString());
       }
-      showSuccess(`Loaded task #${issue.id}`);
+      notifications.show({ title: 'Success', message: `Loaded task #${issue.id}`, color: 'green' });
     } catch (error: any) {
-      showError(`Failed to load task #${id}. It may not exist or you lack permission.`);
+      notifications.show({ title: 'Error', message: `Failed to load task #${id}. It may not exist or you lack permission.`, color: 'red' });
     } finally {
       setIsLoadingIssue(false);
     }
   };
 
-  const handleApplyPreset = (presetId: string) => {
+  const handleApplyPreset = (presetId: string | null) => {
     setSelectedPresetId(presetId);
     if (!presetId) return;
 
     const preset = presets.find(p => p.id === presetId);
     if (preset) {
-      if (preset.projectId) setProjectId(preset.projectId);
-      if (preset.taskId) {
-        setTaskId(preset.taskId);
-      }
-      if (preset.activityId) setActivityId(preset.activityId);
-      if (preset.hours) setHours(preset.hours.toString());
-      if (preset.comments !== undefined) setComments(preset.comments);
+      if (preset.projectId) form.setFieldValue('projectId', preset.projectId);
+      if (preset.taskId) form.setFieldValue('taskId', preset.taskId);
+      if (preset.activityId) form.setFieldValue('activityId', preset.activityId);
+      if (preset.hours) form.setFieldValue('hours', preset.hours);
+      if (preset.comments !== undefined) form.setFieldValue('comments', preset.comments);
       if (preset.isBillable !== undefined) {
         const bId = localStorage.getItem('billableFieldId');
         if (bId) {
@@ -213,6 +202,8 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     const name = prompt("Enter a name for this preset (e.g. 'Standard Day'):");
     if (!name?.trim()) return;
 
+    const { projectId, taskId, activityId, hours, comments } = form.values;
+
     const project = allProjects.find(p => p.id.toString() === projectId);
     const task = tasks.find(t => t.id.toString() === taskId);
 
@@ -224,29 +215,26 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       taskId,
       taskSubject: task?.subject || '',
       activityId,
-      hours: parseFloat(hours) || 0,
+      hours: typeof hours === 'string' ? parseFloat(hours) || 0 : hours,
       comments,
       isBillable: customFieldValues[Number(billableFieldId)] === '1',
     };
 
     savePreset(newPreset);
     setSelectedPresetId(newPreset.id);
-    showSuccess(`Preset "${name.trim()}" saved.`);
+    notifications.show({ title: 'Success', message: `Preset "${name.trim()}" saved.`, color: 'green' });
   };
 
   const handleDeletePreset = () => {
     const preset = presets.find(p => p.id === selectedPresetId);
     if (preset && confirm(`Delete preset "${preset.name}"?`)) {
-      deletePreset(selectedPresetId);
+      deletePreset(preset.id);
       setSelectedPresetId('');
-      showSuccess('Preset deleted.');
+      notifications.show({ title: 'Success', message: 'Preset deleted.', color: 'green' });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!taskId || !activityId || !hours) return;
-
+  const handleSubmit = async (values: typeof form.values) => {
     setIsSubmitting(true);
     try {
       const payloadCustomFields = Object.entries(customFieldValues)
@@ -257,27 +245,27 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         }));
 
       const data = {
-        hours: parseFloat(hours),
-        comments: comments.trim(),
-        activity_id: parseInt(activityId),
-        spent_on: spentOn,
-        issue_id: parseInt(taskId),
-        project_id: projectId && projectId !== 'my_issues' ? parseInt(projectId) : undefined,
+        hours: typeof values.hours === 'string' ? parseFloat(values.hours) : values.hours,
+        comments: values.comments.trim(),
+        activity_id: parseInt(values.activityId),
+        spent_on: values.spentOn,
+        issue_id: parseInt(values.taskId),
+        project_id: values.projectId && values.projectId !== 'my_issues' ? parseInt(values.projectId) : undefined,
         ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
       };
 
       if (isEditing && editEntry) {
         await updateTimeEntry(editEntry.id, data);
-        showSuccess('Time entry updated!');
+        notifications.show({ title: 'Success', message: 'Time entry updated!', color: 'green' });
       } else {
         await createTimeEntry(data);
-        showSuccess('Time entry created!');
+        notifications.show({ title: 'Success', message: 'Time entry created!', color: 'green' });
       }
 
       onSuccess();
       onClose();
     } catch (err: any) {
-      showError(err.message || 'Failed to save time entry.');
+      notifications.show({ title: 'Error', message: err.message || 'Failed to save time entry.', color: 'red' });
     } finally {
       setIsSubmitting(false);
     }
@@ -285,256 +273,219 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
   return (
     <Modal
-      isOpen={isOpen}
+      opened={isOpen}
       onClose={onClose}
-      title={isEditing ? 'Edit Time Entry' : 'Log Time'}
-      footer={
-        <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
-          <Button
-            variant="ghost"
-            icon={Plus}
-            onClick={handleSavePreset}
-            disabled={isSubmitting}
-            style={{ marginRight: 'auto' }}
-          >
-            Save Preset
-          </Button>
-          <Button
-            variant="primary"
-            icon={isEditing ? Save : Send}
-            onClick={() => (formRef.current as any)?.requestSubmit()}
-            isLoading={isSubmitting}
-            disabled={!taskId || !activityId || !hours || isSubmitting}
-          >
-            {isEditing ? 'Update' : 'Submit'}
-          </Button>
-        </div>
-      }
+      title={<Text fw={600}>{isEditing ? 'Edit Time Entry' : 'Log Time'}</Text>}
+      size="lg"
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <Stack gap="md">
         {!isEditing && (
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
-            <Select
-              label="Load Preset"
-              value={selectedPresetId}
-              onChange={e => handleApplyPreset(e.target.value)}
-              fullWidth
-            >
-              <option value="">-- Choose preset --</option>
-              {presets.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </Select>
-            <Button
-              variant="danger"
-              icon={Trash2}
-              onClick={handleDeletePreset}
-              disabled={!selectedPresetId}
-              title="Delete selected preset"
-              size="sm"
-              style={{ marginBottom: '0.25rem' }}
-            />
-          </div>
+          <>
+            <Group align="flex-end">
+              <Select
+                label="Load Preset"
+                placeholder="-- Choose preset --"
+                value={selectedPresetId}
+                onChange={handleApplyPreset}
+                data={presets.map(p => ({ value: p.id, label: p.name }))}
+                style={{ flex: 1 }}
+              />
+              <ActionIcon
+                variant="light"
+                color="red"
+                size="input-sm"
+                onClick={handleDeletePreset}
+                disabled={!selectedPresetId}
+              >
+                <IconTrash size={16} />
+              </ActionIcon>
+            </Group>
+            <Divider />
+          </>
         )}
 
-        <hr style={{ opacity: 0.1 }} />
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Stack gap="md">
+            <Select
+              label="Project"
+              placeholder="Search projects..."
+              data={[{ value: 'my_issues', label: '--- My Assigned Issues ---' }, ...projectOptions]}
+              searchable
+              {...form.getInputProps('projectId')}
+              onChange={(val) => {
+                form.setFieldValue('projectId', val || '');
+                if (!val) form.setFieldValue('taskId', '');
+                form.setFieldValue('activityId', '');
+              }}
+            />
 
-        <form ref={formRef} id="time-entry-form" onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Select
-            enableAutocomplete
-            label="Project"
-            placeholder="Search projects..."
-            items={projectOptions}
-            value={projectId}
-            displayValue={selectedProject?.label || ''}
-            onItemChange={handleProjectChange}
-            fullWidth
-            required
-          />
-
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 120px', minWidth: 0 }}>
-              <Input
+            <Group grow align="flex-start">
+              <TextInput
                 label="Task ID"
                 placeholder="Paste ID..."
-                value={taskId}
-                onChange={e => {
-                  setTaskId(e.target.value);
-                }}
+                {...form.getInputProps('taskId')}
                 onBlur={() => {
-                  if (taskId && taskId !== loadedTask?.id?.toString()) {
-                    handleQuickLoad(taskId);
+                  if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
+                    handleQuickLoad(form.values.taskId);
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (taskId) handleQuickLoad(taskId);
+                    if (form.values.taskId) handleQuickLoad(form.values.taskId);
                   }
                 }}
                 disabled={isLoadingIssue || isSubmitting}
-                fullWidth
+                style={{ flex: 1 }}
               />
-            </div>
-            <div style={{ flex: '2 1 200px', minWidth: 0 }}>
               <Select
-                enableAutocomplete
                 label="Task Name"
                 placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-                items={taskOptions}
-                value={taskId}
-                displayValue={selectedTask?.label || (isLoadingIssue ? 'Loading...' : '')}
-                onItemChange={handleTaskChange}
+                data={taskOptions}
+                searchable
+                withAsterisk
+                {...form.getInputProps('taskId')}
+                onChange={handleTaskChange}
                 disabled={isLoadingTasks || isSubmitting}
-                loading={isLoadingTasks || isLoadingIssue}
-                fullWidth
-                required
+                style={{ flex: 2 }}
               />
-            </div>
-          </div>
+            </Group>
 
-          <Select
-            label={isLoadingActivities ? 'Loading...' : 'Activity'}
-            value={activityId}
-            onChange={e => setActivityId(e.target.value)}
-            fullWidth
-            disabled={isLoadingActivities || !projectId}
-            required
-          >
-            <option value="">-- Select activity --</option>
-            {activities.map(a => (
-              <option key={a.id} value={a.id.toString()}>{a.name}</option>
-            ))}
-          </Select>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
-            <Input
-              label="Hours"
-              type="number"
-              step="any"
-              min="0"
-              value={hours}
-              onChange={e => setHours(e.target.value)}
-              required
-              fullWidth
+            <Select
+              label="Activity"
+              placeholder={isLoadingActivities ? 'Loading...' : '-- Select activity --'}
+              data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
+              withAsterisk
+              disabled={isLoadingActivities || !form.values.projectId}
+              {...form.getInputProps('activityId')}
             />
-            <Input
-              label="Date"
-              type="date"
-              value={spentOn}
-              onChange={e => setSpentOn(e.target.value)}
-              required
-              fullWidth
-            />
-          </div>
 
-          {/* Dynamic Custom Fields */}
-          {customFields.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.5rem 0' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.5, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ListTodo size={14} /> Custom Fields
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-                {customFields.map(field => {
-                  const value = customFieldValues[field.id] || '';
+            <Group grow>
+              <NumberInput
+                label="Hours"
+                withAsterisk
+                min={0}
+                decimalScale={2}
+                step={0.5}
+                {...form.getInputProps('hours')}
+              />
+              <TextInput
+                label="Date"
+                type="date"
+                withAsterisk
+                {...form.getInputProps('spentOn')}
+              />
+            </Group>
 
-                  const format = field.field_format || (field as any).format;
-                  const isLikelyBool = format === 'bool' || 
-                                       format === 'boolean' ||
-                                       field.name.toLowerCase().includes('billable') ||
-                                       field.name.toLowerCase().includes('billing');
+            {/* Dynamic Custom Fields */}
+            {customFields.length > 0 && (
+              <Stack gap="sm" pt="xs">
+                <Group gap="xs">
+                  <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
+                  <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
+                </Group>
+                <Group grow>
+                  {customFields.map(field => {
+                    const value = customFieldValues[field.id] || '';
+                    const format = field.field_format || (field as any).format;
+                    const isLikelyBool = format === 'bool' || 
+                                         format === 'boolean' ||
+                                         field.name.toLowerCase().includes('billable') ||
+                                         field.name.toLowerCase().includes('billing');
 
-                  if (isLikelyBool) {
-                    return (
-                      <label key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
+                    if (isLikelyBool) {
+                      return (
+                        <Checkbox
+                          key={field.id}
+                          label={field.name}
                           checked={value === '1'}
-                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.checked ? '1' : '0' }))}
-                          style={{ width: '1rem', height: '1rem' }}
+                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
                         />
-                        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{field.name}</span>
-                      </label>
-                    );
-                  }
+                      );
+                    }
+                    
+                    if (format === 'list' || format === 'user' || format === 'version') {
+                      return (
+                        <Select
+                          key={field.id}
+                          label={field.name}
+                          placeholder={`-- Select ${field.name} --`}
+                          value={value}
+                          onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
+                          data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
+                          required={field.is_required || field.required}
+                        />
+                      );
+                    }
 
-                  if (field.field_format === 'list' || field.field_format === 'user' || field.field_format === 'version') {
+                    if (format === 'text') {
+                      return (
+                        <Textarea
+                          key={field.id}
+                          label={field.name}
+                          value={value}
+                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                          required={field.is_required || field.required}
+                          minRows={2}
+                          autosize
+                          style={{ flex: '1 1 100%' }}
+                        />
+                      );
+                    }
+
+                    if (format === 'int' || format === 'float') {
+                      return (
+                        <NumberInput
+                          key={field.id}
+                          label={field.name}
+                          value={value ? parseFloat(value) : ''}
+                          onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
+                          required={field.is_required || field.required}
+                          decimalScale={format === 'float' ? 2 : 0}
+                        />
+                      );
+                    }
+
                     return (
-                      <Select
+                      <TextInput
                         key={field.id}
                         label={field.name}
                         value={value}
-                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                        fullWidth
+                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
                         required={field.is_required || field.required}
-                      >
-                        <option value="">-- Select {field.name} --</option>
-                        {field.possible_values?.map(v => (
-                          <option key={v} value={v}>{v}</option>
-                        ))}
-                      </Select>
+                        type={format === 'date' ? 'date' : 'text'}
+                      />
                     );
-                  }
+                  })}
+                </Group>
+              </Stack>
+            )}
 
-                  if (field.field_format === 'text') {
-                    return (
-                      <div key={field.id} style={{ gridColumn: '1 / -1' }}>
-                        <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.375rem', fontSize: '0.875rem' }}>
-                          {field.name}{field.is_required ? ' *' : ''}
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={value}
-                          onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                          required={field.is_required || field.required}
-                          style={{
-                            width: '100%',
-                            padding: '0.625rem',
-                            borderRadius: '0.5rem',
-                            border: '1px solid var(--border-color)',
-                            background: 'var(--surface-color)',
-                            color: 'inherit',
-                            fontFamily: 'inherit',
-                            fontSize: '0.875rem',
-                            resize: 'vertical',
-                          }}
-                        />
-                      </div>
-                    );
-                  }
+            <TextInput
+              label="Comments"
+              placeholder="Optional description"
+              {...form.getInputProps('comments')}
+            />
 
-                  const inputType = 
-                    field.field_format === 'int' ? 'number' :
-                    field.field_format === 'float' ? 'number' :
-                    field.field_format === 'date' ? 'date' : 'text';
-
-                  return (
-                    <Input
-                      key={field.id}
-                      label={field.name}
-                      type={inputType}
-                      step={field.field_format === 'float' ? 'any' : undefined}
-                      value={value}
-                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
-                      fullWidth
-                      required={field.is_required || field.required}
-                      placeholder={`Enter ${field.name.toLowerCase()}...`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <Input
-            label="Comments"
-            placeholder="Optional description"
-            value={comments}
-            onChange={e => setComments(e.target.value)}
-            fullWidth
-          />
+            <Group justify="space-between" mt="md">
+              <Button
+                variant="subtle"
+                onClick={handleSavePreset}
+                disabled={isSubmitting}
+              >
+                Save Preset
+              </Button>
+              <Button
+                type="submit"
+                leftSection={isEditing ? <IconDeviceFloppy size={16} /> : <IconSend size={16} />}
+                loading={isSubmitting}
+              >
+                {isEditing ? 'Update' : 'Submit'}
+              </Button>
+            </Group>
+          </Stack>
         </form>
-      </div>
+      </Stack>
     </Modal>
   );
 };

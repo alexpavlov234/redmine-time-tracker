@@ -1,42 +1,73 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
-import { Header } from './Header';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
-import { AlertCircle } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { AppShell as MantineAppShell, Group, Title, ActionIcon, useMantineColorScheme, Text, Alert, Button } from '@mantine/core';
+import { IconClock, IconCalendarEvent, IconSettings, IconSun, IconMoon, IconSunMoon, IconAlertCircle } from '@tabler/icons-react';
+import classes from './AppShell.module.css';
 
 export const AppShell: React.FC = () => {
   const { isConfigured } = useSettings();
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const location = useLocation();
+
+  const toggleColorScheme = () => {
+    if (colorScheme === 'light') setColorScheme('dark');
+    else if (colorScheme === 'dark') setColorScheme('auto');
+    else setColorScheme('light');
+  };
+
+  const getThemeIcon = () => {
+    if (colorScheme === 'light') return <IconSun size={20} stroke={1.5} />;
+    if (colorScheme === 'dark') return <IconMoon size={20} stroke={1.5} />;
+    return <IconSunMoon size={20} stroke={1.5} />;
+  };
+
+  const navLinks = [
+    { label: 'Tracker', icon: IconClock, to: '/' },
+    { label: 'Logged Time', icon: IconCalendarEvent, to: '/logged-time' },
+    { label: 'Settings', icon: IconSettings, to: '/settings' },
+  ];
 
   return (
-    <div className="app-container">
-      <Header />
+    <MantineAppShell
+      header={{ height: 60 }}
+      padding="md"
+    >
+      <MantineAppShell.Header>
+        <Group h="100%" px="md" justify="space-between">
+          <Title order={3}>Redmine Time Tracker</Title>
+          
+          <Group gap="sm">
+            {navLinks.map((link) => {
+              const isActive = link.to === '/' ? location.pathname === '/' : location.pathname.startsWith(link.to);
+              return (
+                <Button
+                  key={link.label}
+                  component={NavLink}
+                  to={link.to}
+                  variant={isActive ? 'light' : 'subtle'}
+                  color={isActive ? 'blue' : 'gray'}
+                  leftSection={<link.icon size={18} stroke={1.5} />}
+                >
+                  {link.label}
+                </Button>
+              );
+            })}
+            <ActionIcon onClick={toggleColorScheme} variant="subtle" size="lg" aria-label="Toggle color scheme">
+              {getThemeIcon()}
+            </ActionIcon>
+          </Group>
+        </Group>
+      </MantineAppShell.Header>
 
-      {!isConfigured && (
-        <div style={{
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-          borderLeft: '4px solid #3b82f6',
-          padding: '1rem',
-          borderRadius: '0.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          marginBottom: '1rem'
-        }}>
-          <AlertCircle className="text-primary" />
-          <p style={{ margin: 0 }}>
-            Please configure your Redmine URL and API Key in the{' '}
-            <NavLink to="/settings" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>
-              Settings
-            </NavLink>{' '}
-            page to get started.
-          </p>
-        </div>
-      )}
-
-      <main style={{ flex: 1 }}>
+      <MantineAppShell.Main>
+        {!isConfigured && (
+          <Alert icon={<IconAlertCircle size={16} />} title="Configuration Required" color="blue" mb="md">
+            Please configure your Redmine URL and API Key in the <NavLink to="/settings" style={{ fontWeight: 'bold' }}>Settings</NavLink> page to get started.
+          </Alert>
+        )}
         <Outlet />
-      </main>
-    </div>
+      </MantineAppShell.Main>
+    </MantineAppShell>
   );
 };

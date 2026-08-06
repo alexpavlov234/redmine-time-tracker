@@ -1,8 +1,7 @@
 import React from 'react';
 import type { TimeEntry } from '../../../types';
-import styles from './CalendarGrid.module.scss';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '../../../components/ui';
+import { IconChevronLeft, IconChevronRight, IconCheck } from '@tabler/icons-react';
+import { Card, ActionIcon, Group, Title, LoadingOverlay, Text, Box, SimpleGrid, Paper, ThemeIcon } from '@mantine/core';
 
 interface CalendarGridProps {
   currentMonth: Date;
@@ -32,7 +31,6 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const lastDayOfMonth = new Date(year, month + 1, 0);
   const daysInMonth = lastDayOfMonth.getDate();
 
-  // 0 = Sunday, 1 = Monday. We want Monday=0, Sunday=6
   let startDayOfWeek = firstDayOfMonth.getDay();
   startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
 
@@ -45,7 +43,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   for (let i = 0; i < startDayOfWeek; i++) {
-    cells.push(<div key={`empty-${i}`} className={`${styles.day} ${styles.empty}`} />);
+    cells.push(<Box key={`empty-${i}`} h={80} style={{ opacity: 0.5 }} />);
   }
 
   for (let day = 1; day <= daysInMonth; day++) {
@@ -57,56 +55,66 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     const isToday = dateStr === formatDate(new Date());
 
     cells.push(
-      <div
+      <Paper
         key={dateStr}
-        className={`
-          ${styles.day} 
-          ${hasEntries ? styles.hasEntries : ''} 
-          ${isSelected ? styles.selected : ''} 
-          ${isToday ? styles.today : ''} 
-          ${isMultiSelectMode ? styles.multiSelectMode : ''}
-        `}
+        withBorder={isSelected}
+        h={80}
+        radius="sm"
+        p="xs"
+        style={{
+          cursor: 'pointer',
+          position: 'relative',
+          backgroundColor: isSelected ? 'var(--mantine-color-blue-light)' : (hasEntries ? 'var(--mantine-color-green-light)' : 'transparent'),
+          borderColor: isSelected ? 'var(--mantine-color-blue-filled)' : 'var(--mantine-color-default-border)',
+          transition: 'all 0.2s ease',
+          opacity: (isMultiSelectMode && !isSelected) ? 0.7 : 1,
+        }}
         onClick={() => onDayClick(dateStr)}
       >
-        <span className={styles.dayNumber}>{day}</span>
+        <Group justify="space-between" align="flex-start">
+          <Text size="sm" fw={isToday ? 700 : 500} c={isToday ? 'blue' : undefined}>{day}</Text>
+          {isSelected && (
+            <ThemeIcon size="xs" radius="xl" color="blue">
+              <IconCheck size={10} />
+            </ThemeIcon>
+          )}
+        </Group>
+        
         {hasEntries && (
-          <span className={styles.hoursBadge}>{totalHours.toFixed(1)}h</span>
+          <Group justify="center" mt="sm">
+            <Text size="xs" fw={700} c="green.9">{totalHours.toFixed(1)}h</Text>
+          </Group>
         )}
-        {isSelected && (
-          <div className={styles.selectedMarker} />
-        )}
-      </div>
+      </Paper>
     );
   }
 
-  // padding end
   const totalCells = startDayOfWeek + daysInMonth;
   const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
   for (let i = 0; i < remainingCells; i++) {
-    cells.push(<div key={`empty-end-${i}`} className={`${styles.day} ${styles.empty}`} />);
+    cells.push(<Box key={`empty-end-${i}`} h={80} style={{ opacity: 0.5 }} />);
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.headerRow}>
-        <Button variant="ghost" size="sm" icon={ChevronLeft} onClick={onPrevMonth} aria-label="Previous Month" />
-        <h3 className={styles.monthTitle}>{monthName}</h3>
-        <Button variant="ghost" size="sm" icon={ChevronRight} onClick={onNextMonth} aria-label="Next Month" />
-      </div>
+    <Card shadow="sm" padding="lg" radius="md" withBorder pos="relative">
+      <LoadingOverlay visible={isLoading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
+      <Group justify="space-between" mb="xl">
+        <ActionIcon variant="light" onClick={onPrevMonth} aria-label="Previous Month" size="lg">
+          <IconChevronLeft size={20} />
+        </ActionIcon>
+        <Title order={3}>{monthName}</Title>
+        <ActionIcon variant="light" onClick={onNextMonth} aria-label="Next Month" size="lg">
+          <IconChevronRight size={20} />
+        </ActionIcon>
+      </Group>
 
-      <div className={styles.grid}>
+      <SimpleGrid cols={7} spacing="xs" verticalSpacing="xs">
         {dayNames.map(d => (
-          <div key={d} className={styles.dayHeaderCell}>{d}</div>
+          <Text key={d} size="sm" fw={600} c="dimmed" ta="center" mb="xs">{d}</Text>
         ))}
         {cells}
-      </div>
-      
-      {isLoading && (
-        <div className={styles.loadingOverlay}>
-          <div className={styles.spinner} />
-        </div>
-      )}
-    </div>
+      </SimpleGrid>
+    </Card>
   );
 };
 
