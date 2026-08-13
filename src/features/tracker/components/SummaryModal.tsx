@@ -111,10 +111,15 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   }, [projectActivities, defaultActivityId, activeTodo?.activityId]);
 
   const handleSubmit = async () => {
-    const issueId = selectedTaskId || activeTodo?.taskId;
-    const targetProjectId = selectedProjectId || activeTodo?.projectId;
+    const rawIssueId = selectedTaskId || activeTodo?.taskId || '';
+    const cleanIssueStr = rawIssueId.replace(/^#/, '').trim();
+    const parsedIssueId = cleanIssueStr ? parseInt(cleanIssueStr, 10) : undefined;
+    const validIssueId = (parsedIssueId && !isNaN(parsedIssueId)) ? parsedIssueId : undefined;
 
-    if (!issueId && !targetProjectId) {
+    const rawProjectId = selectedProjectId || activeTodo?.projectId || '';
+    const cleanProjectId = (rawProjectId && rawProjectId !== 'my_issues') ? rawProjectId.trim() : '';
+
+    if (!validIssueId && !cleanProjectId) {
       setSubmitResult({ success: false, message: 'Please select a project or task.' });
       return;
     }
@@ -144,10 +149,10 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
       const timeEntryPayload: any = {
         time_entry: {
-          ...(issueId ? { issue_id: issueId } : { project_id: targetProjectId }),
+          ...(validIssueId ? { issue_id: validIssueId } : { project_id: cleanProjectId }),
           hours: hoursFormatted,
           comments: comments.trim(),
-          activity_id: parseInt(activityId),
+          activity_id: parseInt(activityId, 10),
           spent_on: new Date().toISOString().split('T')[0],
           ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
         },
@@ -157,9 +162,9 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       await redmineApiRequest('/time_entries.json', 'POST', timeEntryPayload);
 
       // Step 2: Update issue status if requested
-      if (changeStatus && statusId) {
+      if (changeStatus && statusId && validIssueId) {
         try {
-          await redmineApiRequest(`/issues/${issueId}.json`, 'PUT', {
+          await redmineApiRequest(`/issues/${validIssueId}.json`, 'PUT', {
             issue: { status_id: statusId },
           });
         } catch {

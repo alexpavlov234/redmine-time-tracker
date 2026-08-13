@@ -31,9 +31,10 @@ export const LoggedTimeDashboard: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
   const [activeDayStr, setActiveDayStr] = useState<string | null>(null);
 
-  // Edit/Add modal state
+  // Edit/Add/Copy modal state
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+  const [copyingEntry, setCopyingEntry] = useState<TimeEntry | null>(null);
   const [addForDate, setAddForDate] = useState<string | undefined>(undefined);
 
   const { entriesByDate, isLoading, refetch } = useCalendarEntries(currentMonth);
@@ -94,8 +95,26 @@ export const LoggedTimeDashboard: React.FC = () => {
   };
 
   // --- Day Details handlers ---
+  /**
+   * Opens the time entry form modal in edit mode for the given entry.
+   * 
+   * @param entry Time entry to edit.
+   */
   const handleEditEntry = (entry: TimeEntry) => {
     setEditingEntry(entry);
+    setCopyingEntry(null);
+    setAddForDate(undefined);
+    setIsFormModalOpen(true);
+  };
+
+  /**
+   * Opens the time entry form modal in copy mode for the given entry with an empty date field.
+   * 
+   * @param entry Time entry to copy.
+   */
+  const handleCopyEntry = (entry: TimeEntry) => {
+    setEditingEntry(null);
+    setCopyingEntry(entry);
     setAddForDate(undefined);
     setIsFormModalOpen(true);
   };
@@ -119,6 +138,7 @@ export const LoggedTimeDashboard: React.FC = () => {
 
   const handleAddEntry = (dateStr: string) => {
     setEditingEntry(null);
+    setCopyingEntry(null);
     setAddForDate(dateStr);
     setIsFormModalOpen(true);
   };
@@ -127,6 +147,7 @@ export const LoggedTimeDashboard: React.FC = () => {
     refetch();
     setIsFormModalOpen(false);
     setEditingEntry(null);
+    setCopyingEntry(null);
     setAddForDate(undefined);
   };
 
@@ -188,6 +209,7 @@ export const LoggedTimeDashboard: React.FC = () => {
               projectColorMap={projectColorMap}
               onClose={() => setActiveDayStr(null)}
               onEdit={handleEditEntry}
+              onCopy={handleCopyEntry}
               onDelete={handleDeleteEntry}
               onAdd={handleAddEntry}
             />
@@ -207,9 +229,10 @@ export const LoggedTimeDashboard: React.FC = () => {
 
       <TimeEntryFormModal
         isOpen={isFormModalOpen}
-        onClose={() => { setIsFormModalOpen(false); setEditingEntry(null); setAddForDate(undefined); }}
+        onClose={() => { setIsFormModalOpen(false); setEditingEntry(null); setCopyingEntry(null); setAddForDate(undefined); }}
         onSuccess={handleFormSuccess}
         editEntry={editingEntry}
+        copyEntry={copyingEntry}
         defaultDate={addForDate}
       />
     </Stack>

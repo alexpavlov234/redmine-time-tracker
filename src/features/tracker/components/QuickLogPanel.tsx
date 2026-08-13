@@ -130,8 +130,14 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
   };
 
   const handleQuickSubmit = async () => {
-    if (!selectedTaskId) {
-      setStatusResult({ success: false, message: 'Please select a task to log time against.' });
+    const cleanTaskStr = selectedTaskId ? selectedTaskId.replace(/^#/, '').trim() : '';
+    const parsedTaskId = cleanTaskStr ? parseInt(cleanTaskStr, 10) : undefined;
+    const validTaskId = (parsedTaskId && !isNaN(parsedTaskId)) ? parsedTaskId : undefined;
+
+    const cleanProjectId = (selectedProjectId && selectedProjectId !== 'my_issues') ? selectedProjectId.trim() : '';
+
+    if (!validTaskId && !cleanProjectId) {
+      setStatusResult({ success: false, message: 'Please select a valid Project or Task.' });
       return;
     }
 
@@ -146,10 +152,10 @@ export const QuickLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSu
     try {
       const timeEntryPayload = {
         time_entry: {
-          issue_id: parseInt(selectedTaskId, 10),
+          ...(validTaskId ? { issue_id: validTaskId } : { project_id: cleanProjectId }),
           hours: hoursFormatted,
           comments: comments.trim(),
-          ...(selectedActivityId && { activity_id: parseInt(selectedActivityId, 10) }),
+          ...(selectedActivityId && !isNaN(parseInt(selectedActivityId, 10)) && { activity_id: parseInt(selectedActivityId, 10) }),
           spent_on: spentOn,
         },
       };

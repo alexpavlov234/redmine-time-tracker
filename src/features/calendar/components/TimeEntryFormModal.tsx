@@ -17,6 +17,7 @@ interface TimeEntryFormModalProps {
   onClose: () => void;
   onSuccess: () => void;
   editEntry?: TimeEntry | null;
+  copyEntry?: TimeEntry | null;
   defaultDate?: string;
   initialPresetId?: string | null;
 }
@@ -26,6 +27,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   onClose,
   onSuccess,
   editEntry,
+  copyEntry,
   defaultDate,
   initialPresetId,
 }) => {
@@ -61,6 +63,14 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       activityId: (value) => (value ? null : 'Activity is required'),
       hours: (value) => (value && Number(value) > 0 ? null : 'Valid hours are required'),
       spentOn: (value) => (value ? null : 'Date is required'),
+      taskId: (value, values) => {
+        const cleanTask = value ? String(value).replace(/^#/, '').trim() : '';
+        const cleanProject = values.projectId && values.projectId !== 'my_issues' ? String(values.projectId).trim() : '';
+        if (!cleanTask && !cleanProject) {
+          return 'Either Project or Task ID is required';
+        }
+        return null;
+      },
     },
   });
 
@@ -80,15 +90,16 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       label: a.name,
     }));
 
-    if (isEditing && editEntry?.activity && !options.some(o => o.value === editEntry.activity.id.toString())) {
+    const sourceEntry = editEntry || copyEntry;
+    if (sourceEntry?.activity && !options.some(o => o.value === sourceEntry.activity.id.toString())) {
       options.unshift({
-        value: editEntry.activity.id.toString(),
-        label: editEntry.activity.name || `Activity #${editEntry.activity.id}`,
+        value: sourceEntry.activity.id.toString(),
+        label: sourceEntry.activity.name || `Activity #${sourceEntry.activity.id}`,
       });
     }
 
     return options;
-  }, [activities, isEditing, editEntry]);
+  }, [activities, editEntry, copyEntry]);
 
   const taskOptions = useMemo(() => {
     const options = tasks.map(t => ({
@@ -101,10 +112,11 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         label: `#${loadedTask.id} - ${loadedTask.subject}`,
       });
     }
-    if (isEditing && editEntry?.issue && !options.some(o => o.value === editEntry.issue!.id.toString())) {
+    const sourceEntry = editEntry || copyEntry;
+    if (sourceEntry?.issue && !options.some(o => o.value === sourceEntry.issue!.id.toString())) {
       options.push({
-        value: editEntry.issue.id.toString(),
-        label: `#${editEntry.issue.id} - ${editEntry.issue.subject || (editEntry.issue as any).name || ''}`,
+        value: sourceEntry.issue.id.toString(),
+        label: `#${sourceEntry.issue.id} - ${sourceEntry.issue.subject || (sourceEntry.issue as any).name || ''}`,
       });
     }
     const preset = presets.find(p => p.id === selectedPresetId);
@@ -115,7 +127,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       });
     }
     return options;
-  }, [tasks, loadedTask, isEditing, editEntry, presets, selectedPresetId]);
+  }, [tasks, loadedTask, editEntry, copyEntry, presets, selectedPresetId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -137,6 +149,23 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         });
         setCustomFieldValues(prev => ({ ...prev, ...initialValues }));
       }
+    } else if (copyEntry) {
+      form.setValues({
+        projectId: copyEntry.project?.id?.toString() || '',
+        taskId: copyEntry.issue?.id?.toString() || '',
+        activityId: copyEntry.activity?.id?.toString() || '',
+        hours: copyEntry.hours,
+        spentOn: '', // Date is intentionally left empty when copying
+        comments: copyEntry.comments || '',
+      });
+
+      const initialValues: Record<number, string> = {};
+      if (copyEntry.custom_fields) {
+        copyEntry.custom_fields.forEach(f => {
+          initialValues[f.id] = f.value;
+        });
+      }
+      setCustomFieldValues(initialValues);
     } else {
       form.setValues({
         projectId: '',
@@ -163,13 +192,14 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editEntry, defaultDate, initialPresetId, customFields, billableFieldId]);
+  }, [isOpen, editEntry, copyEntry, defaultDate, initialPresetId, customFields, billableFieldId]);
 
   useEffect(() => {
-    if (isOpen && editEntry?.activity?.id) {
-      form.setFieldValue('activityId', editEntry.activity.id.toString());
+    const sourceActId = editEntry?.activity?.id || copyEntry?.activity?.id;
+    if (isOpen && sourceActId) {
+      form.setFieldValue('activityId', sourceActId.toString());
     }
-  }, [isOpen, editEntry, activities]);
+  }, [isOpen, editEntry, copyEntry, activities]);
 
   const handleTaskChange = (val: string | null) => {
     const newTaskId = val || '';
@@ -274,13 +304,18 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
           value: value,
         }));
 
+      const cleanTaskId = values.taskId ? values.taskId.toString().replace(/^#/, '').trim() : '';
+      const parsedTaskId = cleanTaskId ? parseInt(cleanTaskId, 10) : undefined;
+      const validTaskId = (parsedTaskId && !isNaN(parsedTaskId)) ? parsedTaskId : undefined;
+
+      const cleanProjectId = values.projectId && values.projectId !== 'my_issues' ? values.projectId.toString().trim() : '';
+
       const data = {
         hours: typeof values.hours === 'string' ? parseFloat(values.hours) : values.hours,
         comments: values.comments.trim(),
-        activity_id: parseInt(values.activityId),
+        activity_id: parseInt(values.activityId, 10),
         spent_on: values.spentOn,
-        issue_id: values.taskId ? parseInt(values.taskId, 10) : undefined,
-        project_id: values.projectId && values.projectId !== 'my_issues' ? parseInt(values.projectId) : undefined,
+        ...(validTaskId ? { issue_id: validTaskId } : (cleanProjectId ? { project_id: cleanProjectId } : {})),
         ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
       };
 
@@ -307,7 +342,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     <Modal
       opened={isOpen}
       onClose={onClose}
-      title={<Text fw={600}>{isEditing ? 'Edit Time Entry' : 'Log Time'}</Text>}
+      title={<Text fw={600}>{copyEntry ? 'Copy Time Entry' : (isEditing ? 'Edit Time Entry' : 'Log Time')}</Text>}
       size="80%"
       fullScreen={isMobile}
       centered

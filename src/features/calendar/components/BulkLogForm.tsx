@@ -208,15 +208,20 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
     const hoursNum = typeof values.hours === 'string' ? parseFloat(values.hours) : values.hours;
 
+    const cleanTaskId = values.taskId ? values.taskId.toString().replace(/^#/, '').trim() : '';
+    const parsedTaskId = cleanTaskId ? parseInt(cleanTaskId, 10) : undefined;
+    const validTaskId = (parsedTaskId && !isNaN(parsedTaskId)) ? parsedTaskId : undefined;
+
+    const cleanProjectId = values.projectId && values.projectId !== 'my_issues' ? values.projectId.toString().trim() : '';
+
     for (const dateStr of days) {
       try {
         await createTimeEntry({
           hours: hoursNum,
           comments: values.comments.trim(),
-          activity_id: parseInt(values.activityId),
+          activity_id: parseInt(values.activityId, 10),
           spent_on: dateStr,
-          issue_id: parseInt(values.taskId),
-          project_id: values.projectId && values.projectId !== 'my_issues' ? parseInt(values.projectId) : undefined,
+          ...(validTaskId ? { issue_id: validTaskId } : (cleanProjectId ? { project_id: cleanProjectId } : {})),
           ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
         });
         successCount++;

@@ -15,7 +15,19 @@ function normalizeUrl(url: string): string {
     return url.replace(/\/$/, '');
 }
 
+/**
+ * Serializes request body to JSON, applying time_entry payload sanitization if present.
+ * 
+ * @param body Object payload to serialize.
+ * @returns JSON string or undefined.
+ */
 function buildBody(body: object | null | undefined) {
+    if (body && typeof body === 'object' && 'time_entry' in body && (body as any).time_entry) {
+        body = {
+            ...body,
+            time_entry: sanitizeTimeEntryData((body as any).time_entry)
+        };
+    }
     return body ? JSON.stringify(body) : undefined;
 }
 
@@ -236,17 +248,80 @@ export async function getProjectActivities(projectId: string | number) {
     }
 }
 
+/**
+ * Sanitizes time entry data before sending to Redmine REST API.
+ * Ensures issue_id/project_id/hours/activity_id are cleanly parsed and validated.
+ * 
+ * @param data Raw time entry input data.
+ * @returns Sanitized object ready for JSON serialization.
+ */
+export function sanitizeTimeEntryData(data: Record<string, any>): Record<string, any> {
+    const clean: Record<string, any> = {};
+
+    // 1. Sanitize issue_id
+    if (data.issue_id !== undefined && data.issue_id !== null && data.issue_id !== '') {
+        const cleanIssueStr = String(data.issue_id).replace(/^#/, '').trim();
+        const parsedIssue = parseInt(cleanIssueStr, 10);
+        if (!isNaN(parsedIssue) && parsedIssue > 0) {
+            clean.issue_id = parsedIssue;
+        }
+    }
+
+    // 2. Sanitize project_id
+    if (data.project_id !== undefined && data.project_id !== null && data.project_id !== '' && data.project_id !== 'my_issues') {
+        const cleanProjStr = String(data.project_id).trim();
+        if (cleanProjStr) {
+            const parsedProj = parseInt(cleanProjStr, 10);
+            const validProj = !isNaN(parsedProj) ? parsedProj : cleanProjStr;
+            // Redmine API rule: if issue_id is present, Redmine automatically resolves the project from the issue.
+            // Sending project_id alongside issue_id can cause "Project is invalid" if project_id doesn't match the issue's project.
+            if (!clean.issue_id) {
+                clean.project_id = validProj;
+            }
+        }
+    }
+
+    // 3. Sanitize hours
+    if (data.hours !== undefined && data.hours !== null && data.hours !== '') {
+        const hoursNum = typeof data.hours === 'string' ? parseFloat(data.hours) : Number(data.hours);
+        if (!isNaN(hoursNum)) {
+            clean.hours = hoursNum;
+        }
+    }
+
+    // 4. Sanitize activity_id
+    if (data.activity_id !== undefined && data.activity_id !== null && data.activity_id !== '') {
+        const parsedAct = parseInt(String(data.activity_id), 10);
+        if (!isNaN(parsedAct) && parsedAct > 0) {
+            clean.activity_id = parsedAct;
+        }
+    }
+
+    if (data.comments !== undefined) clean.comments = data.comments;
+    if (data.spent_on !== undefined) clean.spent_on = data.spent_on;
+    if (data.custom_fields !== undefined) clean.custom_fields = data.custom_fields;
+
+    return clean;
+}
+
+/**
+ * Updates an existing time entry in Redmine.
+ * 
+ * @param id The time entry ID to update.
+ * @param data Updated time entry fields.
+ * @returns True if successful.
+ */
 export async function updateTimeEntry(id: number, data: {
     hours?: number;
     comments?: string;
     activity_id?: number;
     spent_on?: string;
-    issue_id?: number;
-    project_id?: number;
+    issue_id?: number | string;
+    project_id?: number | string;
     custom_fields?: Array<{ id: number, value: any }>;
 }) {
     try {
-        const body = { time_entry: data };
+        const body = { time_entry: sanitizeTimeEntryData(data) };
         await redmineApiRequest(`/time_entries/${id}.json`, 'PUT', body);
         return true;
     } catch (error) {
@@ -255,17 +330,23 @@ export async function updateTimeEntry(id: number, data: {
     }
 }
 
+/**
+ * Creates a new time entry in Redmine.
+ * 
+ * @param data Time entry details.
+ * @returns True if successful.
+ */
 export async function createTimeEntry(data: {
     hours: number;
     comments?: string;
     activity_id?: number;
     spent_on?: string;
-    issue_id?: number;
-    project_id?: number;
+    issue_id?: number | string;
+    project_id?: number | string;
     custom_fields?: Array<{ id: number, value: any }>;
 }) {
     try {
-        const body = { time_entry: data };
+        const body = { time_entry: sanitizeTimeEntryData(data) };
         await redmineApiRequest('/time_entries.json', 'POST', body);
         return true;
     } catch (error) {

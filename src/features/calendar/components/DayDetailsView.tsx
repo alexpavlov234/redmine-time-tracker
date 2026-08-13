@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { TimeEntry } from '../../../types';
 import { Card, Button, Group, Text, Progress, Stack, ActionIcon, Badge, Paper, Anchor } from '@mantine/core';
-import { IconClock, IconEdit, IconTrash, IconPlus, IconExternalLink } from '@tabler/icons-react';
+import { IconClock, IconEdit, IconTrash, IconPlus, IconExternalLink, IconCopy } from '@tabler/icons-react';
 import { useSettings } from '../../../contexts/SettingsContext';
 
 interface DayDetailsViewProps {
@@ -10,6 +10,7 @@ interface DayDetailsViewProps {
   projectColorMap: Map<string, string>;
   onClose: () => void;
   onEdit: (entry: TimeEntry) => void;
+  onCopy?: (entry: TimeEntry) => void;
   onDelete: (entryId: number) => void;
   onAdd: (dateStr: string) => void;
 }
@@ -20,6 +21,7 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
   projectColorMap,
   onClose,
   onEdit,
+  onCopy,
   onDelete,
   onAdd,
 }) => {
@@ -143,10 +145,15 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
                           </div>
 
                           <Group gap={2} style={{ flexShrink: 0, marginLeft: 6 }}>
-                            <ActionIcon variant="subtle" size="20px" onClick={() => onEdit(entry)} aria-label="Edit entry">
+                            {onCopy && (
+                              <ActionIcon variant="subtle" size="20px" color="blue" onClick={() => onCopy(entry)} aria-label="Copy entry to another date" title="Copy entry to another date">
+                                <IconCopy size={13} />
+                              </ActionIcon>
+                            )}
+                            <ActionIcon variant="subtle" size="20px" onClick={() => onEdit(entry)} aria-label="Edit entry" title="Edit entry">
                               <IconEdit size={13} />
                             </ActionIcon>
-                            <ActionIcon variant="subtle" size="20px" color="red" onClick={() => onDelete(entry.id)} aria-label="Delete entry">
+                            <ActionIcon variant="subtle" size="20px" color="red" onClick={() => onDelete(entry.id)} aria-label="Delete entry" title="Delete entry">
                               <IconTrash size={13} />
                             </ActionIcon>
                           </Group>
