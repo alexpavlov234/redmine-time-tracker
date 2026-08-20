@@ -12,16 +12,29 @@ import { IconDeviceFloppy, IconSend, IconTrash, IconListCheck } from '@tabler/ic
 import { useCustomFields } from '../../../hooks/useCustomFields';
 import { SavePresetModal } from './SavePresetModal';
 
+/// <summary>
+/// Properties for configuring the TimeEntryFormModal component.
+/// </summary>
 interface TimeEntryFormModalProps {
+  /// <summary>Whether the modal is currently open.</summary>
   isOpen: boolean;
+  /// <summary>Callback triggered when modal is closed.</summary>
   onClose: () => void;
+  /// <summary>Callback triggered when time entry is successfully saved.</summary>
   onSuccess: () => void;
+  /// <summary>Existing time entry to be edited, if any.</summary>
   editEntry?: TimeEntry | null;
+  /// <summary>Existing time entry to copy data from, if any.</summary>
   copyEntry?: TimeEntry | null;
+  /// <summary>Default date to populate when creating a new entry.</summary>
   defaultDate?: string;
+  /// <summary>Identifier of initial preset to pre-fill.</summary>
   initialPresetId?: string | null;
 }
 
+/// <summary>
+/// Modal dialog for logging, editing, and copying Redmine time entries.
+/// </summary>
 export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   isOpen,
   onClose,
@@ -42,6 +55,15 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(initialPresetId || null);
   const [formResult, setFormResult] = useState<{ success: boolean; message: string } | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
+
+  /// <summary>
+  /// Updates a custom field value safely without accessing synthetic event targets asynchronously.
+  /// </summary>
+  /// <param name="fieldId">Custom field identifier.</param>
+  /// <param name="value">New field string value.</param>
+  const handleCustomFieldChange = (fieldId: number, value: string) => {
+    setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }));
+  };
 
   useEffect(() => {
     if (!isOpen) setFormResult(null);
@@ -497,7 +519,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                                 key={field.id}
                                 label={field.name}
                                 checked={value === '1'}
-                                onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
+                                onChange={e => handleCustomFieldChange(field.id, e.currentTarget.checked ? '1' : '0')}
                               />
                             );
                           }
@@ -509,7 +531,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                                 label={field.name}
                                 placeholder={`-- Select ${field.name} --`}
                                 value={value}
-                                onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
+                                onChange={v => handleCustomFieldChange(field.id, v || '')}
                                 data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
                                 required={field.is_required || field.required}
                               />
@@ -522,7 +544,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                                 key={field.id}
                                 label={field.name}
                                 value={value}
-                                onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                                onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
                                 required={field.is_required || field.required}
                                 minRows={2}
                                 autosize
@@ -537,7 +559,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                                 key={field.id}
                                 label={field.name}
                                 value={value ? parseFloat(value) : ''}
-                                onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
+                                onChange={v => handleCustomFieldChange(field.id, v === '' ? '' : String(v))}
                                 required={field.is_required || field.required}
                                 decimalScale={format === 'float' ? 2 : 0}
                               />
@@ -549,7 +571,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                               key={field.id}
                               label={field.name}
                               value={value}
-                              onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                              onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
                               required={field.is_required || field.required}
                               type={format === 'date' ? 'date' : 'text'}
                             />

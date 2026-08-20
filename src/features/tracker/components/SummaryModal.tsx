@@ -12,11 +12,19 @@ import { useCustomFields } from '../../../hooks/useCustomFields';
 
 import { useSettings } from '../../../contexts/SettingsContext';
 
+/// <summary>
+/// Properties for configuring the SummaryModal component.
+/// </summary>
 interface SummaryModalProps {
+  /// <summary>Whether the modal is currently open.</summary>
   isOpen: boolean;
+  /// <summary>Callback triggered when modal is closed.</summary>
   onClose: () => void;
 }
 
+/// <summary>
+/// Modal dialog for reviewing logged queue activity and submitting time logs to Redmine.
+/// </summary>
 export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) => {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const { usePerformedTasksList, redmineUrl } = useSettings();
@@ -38,6 +46,15 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ success: boolean; message: string } | null>(null);
   const [manualHours, setManualHours] = useState<number | string>(0);
+
+  /// <summary>
+  /// Updates a custom field value safely without accessing synthetic event targets asynchronously.
+  /// </summary>
+  /// <param name="fieldId">Custom field identifier.</param>
+  /// <param name="value">New field string value.</param>
+  const handleCustomFieldChange = (fieldId: number, value: string) => {
+    setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }));
+  };
 
   const { customFields } = useCustomFields();
   const billableFieldId = localStorage.getItem('billableFieldId');
@@ -317,7 +334,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                         key={field.id}
                         label={field.name}
                         checked={value === '1'}
-                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.checked ? '1' : '0' }))}
+                        onChange={e => handleCustomFieldChange(field.id, e.currentTarget.checked ? '1' : '0')}
                       />
                     );
                   }
@@ -329,7 +346,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                         label={field.name}
                         placeholder={`-- Select ${field.name} --`}
                         value={value}
-                        onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v || '' }))}
+                        onChange={v => handleCustomFieldChange(field.id, v || '')}
                         data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
                         required={field.is_required || field.required}
                       />
@@ -342,7 +359,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                         key={field.id}
                         label={field.name}
                         value={value}
-                        onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                        onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
                         required={field.is_required || field.required}
                         minRows={2}
                         autosize
@@ -356,7 +373,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                         key={field.id}
                         label={field.name}
                         value={value ? parseFloat(value) : ''}
-                        onChange={v => setCustomFieldValues(prev => ({ ...prev, [field.id]: v === '' ? '' : String(v) }))}
+                        onChange={v => handleCustomFieldChange(field.id, v === '' ? '' : String(v))}
                         required={field.is_required || field.required}
                         decimalScale={format === 'float' ? 2 : 0}
                       />
@@ -368,7 +385,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                       key={field.id}
                       label={field.name}
                       value={value}
-                      onChange={e => setCustomFieldValues(prev => ({ ...prev, [field.id]: e.currentTarget.value }))}
+                      onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
                       required={field.is_required || field.required}
                       type={format === 'date' ? 'date' : 'text'}
                     />
