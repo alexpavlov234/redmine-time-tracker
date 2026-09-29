@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 interface SettingsContextProps {
   apiKey: string;
@@ -57,6 +57,22 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const isConfigured = Boolean(apiKey && redmineUrl);
+
+  // Sync settings with local proxy server config
+  useEffect(() => {
+    if (apiKey || redmineUrl) {
+      const isDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const endpoint = isDev ? 'http://localhost:3000/config' : '/config';
+
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, redmineUrl }),
+      }).catch(() => {
+        // Ignore if proxy is offline
+      });
+    }
+  }, [apiKey, redmineUrl]);
 
   return (
     <SettingsContext.Provider

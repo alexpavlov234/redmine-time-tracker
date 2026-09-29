@@ -1,0 +1,317 @@
+/* Styling for injected Redmine Time Tracker controls and native Redmine-style modals */
+
+.rtt-action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none !important;
+  transition: all 0.2s ease;
+  user-select: none;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+/* Idle / Start State */
+.rtt-button-start {
+  background: #2e7d32;
+  color: #ffffff !important;
+  border: 1px solid #1b5e20;
+}
+
+.rtt-button-start:hover {
+  background: #1b5e20;
+  color: #ffffff !important;
+}
+
+/* Running State - Clean single pulse indicator */
+.rtt-button-running {
+  background: #c62828;
+  color: #ffffff !important;
+  border: 1px solid #b71c1c;
+}
+
+.rtt-button-running:hover {
+  background: #b71c1c;
+  color: #ffffff !important;
+}
+
+.rtt-time-text {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+.rtt-divider {
+  opacity: 0.6;
+  margin: 0 1px;
+}
+
+.rtt-stop-text {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Running on Another Issue */
+.rtt-button-switch {
+  background: #e8590c;
+  color: #ffffff !important;
+  border: 1px solid #d9480f;
+}
+
+.rtt-button-switch:hover {
+  background: #d9480f;
+  color: #ffffff !important;
+}
+
+/* Offline state */
+.rtt-button-offline {
+  background: #868e96;
+  color: #f1f3f5 !important;
+  border: 1px solid #495057;
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+/* Single Pulse Dot Indicator */
+.rtt-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #51cf66;
+  display: inline-block;
+  flex-shrink: 0;
+  animation: rtt-dot-blink 1s ease-in-out infinite alternate;
+}
+
+.rtt-pulse-dot-active {
+  background-color: #ff8787;
+}
+
+@keyframes rtt-dot-blink {
+  from {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.rtt-action-button svg {
+  vertical-align: -1px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+/* Redmine Native jQuery UI Modal Overlay & Dialog */
+.rtt-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  font-family: Verdana, sans-serif;
+  font-size: 12px;
+}
+
+.rtt-modal-dialog.ui-dialog {
+  position: relative !important;
+  width: 480px;
+  max-width: 92vw;
+  padding: 0 !important;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  animation: rttFadeIn 0.15s ease-out;
+  overflow: hidden;
+}
+
+.rtt-modal-header.ui-dialog-titlebar {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.rtt-modal-header .ui-dialog-title {
+  font-size: 13px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.rtt-modal-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0 4px;
+  text-decoration: none !important;
+  font-size: 18px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.rtt-modal-close:hover {
+  opacity: 1;
+}
+
+.rtt-modal-body.ui-dialog-content {
+  padding: 12px 14px !important;
+}
+
+.rtt-modal-body h3.title {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: bold;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.rtt-modal-body .box {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 3px;
+}
+
+.rtt-modal-body .tabular p {
+  margin: 0;
+  padding: 4px 0;
+}
+
+.rtt-modal-body .tabular label {
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.rtt-modal-body select,
+.rtt-modal-body textarea {
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 3px;
+  padding: 5px 7px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.rtt-modal-body textarea {
+  resize: vertical;
+}
+
+.rtt-modal-body p.buttons {
+  margin: 12px 0 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rtt-modal-body p.buttons input[type="button"],
+.rtt-modal-body p.buttons input[type="submit"] {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 3px;
+  font-family: inherit;
+}
+
+.rtt-modal-body a.button-cancel {
+  margin-left: 6px;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 12px;
+}
+
+/* Light Theme Redmine Modal Defaults */
+.rtt-modal-overlay.rtt-light .ui-widget-content {
+  background-color: #ffffff;
+  color: #222222;
+  border-color: #dcdcdc;
+}
+
+.rtt-modal-overlay.rtt-light .box {
+  background-color: #f6f6f6;
+  border-color: #e4e4e4;
+}
+
+.rtt-modal-overlay.rtt-light .ui-dialog-titlebar {
+  background-color: #f0f4f8;
+  border-color: #bbd8e9;
+  color: #169;
+}
+
+.rtt-modal-overlay.rtt-light h3.title {
+  color: #169;
+  border-color: #bbd8e9;
+}
+
+.rtt-modal-overlay.rtt-light select,
+.rtt-modal-overlay.rtt-light textarea {
+  background-color: #ffffff;
+  color: #222222;
+  border-color: #cccccc;
+}
+
+.rtt-modal-overlay.rtt-light a.button-cancel {
+  color: #169;
+}
+
+/* Dark Theme Redmine Modal (matches user's dark Redmine theme) */
+.rtt-modal-overlay.rtt-dark .ui-widget-content {
+  background-color: #282523;
+  color: #e6e6e6;
+  border-color: #484440;
+}
+
+.rtt-modal-overlay.rtt-dark .box {
+  background-color: #1e1b19;
+  border-color: #3d3a36;
+}
+
+.rtt-modal-overlay.rtt-dark .ui-dialog-titlebar {
+  background-color: #201d1b;
+  border-color: #3d3a36;
+  color: #64b5f6;
+}
+
+.rtt-modal-overlay.rtt-dark h3.title {
+  color: #64b5f6;
+  border-color: #3d3a36;
+}
+
+.rtt-modal-overlay.rtt-dark select,
+.rtt-modal-overlay.rtt-dark textarea {
+  background-color: #332f2b;
+  color: #f0f0f0;
+  border-color: #484440;
+}
+
+.rtt-modal-overlay.rtt-dark a.button-cancel {
+  color: #64b5f6;
+}
+
+@keyframes rttFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
