@@ -1,21 +1,17 @@
-import React, { useState, useMemo } from 'react';
-import { Card, Select, TextInput, Button, Group, Stack, ActionIcon, Text } from '@mantine/core';
+import React, { useState } from 'react';
+import { Card, TextInput, Button, Group, Stack, ActionIcon, Text } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useProjects } from '../../../contexts/ProjectsContext';
-import { useTasksForProject } from '../../../hooks/useTasksForProject';
-import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
-import { getIssue } from '../../../services/redmine';
 import type { RedmineIssue } from '../../../types';
 import { IconCirclePlus, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
 
 export const AddTaskForm: React.FC = () => {
   const { addTodo } = useQueue();
   const { allProjects } = useProjects();
   const [isExpanded, setIsExpanded] = useState(false);
-
-  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
-  const [isLoadingIssue, setIsLoadingIssue] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<RedmineIssue | null>(null);
 
   const form = useForm({
     initialValues: {
@@ -30,60 +26,12 @@ export const AddTaskForm: React.FC = () => {
     },
   });
 
-  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(form.values.projectId || null);
-  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(form.values.projectId || null);
-
-  const projectOptions = useMemo(() => {
-    return [
-      { value: 'my_issues', label: '--- My Assigned Issues ---' },
-      ...allProjects.map(p => ({
-        value: p.id.toString(),
-        label: p.name,
-      }))
-    ];
-  }, [allProjects]);
-
-  const taskOptions = useMemo(() => {
-    const options = tasks.map(t => ({
-      value: t.id.toString(),
-      label: `#${t.id} - ${t.subject}`,
-    }));
-    if (loadedTask && !options.some(o => o.value === loadedTask.id.toString())) {
-      options.push({
-        value: loadedTask.id.toString(),
-        label: `#${loadedTask.id} - ${loadedTask.subject}`,
-      });
-    }
-    return options;
-  }, [tasks, loadedTask]);
-
-  const handleQuickLoad = async (id: string) => {
-    if (!id) return;
-    setIsLoadingIssue(true);
-    try {
-      const cleanId = id.replace(/^#/, '').trim();
-      const issue = await getIssue(parseInt(cleanId, 10));
-      setLoadedTask(issue);
-      form.setFieldValue('taskId', issue.id.toString());
-      if (issue.project) {
-        form.setFieldValue('projectId', issue.project.id.toString());
-      }
-    } catch (error: any) {
-      // ignore
-    } finally {
-      setIsLoadingIssue(false);
-    }
-  };
-
-  const handleTaskSelect = (val: string | null) => {
-    const newTaskId = val || '';
-    form.setFieldValue('taskId', newTaskId);
-    
-    if (val && !form.values.projectId) {
-      const task = tasks.find(t => t.id.toString() === val) || (loadedTask?.id.toString() === val ? loadedTask : null);
-      if (task?.project?.id) {
-        form.setFieldValue('projectId', task.project.id.toString());
-      }
+  const handleTaskChange = (taskId: string, task?: RedmineIssue | null) => {
+    form.setFieldValue('taskId', taskId);
+    if (task) {
+      setSelectedTask(task);
+    } else if (!taskId) {
+      setSelectedTask(null);
     }
   };
 
@@ -91,20 +39,18 @@ export const AddTaskForm: React.FC = () => {
     const { projectId, taskId, activityId, note } = values;
 
     const project = allProjects.find(p => p.id.toString() === projectId);
-    const issue = tasks.find(t => t.id.toString() === taskId) || (loadedTask?.id.toString() === taskId ? loadedTask : null);
-    const activity = activities.find(a => a.id.toString() === activityId);
 
     addTodo({
       projectId,
       projectName: project?.name || (projectId === 'my_issues' ? 'My Issues' : `Project ${projectId}`),
       taskId,
-      taskSubject: issue?.subject || `Task ${taskId}`,
-      activityId: activity?.id ? Number(activity.id) : undefined,
-      activityName: activity?.name,
+      taskSubject: selectedTask?.subject || `Task ${taskId}`,
+      activityId: activityId ? Number(activityId) : undefined,
       note,
     });
 
     form.reset();
+    setSelectedTask(null);
   };
 
   return (
@@ -124,58 +70,22 @@ export const AddTaskForm: React.FC = () => {
       {isExpanded && (
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
-            <Select
-              label="Project"
-              placeholder="Search projects..."
-              data={projectOptions}
-              searchable
-              withAsterisk
-              {...form.getInputProps('projectId')}
-              onChange={(val) => {
-                form.setFieldValue('projectId', val || '');
+            <ProjectTaskActivityFields
+              projectId={form.values.projectId}
+              onProjectChange={(val) => {
+                form.setFieldValue('projectId', val);
                 if (!val) form.setFieldValue('taskId', '');
                 form.setFieldValue('activityId', '');
               }}
-            />
-
-            <Group align="flex-start" wrap="nowrap">
-              <TextInput
-                label="Task ID"
-                placeholder="ID..."
-                w={110}
-                {...form.getInputProps('taskId')}
-                onBlur={() => {
-                  if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
-                    handleQuickLoad(form.values.taskId);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (form.values.taskId) handleQuickLoad(form.values.taskId);
-                  }
-                }}
-                disabled={isLoadingIssue}
-              />
-              <Select
-                label="Task Name"
-                placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-                data={taskOptions}
-                searchable
-                withAsterisk
-                disabled={isLoadingTasks}
-                {...form.getInputProps('taskId')}
-                onChange={handleTaskSelect}
-                style={{ flex: 1 }}
-              />
-            </Group>
-
-            <Select
-              label="Activity"
-              placeholder={isLoadingActivities ? 'Loading activities...' : '-- Select activity (optional) --'}
-              data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
-              disabled={isLoadingActivities || !form.values.projectId}
-              {...form.getInputProps('activityId')}
+              taskId={form.values.taskId}
+              onTaskChange={handleTaskChange}
+              activityId={form.values.activityId}
+              onActivityChange={(val) => form.setFieldValue('activityId', val)}
+              includeMyIssues={true}
+              activityRequired={false}
+              projectRequired={true}
+              taskRequired={true}
+              layout="stacked"
             />
 
             <TextInput
@@ -185,7 +95,7 @@ export const AddTaskForm: React.FC = () => {
             />
 
             <Group justify="flex-end">
-              <Button type="submit" disabled={!form.values.projectId || !form.values.taskId || isLoadingTasks}>
+              <Button type="submit" disabled={!form.values.projectId || !form.values.taskId}>
                 Add to Queue
               </Button>
             </Group>

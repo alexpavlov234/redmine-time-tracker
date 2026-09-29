@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Select, TextInput, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor, Grid, Paper } from '@mantine/core';
+import { Modal, Button, Select, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor, Grid, Paper } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
@@ -7,10 +7,12 @@ import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject'
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { redmineApiRequest } from '../../../services/redmine';
 import { formatTime } from '../../../utils/formatters';
-import { IconSend, IconCheck, IconListCheck, IconExternalLink } from '@tabler/icons-react';
+import { IconSend, IconCheck, IconExternalLink } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
-
 import { useSettings } from '../../../contexts/SettingsContext';
+import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
+import { CustomFieldsSection } from '../../../components/common/CustomFieldsSection';
+import { getLastActivityForTask, setLastActivityForTask } from '../../../services/taskActivity';
 
 /// <summary>
 /// Properties for configuring the SummaryModal component.
@@ -30,7 +32,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   const { usePerformedTasksList, redmineUrl } = useSettings();
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
   const { } = useQueue();
-  const { allProjects, issueStatuses, setIssueStatuses } = useProjects();
+  const { allProjects, issueStatuses, setIssueStatuses, refreshRecentProjects } = useProjects();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
@@ -90,9 +92,17 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       }
       setManualHours(parseFloat(hoursCalc.toFixed(2)));
 
-      // Set activity from todo or default
+      // Set activity from todo, or check last used activity for task, or default
       if (activeTodo?.activityId) {
         setActivityId(String(activeTodo.activityId));
+      } else if (activeTodo?.taskId) {
+        getLastActivityForTask(activeTodo.taskId).then(actId => {
+          if (actId) {
+            setActivityId(actId);
+          } else if (defaultActivityId) {
+            setActivityId(String(defaultActivityId));
+          }
+        });
       } else if (defaultActivityId) {
         setActivityId(String(defaultActivityId));
       }
@@ -191,6 +201,11 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
       setSubmitResult({ success: true, message: 'Time entry submitted successfully!' });
 
+      if (validIssueId && activityId) {
+        setLastActivityForTask(validIssueId, activityId);
+      }
+      refreshRecentProjects().catch(() => {});
+
       // Auto-close & advance queue
       setTimeout(() => {
         onClose();
@@ -218,62 +233,77 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
           <Stack gap="md">
             {/* Task or Project info */}
             {activeTodo?.taskId ? (
-              <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-default)">
-                <Stack gap={2}>
-                  <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-                    {activeTodo.projectName}
-                  </Text>
-                  <Group gap={6} wrap="nowrap">
-                    <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="md" fw={700} underline="hover">
-                      #{activeTodo.taskId} - {activeTodo.taskSubject}
-                    </Anchor>
-                    <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
-                  </Group>
-                </Stack>
-              </Paper>
+              <>
+                <Paper withBorder p="sm" radius="md" bg="var(--mantine-color-default)">
+                  <Stack gap={2}>
+                    <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+                      {activeTodo.projectName}
+                    </Text>
+                    <Group gap={6} wrap="nowrap">
+                      <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="md" fw={700} underline="hover">
+                        #{activeTodo.taskId} - {activeTodo.taskSubject}
+                      </Anchor>
+                      <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
+                    </Group>
+                  </Stack>
+                </Paper>
+
+                {/* Side-by-side: Hours & Activity */}
+                <Group align="flex-start" wrap="nowrap">
+                  <NumberInput
+                    label="Hours"
+                    description={`Recorded: ${formatTime(totalElapsedTime)}`}
+                    value={manualHours}
+                    onChange={setManualHours}
+                    decimalScale={2}
+                    step={0.1}
+                    min={0.1}
+                    withAsterisk
+                    w={120}
+                  />
+
+                  <Select
+                    label="Activity"
+                    placeholder="-- Select activity --"
+                    value={activityId}
+                    onChange={setActivityId}
+                    data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
+                    required
+                    style={{ flex: 1 }}
+                  />
+                </Group>
+              </>
             ) : (
-              <Stack gap="xs">
-                <Select
-                  label="Project"
-                  placeholder="-- Select project --"
-                  value={selectedProjectId}
-                  onChange={val => setSelectedProjectId(val || '')}
-                  data={allProjects.map(p => ({ value: p.id.toString(), label: p.name }))}
-                  required
+              <>
+                <ProjectTaskActivityFields
+                  projectId={selectedProjectId}
+                  onProjectChange={(val) => {
+                    setSelectedProjectId(val);
+                    if (!val) setSelectedTaskId('');
+                  }}
+                  taskId={selectedTaskId}
+                  onTaskChange={(val) => setSelectedTaskId(val)}
+                  activityId={activityId || ''}
+                  onActivityChange={(val) => setActivityId(val)}
+                  includeMyIssues={true}
+                  activityRequired={true}
+                  projectRequired={true}
+                  taskRequired={false}
+                  layout="stacked"
                 />
-                <TextInput
-                  label="Issue # (Optional)"
-                  placeholder="e.g. 12345"
-                  value={selectedTaskId}
-                  onChange={e => setSelectedTaskId(e.currentTarget.value)}
+
+                <NumberInput
+                  label="Hours"
+                  description={`Recorded: ${formatTime(totalElapsedTime)}`}
+                  value={manualHours}
+                  onChange={setManualHours}
+                  decimalScale={2}
+                  step={0.1}
+                  min={0.1}
+                  withAsterisk
                 />
-              </Stack>
+              </>
             )}
-
-            {/* Side-by-side: Hours & Activity */}
-            <Group align="flex-start" wrap="nowrap">
-              <NumberInput
-                label="Hours"
-                description={`Recorded: ${formatTime(totalElapsedTime)}`}
-                value={manualHours}
-                onChange={setManualHours}
-                decimalScale={2}
-                step={0.1}
-                min={0.1}
-                withAsterisk
-                w={120}
-              />
-
-              <Select
-                label="Activity"
-                placeholder="-- Select activity --"
-                value={activityId}
-                onChange={setActivityId}
-                data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
-                required
-                style={{ flex: 1 }}
-              />
-            </Group>
 
             {/* Status Change row */}
             <Group align="flex-end" wrap="nowrap">
@@ -313,86 +343,12 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
               }}
             />
 
-            {/* Dynamic Custom Fields */}
-            {customFields.length > 0 && (
-              <Stack gap="sm" pt="xs">
-                <Group gap="xs">
-                  <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
-                </Group>
-                {customFields.map(field => {
-                  const value = customFieldValues[field.id] || '';
-                  const format = field.field_format || (field as any).format;
-                  const isLikelyBool = format === 'bool' || 
-                                       format === 'boolean' ||
-                                       field.name.toLowerCase().includes('billable') ||
-                                       field.name.toLowerCase().includes('billing');
-
-                  if (isLikelyBool) {
-                    return (
-                      <Checkbox
-                        key={field.id}
-                        label={field.name}
-                        checked={value === '1'}
-                        onChange={e => handleCustomFieldChange(field.id, e.currentTarget.checked ? '1' : '0')}
-                      />
-                    );
-                  }
-                  
-                  if (format === 'list' || format === 'user' || format === 'version') {
-                    return (
-                      <Select
-                        key={field.id}
-                        label={field.name}
-                        placeholder={`-- Select ${field.name} --`}
-                        value={value}
-                        onChange={v => handleCustomFieldChange(field.id, v || '')}
-                        data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
-                        required={field.is_required || field.required}
-                      />
-                    );
-                  }
-
-                  if (format === 'text') {
-                    return (
-                      <Textarea
-                        key={field.id}
-                        label={field.name}
-                        value={value}
-                        onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
-                        required={field.is_required || field.required}
-                        minRows={2}
-                        autosize
-                      />
-                    );
-                  }
-
-                  if (format === 'int' || format === 'float') {
-                    return (
-                      <NumberInput
-                        key={field.id}
-                        label={field.name}
-                        value={value ? parseFloat(value) : ''}
-                        onChange={v => handleCustomFieldChange(field.id, v === '' ? '' : String(v))}
-                        required={field.is_required || field.required}
-                        decimalScale={format === 'float' ? 2 : 0}
-                      />
-                    );
-                  }
-
-                  return (
-                    <TextInput
-                      key={field.id}
-                      label={field.name}
-                      value={value}
-                      onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
-                      required={field.is_required || field.required}
-                      type={format === 'date' ? 'date' : 'text'}
-                    />
-                  );
-                })}
-              </Stack>
-            )}
+            <CustomFieldsSection
+              customFields={customFields}
+              values={customFieldValues}
+              onChange={handleCustomFieldChange}
+              disabled={isSubmitting}
+            />
           </Stack>
         </Grid.Col>
       </Grid>

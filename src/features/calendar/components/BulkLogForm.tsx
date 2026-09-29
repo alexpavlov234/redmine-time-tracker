@@ -1,15 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Card, TextInput, Button, Select, NumberInput, Checkbox, Textarea, Group, Stack, Text, Progress, Badge, ActionIcon, Divider, Alert } from '@mantine/core';
+import { Card, TextInput, Button, Select, NumberInput, Group, Stack, Text, Progress, Badge, ActionIcon, Divider, Alert } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconSend, IconCheck, IconListCheck, IconTrash, IconCirclePlus } from '@tabler/icons-react';
+import { IconSend, IconCheck, IconTrash, IconCirclePlus } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
-import { createTimeEntry, getIssue } from '../../../services/redmine';
-import type { RedmineIssue, TimeLogPreset } from '../../../types';
+import { createTimeEntry } from '../../../services/redmine';
+import type { TimeLogPreset } from '../../../types';
 import { useProjects } from '../../../contexts/ProjectsContext';
-import { useTasksForProject } from '../../../hooks/useTasksForProject';
-import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { usePresets } from '../../../hooks/usePresets';
 import { SavePresetModal } from './SavePresetModal';
+import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
+import { CustomFieldsSection } from '../../../components/common/CustomFieldsSection';
 
 /// <summary>
 /// Properties for configuring the BulkLogForm component.
@@ -27,7 +27,7 @@ interface BulkLogFormProps {
 /// Component for bulk logging time entries across multiple selected calendar days.
 /// </summary>
 export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSuccess, onCancel }) => {
-  const { allProjects } = useProjects();
+  const { allProjects, refreshRecentProjects } = useProjects();
   const { presets, savePreset, deletePreset } = usePresets();
 
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>('');
@@ -45,8 +45,6 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   const [isDeploying, setIsDeploying] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
-  const [isLoadingIssue, setIsLoadingIssue] = useState(false);
   const [statusResult, setStatusResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isSavePresetModalOpen, setIsSavePresetModalOpen] = useState(false);
 
@@ -67,9 +65,6 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     },
   });
 
-  const { tasks, isLoading: isLoadingTasks } = useTasksForProject(form.values.projectId || null);
-  const { activities, isLoading: isLoadingActivities } = useActivitiesForProject(form.values.projectId || null);
-
   // Initialize custom fields when they load
   React.useEffect(() => {
     if (customFields.length > 0) {
@@ -86,66 +81,17 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     }
   }, [customFields]);
 
-  const projectOptions = useMemo(() => {
-    return [
-      { value: 'my_issues', label: '--- My Assigned Issues ---' },
-      ...allProjects.map(p => ({
-        value: p.id.toString(),
-        label: p.name,
-      }))
-    ];
-  }, [allProjects]);
-
-  const taskOptions = useMemo(() => {
-    const options = tasks.map(t => ({
-      value: t.id.toString(),
-      label: `#${t.id} - ${t.subject}`,
-    }));
-    if (loadedTask && !options.some(o => o.value === loadedTask.id.toString())) {
-      options.push({
-        value: loadedTask.id.toString(),
-        label: `#${loadedTask.id} - ${loadedTask.subject}`,
-      });
-    }
+  const additionalTaskOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
     const preset = presets.find(p => p.id === selectedPresetId);
-    if (preset && preset.taskId && preset.taskSubject && !options.some(o => o.value === preset.taskId)) {
+    if (preset && preset.taskId && preset.taskSubject) {
       options.push({
         value: preset.taskId,
         label: `#${preset.taskId} - ${preset.taskSubject}`,
       });
     }
     return options;
-  }, [tasks, loadedTask, presets, selectedPresetId]);
-
-  const handleTaskChange = (val: string | null) => {
-    const newTaskId = val || '';
-    form.setFieldValue('taskId', newTaskId);
-    
-    if (val && !form.values.projectId) {
-      const task = tasks.find(t => t.id.toString() === val) || (loadedTask?.id.toString() === val ? loadedTask : null);
-      if (task?.project?.id) {
-        form.setFieldValue('projectId', task.project.id.toString());
-      }
-    }
-  };
-
-  const handleQuickLoad = async (id: string) => {
-    if (!id) return;
-    setIsLoadingIssue(true);
-    try {
-      const cleanId = id.replace(/^#/, '').trim();
-      const issue = await getIssue(parseInt(cleanId, 10));
-      setLoadedTask(issue);
-      form.setFieldValue('taskId', issue.id.toString());
-      if (issue.project) {
-        form.setFieldValue('projectId', issue.project.id.toString());
-      }
-    } catch (error: any) {
-      // Ignore or handle error
-    } finally {
-      setIsLoadingIssue(false);
-    }
-  };
+  }, [presets, selectedPresetId]);
 
   const handleApplyPreset = (presetId: string | null) => {
     setSelectedPresetId(presetId);
@@ -177,7 +123,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
   const handleExecuteSavePreset = (name: string) => {
     const { projectId, taskId, activityId, hours, comments } = form.values;
     const project = allProjects.find(p => p.id.toString() === projectId);
-    const task = tasks.find(t => t.id.toString() === taskId);
+    const taskOpt = additionalTaskOptions.find(t => t.value === taskId);
 
     const billableFieldId = localStorage.getItem('billableFieldId');
 
@@ -187,7 +133,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
       projectId,
       projectName: project?.name || '',
       taskId,
-      taskSubject: task?.subject || '',
+      taskSubject: taskOpt ? taskOpt.label.replace(/^#\d+\s*-\s*/, '') : '',
       activityId,
       hours: typeof hours === 'string' ? parseFloat(hours) || 0 : hours,
       comments,
@@ -253,6 +199,9 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
     setIsDeploying(false);
 
+    // Update recently used projects
+    refreshRecentProjects().catch(() => {});
+
     if (failCount === 0) {
       setStatusResult({ success: true, message: `Successfully logged time for ${successCount} day${successCount > 1 ? 's' : ''}.` });
     } else {
@@ -304,73 +253,35 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack gap="md">
-            <Select
-              label="Project"
-              placeholder="Search projects..."
-              data={projectOptions}
-              searchable
-              disabled={isDeploying}
-              withAsterisk
-              {...form.getInputProps('projectId')}
-              onChange={(val) => {
-                form.setFieldValue('projectId', val || '');
+            <ProjectTaskActivityFields
+              projectId={form.values.projectId}
+              onProjectChange={(val) => {
+                form.setFieldValue('projectId', val);
                 if (!val) form.setFieldValue('taskId', '');
                 form.setFieldValue('activityId', '');
               }}
+              taskId={form.values.taskId}
+              onTaskChange={(val) => form.setFieldValue('taskId', val)}
+              activityId={form.values.activityId}
+              onActivityChange={(val) => form.setFieldValue('activityId', val)}
+              includeMyIssues={true}
+              activityRequired={true}
+              projectRequired={true}
+              disabled={isDeploying}
+              additionalTaskOptions={additionalTaskOptions}
+              layout="stacked"
             />
 
-            <Group grow align="flex-start">
-              <TextInput
-                label="Task ID"
-                placeholder="Paste ID..."
-                {...form.getInputProps('taskId')}
-                onBlur={() => {
-                  if (form.values.taskId && form.values.taskId !== loadedTask?.id?.toString()) {
-                    handleQuickLoad(form.values.taskId);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (form.values.taskId) handleQuickLoad(form.values.taskId);
-                  }
-                }}
-                disabled={isLoadingIssue || isDeploying}
-                style={{ flex: 1 }}
-              />
-              <Select
-                label="Task Name"
-                placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
-                data={taskOptions}
-                searchable
-                withAsterisk
-                disabled={isLoadingTasks || isDeploying}
-                {...form.getInputProps('taskId')}
-                onChange={handleTaskChange}
-                style={{ flex: 2 }}
-              />
-            </Group>
-
-            <Group grow>
-              <Select
-                label="Activity"
-                placeholder={isLoadingActivities ? 'Loading...' : '-- Select activity --'}
-                data={activities.map(a => ({ value: a.id.toString(), label: a.name }))}
-                disabled={isLoadingActivities || isDeploying || !form.values.projectId}
-                withAsterisk
-                {...form.getInputProps('activityId')}
-              />
-              <NumberInput
-                label="Hours per day"
-                placeholder="e.g. 8"
-                min={0}
-                decimalScale={2}
-                step={0.5}
-                disabled={isDeploying}
-                withAsterisk
-                {...form.getInputProps('hours')}
-              />
-            </Group>
+            <NumberInput
+              label="Hours per day"
+              placeholder="e.g. 8"
+              min={0}
+              decimalScale={2}
+              step={0.5}
+              disabled={isDeploying}
+              withAsterisk
+              {...form.getInputProps('hours')}
+            />
 
             <TextInput
               label="Comments"
@@ -379,94 +290,12 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
               {...form.getInputProps('comments')}
             />
 
-            {/* Dynamic Custom Fields */}
-            {customFields.length > 0 && (
-              <Stack gap="sm" pt="xs">
-                <Group gap="xs">
-                  <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
-                  <Text size="xs" fw={700} tt="uppercase" c="dimmed">Custom Fields</Text>
-                </Group>
-                <Group grow>
-                  {customFields.map(field => {
-                    const value = customFieldValues[field.id] || '';
-                    const format = field.field_format || (field as any).format;
-                    const isLikelyBool = format === 'bool' || 
-                                         format === 'boolean' ||
-                                         field.name.toLowerCase().includes('billable') ||
-                                         field.name.toLowerCase().includes('billing');
-
-                    if (isLikelyBool) {
-                      return (
-                        <Checkbox
-                          key={field.id}
-                          label={field.name}
-                          checked={value === '1'}
-                          onChange={e => handleCustomFieldChange(field.id, e.currentTarget.checked ? '1' : '0')}
-                          disabled={isDeploying}
-                        />
-                      );
-                    }
-                    
-                    if (format === 'list' || format === 'user' || format === 'version') {
-                      return (
-                        <Select
-                          key={field.id}
-                          label={field.name}
-                          placeholder={`-- Select ${field.name} --`}
-                          value={value}
-                          onChange={v => handleCustomFieldChange(field.id, v || '')}
-                          data={field.possible_values?.map(v => ({ value: v, label: v })) || []}
-                          required={field.is_required || field.required}
-                          disabled={isDeploying}
-                        />
-                      );
-                    }
-
-                    if (format === 'text') {
-                      return (
-                        <Textarea
-                          key={field.id}
-                          label={field.name}
-                          value={value}
-                          onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
-                          required={field.is_required || field.required}
-                          minRows={2}
-                          autosize
-                          disabled={isDeploying}
-                          style={{ flex: '1 1 100%' }}
-                        />
-                      );
-                    }
-
-                    if (format === 'int' || format === 'float') {
-                      return (
-                        <NumberInput
-                          key={field.id}
-                          label={field.name}
-                          value={value ? parseFloat(value) : ''}
-                          onChange={v => handleCustomFieldChange(field.id, v === '' ? '' : String(v))}
-                          required={field.is_required || field.required}
-                          decimalScale={format === 'float' ? 2 : 0}
-                          disabled={isDeploying}
-                        />
-                      );
-                    }
-
-                    return (
-                      <TextInput
-                        key={field.id}
-                        label={field.name}
-                        value={value}
-                        onChange={e => handleCustomFieldChange(field.id, e.currentTarget.value)}
-                        required={field.is_required || field.required}
-                        type={format === 'date' ? 'date' : 'text'}
-                        disabled={isDeploying}
-                      />
-                    );
-                  })}
-                </Group>
-              </Stack>
-            )}
+            <CustomFieldsSection
+              customFields={customFields}
+              values={customFieldValues}
+              onChange={handleCustomFieldChange}
+              disabled={isDeploying}
+            />
 
             {isDeploying && (
               <Stack gap={4} mt="sm">
