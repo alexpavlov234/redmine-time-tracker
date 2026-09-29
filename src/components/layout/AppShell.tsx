@@ -2,7 +2,7 @@ import React from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 import { AppShell as MantineAppShell, Group, Title, ActionIcon, useMantineColorScheme, Alert, Button } from '@mantine/core';
-import { IconClock, IconCalendarEvent, IconSettings, IconSun, IconMoon, IconSunMoon, IconAlertCircle } from '@tabler/icons-react';
+import { IconClock, IconCalendarEvent, IconSettings, IconSun, IconMoon, IconSunMoon, IconAlertCircle, IconBriefcase } from '@tabler/icons-react';
 
 export const AppShell: React.FC = () => {
   const { isConfigured } = useSettings();
@@ -24,6 +24,7 @@ export const AppShell: React.FC = () => {
   const navLinks = [
     { label: 'Tracker', icon: IconClock, to: '/' },
     { label: 'Logged Time', icon: IconCalendarEvent, to: '/logged-time' },
+    { label: 'Projects', icon: IconBriefcase, to: '/projects' },
     { label: 'Settings', icon: IconSettings, to: '/settings' },
   ];
 

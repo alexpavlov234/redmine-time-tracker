@@ -1,0 +1,509 @@
+/* Professional Minimalist Client Report Styling for Screen Live Preview and A4 PDF Print */
+
+.client-preview-wrapper {
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+.client-report-container {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+  padding: 32px 36px;
+  max-width: 860px;
+  margin: 0 auto;
+  line-height: 1.45;
+}
+
+/* Minimalist Document Header */
+.client-report-header {
+  border-bottom: 1.5px solid #0f172a;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+}
+
+.client-report-brand-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.client-report-logo {
+  max-height: 48px;
+  max-width: 180px;
+  object-fit: contain;
+  display: block;
+}
+
+.client-report-logo-left {
+  margin-bottom: 8px;
+}
+
+.client-report-logo-right {
+  margin-left: auto;
+  margin-bottom: 8px;
+}
+
+.client-report-logo-center-wrapper {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.client-report-logo-center {
+  max-height: 52px;
+  max-width: 200px;
+  object-fit: contain;
+  display: inline-block;
+}
+
+.client-report-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.client-report-date-box {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.client-report-date {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0 0 2px 0;
+}
+
+/* Metadata Grid */
+.client-report-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 16px;
+  font-size: 12px;
+  background-color: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 4px;
+  border: 1px solid #f1f5f9;
+}
+
+.client-report-meta-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.client-report-meta-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.client-report-meta-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* Simple, Minimalist Summary Bar (No huge digits) */
+.client-report-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 8px 14px;
+  margin-bottom: 18px;
+  align-items: center;
+}
+
+.client-summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.client-summary-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.client-summary-val {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.client-summary-val.highlight {
+  color: #047857;
+}
+
+.client-summary-val.danger {
+  color: #dc2626;
+}
+
+/* Section Header */
+.client-report-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #334155;
+  margin: 16px 0 8px 0;
+}
+
+/* Clean Professional Table */
+.client-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  margin-bottom: 18px;
+}
+
+.client-report-table th {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: left;
+  padding: 6px 8px;
+  border-top: 1px solid #cbd5e1;
+  border-bottom: 1.5px solid #94a3b8;
+}
+
+.client-report-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: top;
+}
+
+.client-report-table tbody tr:nth-child(even) {
+  background-color: #fafbfc;
+}
+
+.client-report-table tfoot td {
+  font-weight: 700;
+  background-color: #f1f5f9;
+  border-top: 1.5px solid #94a3b8;
+  border-bottom: 1px solid #cbd5e1;
+  color: #0f172a;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.client-report-table .text-right {
+  text-align: right;
+}
+
+.client-report-table .action-col {
+  width: 32px;
+  text-align: center;
+  padding: 4px;
+}
+
+.client-report-table tr.is-excluded {
+  opacity: 0.45;
+  background-color: #f8fafc;
+}
+
+.client-report-table tr.is-excluded td {
+  text-decoration: line-through;
+}
+
+.client-report-table tr.is-excluded .action-col {
+  text-decoration: none;
+}
+
+.client-report-task-subject {
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.client-report-task-comment {
+  font-size: 10.5px;
+  color: #64748b;
+}
+
+/* Grouped by Task Section Styling */
+.client-report-task-group-row {
+  background-color: #f8fafc;
+  border-top: 1.5px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.client-report-task-group-row td {
+  padding: 8px 10px !important;
+  vertical-align: middle;
+  background-color: #f8fafc;
+}
+
+.client-report-task-group-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.client-report-task-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.client-report-task-group-id {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 12px;
+}
+
+.client-report-task-group-subject {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 12.5px;
+}
+
+.client-report-task-group-subtotal {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.client-report-task-group-cost {
+  margin-left: 6px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.client-report-sub-entry-row td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 11.5px;
+}
+
+.client-report-sub-entry-row:hover {
+  background-color: #f8fafc;
+}
+
+.client-report-sub-date {
+  padding-left: 18px !important;
+  color: #334155;
+  font-weight: 500;
+}
+
+/* Notes Section */
+.client-report-notes {
+  background-color: #f8fafc;
+  border-left: 2.5px solid #64748b;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #475569;
+  margin-top: 14px;
+  margin-bottom: 24px;
+}
+
+/* Formal Signature Section */
+.client-report-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.client-report-signature-block {
+  width: 200px;
+  text-align: center;
+}
+
+.client-report-signature-line {
+  border-bottom: 1px solid #94a3b8;
+  height: 32px;
+  margin-bottom: 4px;
+}
+
+.client-report-signature-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+/* =========================================
+   Print Stylesheet (@media print)
+   Optimized for Clean, Minimalist A4 Output
+   ========================================= */
+@media print {
+  /* Force root, html, and body to pure white background and remove all dark themes */
+  :root,
+  html,
+  html[data-mantine-color-scheme="dark"],
+  html[data-mantine-color-scheme="light"],
+  body,
+  body[data-mantine-color-scheme="dark"],
+  body[data-mantine-color-scheme="light"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  /* Completely eliminate dark modal overlays, app chrome, headers, controls */
+  .mantine-Modal-overlay {
+    display: none !important;
+    visibility: hidden !important;
+    background: transparent !important;
+    opacity: 0 !important;
+  }
+
+  .mantine-Modal-header,
+  .mantine-Modal-close,
+  .mantine-AppShell-header,
+  .mantine-AppShell-navbar,
+  .mantine-AppShell-aside,
+  .mantine-AppShell-footer,
+  .client-settings-col,
+  .client-preview-header-bar,
+  .client-preview-alert {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Flatten modal containers so they span 100% width on paper without flex-centering or dark padding */
+  .mantine-Modal-root,
+  .mantine-Modal-inner {
+    position: static !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+  }
+
+  .mantine-Modal-content {
+    position: static !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+
+  .mantine-Modal-body {
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+  }
+
+  /* Hide left settings column and make preview column 100% width */
+  .client-preview-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    padding: 0 !important;
+  }
+
+  .client-preview-wrapper {
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  .client-print-document {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    color: #0f172a !important;
+  }
+
+  .client-report-container {
+    box-shadow: none !important;
+    border: none !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    color: #0f172a !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 14mm 10mm 15mm 10mm;
+    @bottom-right {
+      content: counter(page) " / " counter(pages);
+      font-size: 8.5pt;
+      font-weight: 500;
+      color: #64748b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+  }
+
+  /* Prevent table footer from repeating on every printed page (prevents sticky footer) */
+  .client-report-table tfoot {
+    display: table-row-group !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Avoid awkward page breaks inside rows and blocks */
+  .client-report-table tr,
+  .client-report-task-group-row,
+  .client-report-sub-entry-row,
+  .client-report-summary-bar,
+  .client-report-signatures,
+  .client-report-header {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .client-report-task-group-row {
+    background-color: #f1f5f9 !important;
+    border-top: 1.5px solid #94a3b8 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .client-report-task-group-row td {
+    background-color: #f1f5f9 !important;
+  }
+
+  .client-report-table .action-col,
+  .client-report-table tr.is-excluded {
+    display: none !important;
+  }
+
+  /* Ensure colors and borders print clearly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

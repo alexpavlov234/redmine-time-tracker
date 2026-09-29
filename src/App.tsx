@@ -11,6 +11,7 @@ import { MantineProvider } from '@mantine/core';
 
 import { TrackerDashboard } from './features/tracker/components/TrackerDashboard';
 import { LoggedTimeDashboard } from './features/calendar/components/LoggedTimeDashboard';
+import { ProjectManagerDashboard } from './features/pm/components/ProjectManagerDashboard';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
                     <Route path="/" element={<AppShell />}>
                       <Route index element={<TrackerDashboard />} />
                       <Route path="logged-time" element={<LoggedTimeDashboard />} />
+                      <Route path="projects" element={<ProjectManagerDashboard />} />
                       <Route path="settings" element={<SettingsForm />} />
                     </Route>
                   </Routes>

@@ -191,7 +191,12 @@ export async function getTimeEntries(params: { from: string, to: string, user_id
 // Global in-memory cache for Redmine issues to avoid redundant network requests
 const issueCache = new Map<number, RedmineIssue>();
 
-export async function getIssues(ids: number[]) {
+/// <summary>
+/// Retrieves Redmine issues by their IDs with in-memory caching and automatic batching to avoid API limits.
+/// </summary>
+/// <param name="ids">Array of issue IDs to retrieve.</param>
+/// <returns>Array of retrieved RedmineIssue objects.</returns>
+export async function getIssues(ids: number[]): Promise<RedmineIssue[]> {
     if (ids.length === 0) {
         return [];
     }
@@ -200,17 +205,20 @@ export async function getIssues(ids: number[]) {
     const missingIds = ids.filter(id => !issueCache.has(id));
     
     if (missingIds.length > 0) {
-        try {
-            const response = await redmineApiRequest(`/issues.json?issue_id=${missingIds.join(',')}&status_id=*&limit=${missingIds.length}`);
-            const fetchedIssues = response.issues || [];
-            
-            // Populate cache
-            fetchedIssues.forEach((issue: RedmineIssue) => {
-                issueCache.set(issue.id, issue);
-            });
-        } catch (error) {
-            console.error(`Could not fetch issues`, error);
-            throw error;
+        const batchSize = 100;
+        for (let i = 0; i < missingIds.length; i += batchSize) {
+            const batch = missingIds.slice(i, i + batchSize);
+            try {
+                const response = await redmineApiRequest(`/issues.json?issue_id=${batch.join(',')}&status_id=*&limit=${batch.length}`);
+                const fetchedIssues = response.issues || [];
+                
+                // Populate cache
+                fetchedIssues.forEach((issue: RedmineIssue) => {
+                    issueCache.set(issue.id, issue);
+                });
+            } catch (error) {
+                console.error('Could not fetch batch of issues', error);
+            }
         }
     }
     

@@ -54,9 +54,10 @@ export interface TimeEntry {
     id: number;
     name: string;
   };
-  issue: {
+  /// <summary>Associated Redmine issue / task details.</summary>
+  issue?: {
     id: number;
-    subject: string;
+    subject?: string;
   };
   user: {
     id: number;
@@ -133,5 +134,6 @@ export interface CustomField {
   default_value?: string;
   required?: boolean;
   is_required?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value?: any;
 }
