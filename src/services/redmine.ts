@@ -82,87 +82,115 @@ function mapNetworkError(e: unknown, context: 'proxy' | 'direct') {
     return new Error(`Network error (${context}): ${msg}${hint ? ' — ' + hint : ''}`);
 }
 
+// Map of in-flight GET requests to prevent duplicate concurrent network calls for the same endpoint
+const inFlightGetRequests = new Map<string, Promise<any>>();
+
+/// <summary>
+/// Executes a Redmine REST API request via the local proxy (with direct HTTPS fallback)
+/// and deduplicates identical concurrent GET requests.
+/// </summary>
+/// <param name="endpoint">API endpoint path starting with '/'.</param>
+/// <param name="method">HTTP method ('GET', 'POST', 'PUT', 'DELETE').</param>
+/// <param name="body">Optional request payload object.</param>
+/// <returns>Parsed JSON response object.</returns>
 export async function redmineApiRequest(endpoint: string, method: string = 'GET', body: object | null = null) {
-    const apiKey = localStorage.getItem('redmineApiKey');
-    let redmineUrl = localStorage.getItem('redmineUrl') || '';
-
-    if (!apiKey) {
-        throw new Error('Redmine API Key not configured.');
-    }
-    if (!redmineUrl) {
-        throw new Error('Redmine URL not configured.');
+    const upperMethod = method.toUpperCase();
+    if (upperMethod === 'GET' && inFlightGetRequests.has(endpoint)) {
+        return inFlightGetRequests.get(endpoint)!;
     }
 
-    redmineUrl = normalizeUrl(redmineUrl);
+    const executeRequest = async () => {
+        const apiKey = localStorage.getItem('redmineApiKey');
+        let redmineUrl = localStorage.getItem('redmineUrl') || '';
 
-    // First attempt: via local proxy (recommended path)
-    const proxyHeaders = buildHeaders({
-        'X-Redmine-API-Key': apiKey,
-        'X-Redmine-URL': redmineUrl,
-        'Content-Type': 'application/json'
-    });
-    const proxyController = new AbortController();
-    const clearProxyTimeout = withTimeout(proxyController, TIMEOUT_MS);
-    try {
-        const proxyResp = await fetch(`${PROXY_BASE_URL}${endpoint}`, {
-            method,
-            headers: proxyHeaders,
-            body: buildBody(body),
-            signal: proxyController.signal,
-        });
-        clearProxyTimeout();
-        if (!proxyResp.ok) {
-            const errorText = await proxyResp.text();
-            throw mapHttpError(proxyResp.status, proxyResp.statusText, errorText);
+        if (!apiKey) {
+            throw new Error('Redmine API Key not configured.');
         }
-        if (proxyResp.status === 204 || proxyResp.status === 201) return {};
-        return proxyResp.json();
-    } catch (e: any) {
-        clearProxyTimeout();
-
-        // If Redmine responded through proxy with an HTTP error (422, 403, etc.), rethrow directly
-        if (e?.isHttpError) {
-            throw e;
-        }
-        // Only consider direct fallback for HTTPS Redmine to avoid mixed-content and to give a chance if CORS is enabled
-        const isHttps = /^https:\/\//i.test(redmineUrl);
-        const shouldTryDirect = isHttps;
-        // If we shouldn't try direct, rethrow mapped proxy error
-        if (!shouldTryDirect) {
-            throw mapNetworkError(e, 'proxy');
+        if (!redmineUrl) {
+            throw new Error('Redmine URL not configured.');
         }
 
-        // Try direct HTTPS call (may be blocked by CORS depending on Redmine server)
-        const directHeaders = buildHeaders({
+        redmineUrl = normalizeUrl(redmineUrl);
+
+        // First attempt: via local proxy (recommended path)
+        const proxyHeaders = buildHeaders({
             'X-Redmine-API-Key': apiKey,
+            'X-Redmine-URL': redmineUrl,
             'Content-Type': 'application/json'
         });
-        const directController = new AbortController();
-        const clearDirectTimeout = withTimeout(directController, TIMEOUT_MS);
+        const proxyController = new AbortController();
+        const clearProxyTimeout = withTimeout(proxyController, TIMEOUT_MS);
         try {
-            const directUrl = `${redmineUrl}${endpoint}`;
-            const directResp = await fetch(directUrl, {
-                method,
-                headers: directHeaders,
+            const proxyResp = await fetch(`${PROXY_BASE_URL}${endpoint}`, {
+                method: upperMethod,
+                headers: proxyHeaders,
                 body: buildBody(body),
-                signal: directController.signal,
-                // No mode: 'no-cors' because we need JSON; if CORS is blocked, this will throw
+                signal: proxyController.signal,
             });
-            clearDirectTimeout();
-            if (!directResp.ok) {
-                const errorText = await directResp.text();
-                throw mapHttpError(directResp.status, directResp.statusText, errorText);
+            clearProxyTimeout();
+            if (!proxyResp.ok) {
+                const errorText = await proxyResp.text();
+                throw mapHttpError(proxyResp.status, proxyResp.statusText, errorText);
             }
-            if (directResp.status === 204 || directResp.status === 201) return {};
-            return directResp.json();
-        } catch (e2) {
-            clearDirectTimeout();
-            // Provide a combined error indicating proxy and direct both failed
-            const proxyErr = mapNetworkError(e, 'proxy').message;
-            const directErr = mapNetworkError(e2, 'direct').message;
-            throw new Error(`${proxyErr}\n${directErr}`);
+            if (proxyResp.status === 204 || proxyResp.status === 201) return {};
+            return proxyResp.json();
+        } catch (e: any) {
+            clearProxyTimeout();
+
+            // If Redmine responded through proxy with an HTTP error (422, 403, etc.), rethrow directly
+            if (e?.isHttpError) {
+                throw e;
+            }
+            // Only consider direct fallback for HTTPS Redmine to avoid mixed-content and to give a chance if CORS is enabled
+            const isHttps = /^https:\/\//i.test(redmineUrl);
+            const shouldTryDirect = isHttps;
+            // If we shouldn't try direct, rethrow mapped proxy error
+            if (!shouldTryDirect) {
+                throw mapNetworkError(e, 'proxy');
+            }
+
+            // Try direct HTTPS call (may be blocked by CORS depending on Redmine server)
+            const directHeaders = buildHeaders({
+                'X-Redmine-API-Key': apiKey,
+                'Content-Type': 'application/json'
+            });
+            const directController = new AbortController();
+            const clearDirectTimeout = withTimeout(directController, TIMEOUT_MS);
+            try {
+                const directUrl = `${redmineUrl}${endpoint}`;
+                const directResp = await fetch(directUrl, {
+                    method: upperMethod,
+                    headers: directHeaders,
+                    body: buildBody(body),
+                    signal: directController.signal,
+                    // No mode: 'no-cors' because we need JSON; if CORS is blocked, this will throw
+                });
+                clearDirectTimeout();
+                if (!directResp.ok) {
+                    const errorText = await directResp.text();
+                    throw mapHttpError(directResp.status, directResp.statusText, errorText);
+                }
+                if (directResp.status === 204 || directResp.status === 201) return {};
+                return directResp.json();
+            } catch (e2) {
+                clearDirectTimeout();
+                // Provide a combined error indicating proxy and direct both failed
+                const proxyErr = mapNetworkError(e, 'proxy').message;
+                const directErr = mapNetworkError(e2, 'direct').message;
+                throw new Error(`${proxyErr}\n${directErr}`);
+            }
         }
+    };
+
+    if (upperMethod === 'GET') {
+        const promise = executeRequest().finally(() => {
+            inFlightGetRequests.delete(endpoint);
+        });
+        inFlightGetRequests.set(endpoint, promise);
+        return promise;
     }
+
+    return executeRequest();
 }
 
 export async function getCurrentUser() {
@@ -192,11 +220,25 @@ export async function getTimeEntries(params: { from: string, to: string, user_id
 const issueCache = new Map<number, RedmineIssue>();
 
 /// <summary>
-/// Retrieves Redmine issues by their IDs with in-memory caching and automatic batching to avoid API limits.
+/// Populates the global in-memory issue cache with an array of already fetched Redmine issues.
+/// </summary>
+/// <param name="issues">Array of RedmineIssue objects to store in cache.</param>
+export function cacheIssues(issues: RedmineIssue[]): void {
+    for (const issue of issues) {
+        if (issue && typeof issue.id === 'number') {
+            issueCache.set(issue.id, issue);
+        }
+    }
+}
+
+/// <summary>
+/// Retrieves Redmine issues by their IDs with in-memory caching, automatic batching,
+/// and automatic resolution of parent tasks so that parent subjects and hierarchy are fully populated.
 /// </summary>
 /// <param name="ids">Array of issue IDs to retrieve.</param>
-/// <returns>Array of retrieved RedmineIssue objects.</returns>
-export async function getIssues(ids: number[]): Promise<RedmineIssue[]> {
+/// <param name="resolveParents">Whether to automatically fetch and link parent issues recursively.</param>
+/// <returns>Array of retrieved RedmineIssue objects with parents populated.</returns>
+export async function getIssues(ids: number[], resolveParents: boolean = true): Promise<RedmineIssue[]> {
     if (ids.length === 0) {
         return [];
     }
@@ -221,14 +263,80 @@ export async function getIssues(ids: number[]): Promise<RedmineIssue[]> {
             }
         }
     }
+
+    // Resolve parent issues if requested (only for the requested IDs chain)
+    if (resolveParents) {
+        let depth = 0;
+        const maxDepth = 3;
+        const visitedParents = new Set<number>(ids);
+        let currentFrontierIds = [...ids];
+
+        while (depth < maxDepth && currentFrontierIds.length > 0) {
+            depth++;
+            const missingParentIds: number[] = [];
+            const nextFrontierIds: number[] = [];
+
+            for (const id of currentFrontierIds) {
+                const cached = issueCache.get(id);
+                const parentId = cached?.parent?.id;
+                if (parentId && !visitedParents.has(parentId)) {
+                    visitedParents.add(parentId);
+                    nextFrontierIds.push(parentId);
+                    if (!issueCache.has(parentId)) {
+                        missingParentIds.push(parentId);
+                    }
+                }
+            }
+
+            currentFrontierIds = nextFrontierIds;
+
+            if (missingParentIds.length > 0) {
+                const batchSize = 100;
+                for (let i = 0; i < missingParentIds.length; i += batchSize) {
+                    const batch = missingParentIds.slice(i, i + batchSize);
+                    try {
+                        const response = await redmineApiRequest(`/issues.json?issue_id=${batch.join(',')}&status_id=*&limit=${batch.length}`);
+                        const fetchedIssues = response.issues || [];
+                        fetchedIssues.forEach((issue: RedmineIssue) => {
+                            issueCache.set(issue.id, issue);
+                        });
+                    } catch (error) {
+                        console.error('Could not fetch batch of parent issues', error);
+                    }
+                }
+            }
+        }
+
+        // Link parent subjects for the visited issues
+        for (const id of visitedParents) {
+            const cached = issueCache.get(id);
+            if (cached?.parent?.id) {
+                const parentIssue = issueCache.get(cached.parent.id);
+                if (parentIssue && parentIssue.subject) {
+                    cached.parent.subject = parentIssue.subject;
+                }
+            }
+        }
+    }
     
     // Return combined result from cache (including newly fetched ones)
     return ids.map(id => issueCache.get(id)).filter(Boolean) as RedmineIssue[];
 }
 
+/// <summary>
+/// Retrieves a single Redmine issue by ID, checking the in-memory cache first.
+/// </summary>
+/// <param name="id">Numeric issue ID.</param>
+/// <returns>The resolved RedmineIssue object.</returns>
 export async function getIssue(id: number) {
+    if (issueCache.has(id)) {
+        return issueCache.get(id)!;
+    }
     try {
         const response = await redmineApiRequest(`/issues/${id}.json`);
+        if (response.issue && response.issue.id) {
+            issueCache.set(response.issue.id, response.issue);
+        }
         return response.issue;
     } catch (error) {
         console.error(`Could not fetch issue #${id}`, error);
@@ -236,20 +344,123 @@ export async function getIssue(id: number) {
     }
 }
 
-export async function getTimeEntryActivities() {
+// In-memory caches for global and project-specific time entry activities
+let cachedGlobalActivities: any[] | null = null;
+const projectActivitiesCache = new Map<string, any[]>();
+
+/// <summary>
+/// Retrieves global time entry activities with in-memory session caching.
+/// </summary>
+/// <returns>Array of time entry activity options.</returns>
+export async function getTimeEntryActivities(): Promise<any[]> {
+    if (cachedGlobalActivities !== null) {
+        return cachedGlobalActivities;
+    }
     try {
         const response = await redmineApiRequest('/enumerations/time_entry_activities.json');
-        return response.time_entry_activities || [];
+        const activities: any[] = response.time_entry_activities || [];
+        cachedGlobalActivities = activities;
+        return activities;
     } catch (error) {
         console.error('Failed to fetch time entry activities:', error);
         return [];
     }
 }
 
+/// <summary>
+/// Retrieves all time entries for a given user or task across a date range with automatic pagination and issue subject enrichment.
+/// </summary>
+/// <param name="params">Query parameters including date range, user ID, and optional task/issue ID.</param>
+/// <returns>Array of all retrieved and enriched TimeEntry objects.</returns>
+export async function getAllUserTimeEntries(params: {
+    from?: string;
+    to?: string;
+    user_id?: number | string;
+    issue_id?: number | string;
+    project_id?: number | string;
+}): Promise<TimeEntry[]> {
+    const { from, to, user_id, issue_id, project_id } = params;
+    let queryParams = 'limit=100&include=issue,custom_fields';
+    if (user_id) queryParams += `&user_id=${user_id}`;
+    if (from) queryParams += `&from=${from}`;
+    if (to) queryParams += `&to=${to}`;
+    if (issue_id) queryParams += `&issue_id=${issue_id}`;
+    if (project_id) queryParams += `&project_id=${project_id}`;
+
+    const allEntries: TimeEntry[] = [];
+    let offset = 0;
+    let totalCount = Infinity;
+
+    try {
+        while (allEntries.length < totalCount) {
+            const url = `/time_entries.json?${queryParams}&offset=${offset}`;
+            const response = await redmineApiRequest(url);
+            const entries: TimeEntry[] = Array.isArray(response.time_entries) ? response.time_entries : [];
+
+            totalCount = typeof response.total_count === 'number' ? response.total_count : entries.length;
+            allEntries.push(...entries);
+
+            if (entries.length === 0 || allEntries.length >= totalCount) {
+                break;
+            }
+
+            offset += entries.length;
+        }
+    } catch (error) {
+        console.error('Failed to fetch user time entries:', error);
+        throw error;
+    }
+
+    // Enrich entries with issue subjects and parent tasks using cache
+    const missingIssueIds = Array.from(
+        new Set(
+            allEntries
+                .filter(e => e.issue?.id && !e.issue.subject)
+                .map(e => e.issue!.id)
+        )
+    );
+
+    if (missingIssueIds.length > 0) {
+        try {
+            const issues = await getIssues(missingIssueIds, true);
+            const issueMap = new Map<number, RedmineIssue>();
+            issues.forEach(i => issueMap.set(i.id, i));
+
+            allEntries.forEach(entry => {
+                if (entry.issue?.id && issueMap.has(entry.issue.id)) {
+                    const found = issueMap.get(entry.issue.id)!;
+                    entry.issue.subject = found.subject;
+                    if (found.parent) {
+                        entry.issue.parent = found.parent;
+                    }
+                    if (!entry.project && found.project) {
+                        entry.project = found.project;
+                    }
+                }
+            });
+        } catch (enrichError) {
+            console.warn('Could not enrich all issue subjects:', enrichError);
+        }
+    }
+
+    return allEntries;
+}
+
+/// <summary>
+/// Retrieves time entry activities configured for a specific project, with in-memory caching.
+/// </summary>
+/// <param name="projectId">Project identifier.</param>
+/// <returns>Array of project-specific time entry activities.</returns>
 export async function getProjectActivities(projectId: string | number) {
+    const key = String(projectId);
+    if (projectActivitiesCache.has(key)) {
+        return projectActivitiesCache.get(key)!;
+    }
     try {
         const response = await redmineApiRequest(`/projects/${projectId}.json?include=time_entry_activities`);
-        return response.project?.time_entry_activities || [];
+        const activities = response.project?.time_entry_activities || [];
+        projectActivitiesCache.set(key, activities);
+        return activities;
     } catch (error) {
         console.error(`Failed to fetch activities for project ${projectId}:`, error);
         return [];
@@ -373,27 +584,47 @@ export async function deleteTimeEntry(id: number) {
     }
 }
 
+// In-memory cache for detected time entry custom fields
+let cachedCustomFields: CustomField[] | null = null;
+
+/// <summary>
+/// Retrieves custom fields applicable to time entries, caching the result in memory.
+/// </summary>
+/// <returns>Array of CustomField definitions.</returns>
 export async function getTimeEntryCustomFields(): Promise<CustomField[]> {
+    if (cachedCustomFields !== null) {
+        return cachedCustomFields;
+    }
+
+    let scannedSuccessfully = false;
     // Try scanning recent entries first - this works for non-admins!
     try {
         const timeEntriesResponse = await redmineApiRequest('/time_entries.json?limit=10&include=custom_fields');
+        scannedSuccessfully = true;
         if (timeEntriesResponse.time_entries) {
             const entryWithFields = timeEntriesResponse.time_entries.find((e: any) => 
                 e.custom_fields && e.custom_fields.length > 0
             );
             if (entryWithFields) {
-                return entryWithFields.custom_fields;
+                cachedCustomFields = entryWithFields.custom_fields;
+                return cachedCustomFields!;
             }
         }
-    } catch (e) {
+    } catch {
         console.warn('Scanning recent entries failed, trying admin API...');
     }
 
     // Fallback to official API (requires admin permissions)
     try {
         const response = await redmineApiRequest('/custom_fields.json');
-        return response.custom_fields.filter((f: any) => f.type === 'TimeEntryCustomField' || f.customized_type === 'time_entry');
+        cachedCustomFields = response.custom_fields.filter((f: any) => f.type === 'TimeEntryCustomField' || f.customized_type === 'time_entry');
+        return cachedCustomFields!;
     } catch (error) {
+        if (scannedSuccessfully) {
+            // Non-admin user with no custom fields on recent entries; cache empty array to avoid hammering server
+            cachedCustomFields = [];
+            return [];
+        }
         console.error('All custom field detection methods failed.');
         throw error;
     }
@@ -422,27 +653,5 @@ export async function detectBillableField() {
     } catch (error) {
         console.error('Failed to detect billable field:', error);
         return null;
-    }
-}
-
-export async function getWatchedIssues(limit: number = 25): Promise<RedmineIssue[]> {
-    try {
-        const endpoint = `/issues.json?watcher_id=me&status_id=open&limit=${limit}`;
-        const response = await redmineApiRequest(endpoint);
-        return response.issues || [];
-    } catch (error) {
-        console.error('Failed to fetch watched issues:', error);
-        return [];
-    }
-}
-
-export async function getMyIssues(limit: number = 50): Promise<RedmineIssue[]> {
-    try {
-        const endpoint = `/issues.json?assigned_to_id=me&status_id=open&limit=${limit}`;
-        const response = await redmineApiRequest(endpoint);
-        return response.issues || [];
-    } catch (error) {
-        console.error('Failed to fetch my issues:', error);
-        return [];
     }
 }

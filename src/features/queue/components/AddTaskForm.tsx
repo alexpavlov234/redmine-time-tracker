@@ -6,6 +6,7 @@ import { useProjects } from '../../../contexts/ProjectsContext';
 import type { RedmineIssue } from '../../../types';
 import { IconCirclePlus, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
+import { getTaskNote, setTaskNote } from '../../../services/taskNotes';
 
 export const AddTaskForm: React.FC = () => {
   const { addTodo } = useQueue();
@@ -33,10 +34,20 @@ export const AddTaskForm: React.FC = () => {
     } else if (!taskId) {
       setSelectedTask(null);
     }
+    if (taskId && !form.values.note) {
+      const existing = getTaskNote(taskId);
+      if (existing) {
+        form.setFieldValue('note', existing);
+      }
+    }
   };
 
   const handleSubmit = (values: typeof form.values) => {
     const { projectId, taskId, activityId, note } = values;
+
+    if (note && taskId) {
+      setTaskNote(taskId, note);
+    }
 
     const project = allProjects.find(p => p.id.toString() === projectId);
 

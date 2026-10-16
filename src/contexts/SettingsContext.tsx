@@ -68,7 +68,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey, redmineUrl }),
-      }).catch(() => {
+        priority: 'low',
+      } as RequestInit).catch(() => {
         // Ignore if proxy is offline
       });
     }

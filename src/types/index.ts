@@ -30,6 +30,11 @@ export interface RedmineIssue {
     id: number;
     name: string;
   };
+  /// <summary>Parent issue reference if this issue is a subtask.</summary>
+  parent?: {
+    id: number;
+    subject?: string;
+  };
   fixed_version?: {
     id: number;
     name: string;
@@ -58,6 +63,11 @@ export interface TimeEntry {
   issue?: {
     id: number;
     subject?: string;
+    /// <summary>Parent task reference if this task is a subtask.</summary>
+    parent?: {
+      id: number;
+      subject?: string;
+    };
   };
   user: {
     id: number;
@@ -136,4 +146,59 @@ export interface CustomField {
   is_required?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value?: any;
+}
+
+/// <summary>
+/// Status options for personal tasks.
+/// </summary>
+export type PersonalTaskStatus = 'not_started' | 'in_progress' | 'awaiting' | 'completed';
+
+/// <summary>
+/// Priority level for personal queue tasks.
+/// </summary>
+export type PersonalTaskPriority = 'high' | 'medium' | 'low';
+
+/// <summary>
+/// Checklist sub-item within a personal task.
+/// </summary>
+export interface PersonalTaskChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+/// <summary>
+/// Personal backlog task item with notes, priority, checklist, status, and optional Redmine linkage.
+/// </summary>
+export interface PersonalTask {
+  id: string;
+  title: string;
+  notes?: string;
+  priority: PersonalTaskPriority;
+  status?: PersonalTaskStatus;
+  dueDate?: string;
+  completed: boolean;
+  createdAt: number;
+  completedAt?: number;
+  redmineIssueId?: string;
+  redmineIssueSubject?: string;
+  redmineProjectId?: string;
+  redmineProjectName?: string;
+  checklist: PersonalTaskChecklistItem[];
+  order: number;
+}
+/// <summary>
+/// Model for a note which can be connected to a Redmine task or exist as a general note with labels.
+/// </summary>
+export interface NoteItem {
+  id: string;
+  taskId?: string | null;
+  taskSubject?: string | null;
+  title?: string;
+  content: string;
+  labels: string[];
+  color?: string;
+  pinned?: boolean;
+  createdAt: number;
+  updatedAt: number;
 }

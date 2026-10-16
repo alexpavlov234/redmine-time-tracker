@@ -108,15 +108,21 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
         </Stack>
       </Card>
 
-      <TimeEntryFormModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={() => {
-          setIsModalOpen(false);
-          if (onLogSuccess) onLogSuccess();
-        }}
-        initialPresetId={selectedPresetId}
-      />
+      {isModalOpen && (
+        <TimeEntryFormModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedPresetId(null);
+          }}
+          onSuccess={() => {
+            setIsModalOpen(false);
+            setSelectedPresetId(null);
+            if (onLogSuccess) onLogSuccess();
+          }}
+          initialPresetId={selectedPresetId}
+        />
+      )}
     </>
   );
 };

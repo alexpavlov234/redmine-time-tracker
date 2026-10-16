@@ -72,9 +72,10 @@ export async function getLastActivityForTask(taskId: number | string): Promise<s
   const cleanId = String(taskId).replace(/^#/, '').trim();
   if (!cleanId) return getLastUserActivity();
 
-  // 1. Check in-memory task cache
+  // 1. Check in-memory task cache (empty string indicates negative cache)
   if (taskActivityCache.has(cleanId)) {
-    return taskActivityCache.get(cleanId)!;
+    const cached = taskActivityCache.get(cleanId)!;
+    return cached || null;
   }
 
   // 2. Check localStorage for this task
@@ -104,6 +105,7 @@ export async function getLastActivityForTask(taskId: number | string): Promise<s
   // 4. Fallback: Check user's last activity across all tasks
   const userGeneralActivity = await getLastUserActivity();
   if (userGeneralActivity) {
+    taskActivityCache.set(cleanId, userGeneralActivity);
     return userGeneralActivity;
   }
 
@@ -120,6 +122,7 @@ export async function getLastActivityForTask(taskId: number | string): Promise<s
     console.warn(`Could not fetch general last activity for issue #${cleanId}:`, err);
   }
 
+  taskActivityCache.set(cleanId, '');
   return null;
 }
 

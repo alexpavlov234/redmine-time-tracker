@@ -31,13 +31,15 @@ export type BudgetThresholdType = 'contract' | 'estimate' | 'profitability';
 /// Custom React hook that coordinates Redmine project manager data, budgets, and team time logs.
 /// </summary>
 export function useProjectManagerData() {
-  const { allProjects, isLoadingProjects } = useProjects();
+  const { allProjects, isLoadingProjects, ensureProjectsLoaded, refetchProjects } = useProjects();
   const { user } = useUser();
 
   // Mode: Show only projects managed by current user or all projects
   const [filterMode, setFilterMode] = useState<'managed' | 'all'>('managed');
   const [userMemberships, setUserMemberships] = useState<RedmineProjectMembership[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [hasRequestedProjects, setHasRequestedProjects] = useState<boolean>(false);
+  const [isLoadingMemberships, setIsLoadingMemberships] = useState<boolean>(false);
 
   // Project details & budget metadata
   const [projectDetails, setProjectDetails] = useState<RedmineProjectFull | null>(null);
@@ -76,18 +78,25 @@ export function useProjectManagerData() {
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
   const [isLoadingEntries, setIsLoadingEntries] = useState<boolean>(false);
 
-  // 1. Fetch current user memberships
-  useEffect(() => {
-    let isMounted = true;
-    getUserMemberships().then(memberships => {
-      if (isMounted) setUserMemberships(memberships);
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id]);
+  /// <summary>
+  /// Lazily loads the projects list and current user memberships when the user interacts with the project dropdown.
+  /// </summary>
+  const loadProjectsForDropdown = useCallback(() => {
+    setHasRequestedProjects(true);
+    ensureProjectsLoaded();
+    if (userMemberships.length === 0 && !isLoadingMemberships) {
+      setIsLoadingMemberships(true);
+      getUserMemberships()
+        .then(memberships => {
+          setUserMemberships(memberships);
+        })
+        .finally(() => {
+          setIsLoadingMemberships(false);
+        });
+    }
+  }, [ensureProjectsLoaded, userMemberships.length, isLoadingMemberships]);
 
-  // 2. Identify projects where current user has PM role or is in memberships
+  // Identify projects where current user has PM role or is in memberships
   const managedProjectIds = useMemo(() => {
     const ids = new Set<string>();
     for (const m of userMemberships) {
@@ -98,31 +107,36 @@ export function useProjectManagerData() {
     return ids;
   }, [userMemberships, user?.id]);
 
-  // Projects list based on filterMode
+  // Projects list based on filterMode (only populated after user clicks dropdown)
   const displayedProjects = useMemo(() => {
+    if (!hasRequestedProjects) {
+      return [];
+    }
     if (filterMode === 'managed' && managedProjectIds.size > 0) {
       return allProjects.filter(p => managedProjectIds.has(String(p.id)));
     }
     return allProjects;
-  }, [filterMode, managedProjectIds, allProjects]);
+  }, [hasRequestedProjects, filterMode, managedProjectIds, allProjects]);
 
-  // Active selected project ID (falls back to first displayed project)
+  // Active selected project ID (only set when explicitly chosen by user; never auto-selects first project)
   const activeProjectId = useMemo(() => {
     if (selectedProjectId && displayedProjects.some(p => String(p.id) === selectedProjectId)) {
       return selectedProjectId;
     }
-    return displayedProjects.length > 0 ? String(displayedProjects[0].id) : '';
+    return selectedProjectId;
   }, [displayedProjects, selectedProjectId]);
 
-  // Fetch project details and time entries when activeProjectId changes
+  // Fetch project details and time entries only when user explicitly selects a project
   useEffect(() => {
     if (!activeProjectId) {
+      setProjectDetails(null);
+      setAllTimeEntries([]);
       return;
     }
 
     let isMounted = true;
 
-    // Asynchronously initiate data fetching
+    // Asynchronously initiate data fetching for the chosen project
     Promise.resolve().then(() => {
       if (!isMounted) return;
       setIsLoadingDetails(true);
@@ -187,26 +201,26 @@ export function useProjectManagerData() {
     if (dateRangePreset === 'this_month') {
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      return { from: toYMD(start), to: toYMD(end), label: `Този месец (${toYMD(start)} - ${toYMD(end)})` };
+      return { from: toYMD(start), to: toYMD(end), label: `This Month (${toYMD(start)} - ${toYMD(end)})` };
     }
 
     if (dateRangePreset === 'last_month') {
       const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const end = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { from: toYMD(start), to: toYMD(end), label: `Миналия месец (${toYMD(start)} - ${toYMD(end)})` };
+      return { from: toYMD(start), to: toYMD(end), label: `Last Month (${toYMD(start)} - ${toYMD(end)})` };
     }
 
     if (dateRangePreset === 'last_30_days') {
       const start = new Date();
       start.setDate(start.getDate() - 30);
-      return { from: toYMD(start), to: toYMD(now), label: `Последните 30 дни (${toYMD(start)} - ${toYMD(now)})` };
+      return { from: toYMD(start), to: toYMD(now), label: `Last 30 Days (${toYMD(start)} - ${toYMD(now)})` };
     }
 
     if (dateRangePreset === 'contract_period' && budgetMetadata.startDate && budgetMetadata.contractEndDate) {
       return {
         from: budgetMetadata.startDate,
         to: budgetMetadata.contractEndDate,
-        label: `Срок по договор (${budgetMetadata.startDate} - ${budgetMetadata.contractEndDate})`,
+        label: `Contract Period (${budgetMetadata.startDate} - ${budgetMetadata.contractEndDate})`,
       };
     }
 
@@ -214,11 +228,11 @@ export function useProjectManagerData() {
       return {
         from: customFromDate,
         to: customToDate,
-        label: `Свободен период (${customFromDate || '...'} - ${customToDate || '...'})`,
+        label: `Custom Period (${customFromDate || '...'} - ${customToDate || '...'})`,
       };
     }
 
-    return { from: '', to: '', label: 'Всички отчетени записи' };
+    return { from: '', to: '', label: 'All Logged Entries' };
   }, [dateRangePreset, customFromDate, customToDate, budgetMetadata]);
 
   // Filter time entries for the table & client export
@@ -250,9 +264,14 @@ export function useProjectManagerData() {
         const query = searchQuery.trim().toLowerCase();
         const matchesComment = (entry.comments || '').toLowerCase().includes(query);
         const matchesIssue = String(entry.issue?.id || '').includes(query) || (entry.issue?.subject || '').toLowerCase().includes(query);
+        const matchesParent = Boolean(
+          entry.issue?.parent &&
+          (String(entry.issue.parent.id).includes(query) ||
+           (entry.issue.parent.subject || '').toLowerCase().includes(query))
+        );
         const matchesUser = (entry.user?.name || '').toLowerCase().includes(query);
         const matchesActivity = (entry.activity?.name || '').toLowerCase().includes(query);
-        if (!matchesComment && !matchesIssue && !matchesUser && !matchesActivity) return false;
+        if (!matchesComment && !matchesIssue && !matchesParent && !matchesUser && !matchesActivity) return false;
       }
 
       return true;
@@ -281,22 +300,29 @@ export function useProjectManagerData() {
     localStorage.setItem('pm_global_currency', curr);
   }, []);
 
-  // Refetch everything for active project
+  // Refetch everything for active project (bypasses cache) or reload projects list
   const refetchAll = useCallback(() => {
+    setHasRequestedProjects(true);
+    refetchProjects();
+    setIsLoadingMemberships(true);
+    getUserMemberships(true)
+      .then(memberships => setUserMemberships(memberships))
+      .finally(() => setIsLoadingMemberships(false));
+
     if (!activeProjectId) return;
     setIsLoadingDetails(true);
     setIsLoadingEntries(true);
-    getProjectDetails(activeProjectId)
+    getProjectDetails(activeProjectId, true)
       .then(details => {
         setProjectDetails(details);
         setBudgetMetadata(extractBudgetMetadata(details));
       })
       .finally(() => setIsLoadingDetails(false));
 
-    getAllProjectTimeEntries(activeProjectId)
+    getAllProjectTimeEntries(activeProjectId, undefined, undefined, true)
       .then(entries => setAllTimeEntries(entries))
       .finally(() => setIsLoadingEntries(false));
-  }, [activeProjectId]);
+  }, [activeProjectId, refetchProjects]);
 
   return {
     // Projects
@@ -307,7 +333,10 @@ export function useProjectManagerData() {
     filterMode,
     setFilterMode,
     managedProjectIds,
-    isLoadingProjects: isLoadingProjects || isLoadingDetails,
+    hasRequestedProjects,
+    isLoadingProjectsList: isLoadingProjects || isLoadingMemberships,
+    isLoadingProjects: isLoadingDetails,
+    loadProjectsForDropdown,
 
     // Project Details & Budgets
     projectDetails,

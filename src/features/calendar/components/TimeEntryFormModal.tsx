@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, Button, Select, TextInput, NumberInput, Textarea, Group, Stack, Text, Divider, ActionIcon, Grid, Alert } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
@@ -11,6 +11,7 @@ import { useCustomFields } from '../../../hooks/useCustomFields';
 import { SavePresetModal } from './SavePresetModal';
 import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
 import { CustomFieldsSection } from '../../../components/common/CustomFieldsSection';
+import { cleanTaskId, formatCustomFieldsPayload } from '../../../utils/formatters';
 
 /// <summary>
 /// Properties for configuring the TimeEntryFormModal component.
@@ -63,9 +64,6 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }));
   };
 
-  useEffect(() => {
-    if (!isOpen) setFormResult(null);
-  }, [isOpen]);
 
   const { customFields } = useCustomFields();
   const billableFieldId = localStorage.getItem('billableFieldId');
@@ -126,78 +124,6 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     return [];
   }, [editEntry, copyEntry]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (editEntry) {
-      form.setValues({
-        projectId: editEntry.project?.id?.toString() || '',
-        taskId: editEntry.issue?.id?.toString() || '',
-        activityId: editEntry.activity?.id?.toString() || '',
-        hours: editEntry.hours,
-        spentOn: editEntry.spent_on,
-        comments: editEntry.comments || '',
-      });
-
-      if (editEntry.custom_fields) {
-        const initialValues: Record<number, string> = {};
-        editEntry.custom_fields.forEach(f => {
-          initialValues[f.id] = f.value;
-        });
-        setCustomFieldValues(prev => ({ ...prev, ...initialValues }));
-      }
-    } else if (copyEntry) {
-      form.setValues({
-        projectId: copyEntry.project?.id?.toString() || '',
-        taskId: copyEntry.issue?.id?.toString() || '',
-        activityId: copyEntry.activity?.id?.toString() || '',
-        hours: copyEntry.hours,
-        spentOn: '', // Date is intentionally left empty when copying
-        comments: copyEntry.comments || '',
-      });
-
-      const initialValues: Record<number, string> = {};
-      if (copyEntry.custom_fields) {
-        copyEntry.custom_fields.forEach(f => {
-          initialValues[f.id] = f.value;
-        });
-      }
-      setCustomFieldValues(initialValues);
-    } else {
-      form.setValues({
-        projectId: '',
-        taskId: '',
-        activityId: '',
-        hours: '',
-        spentOn: defaultDate || new Date().toISOString().split('T')[0],
-        comments: '',
-      });
-      setSelectedPresetId('');
-
-      const initialValues: Record<number, string> = {};
-      customFields.forEach(field => {
-        if (field.id === Number(billableFieldId)) {
-          initialValues[field.id] = '1';
-        } else {
-          initialValues[field.id] = field.default_value || '';
-        }
-      });
-      setCustomFieldValues(initialValues);
-
-      if (initialPresetId) {
-        handleApplyPreset(initialPresetId);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editEntry, copyEntry, defaultDate, initialPresetId, customFields, billableFieldId]);
-
-  useEffect(() => {
-    const sourceActId = editEntry?.activity?.id || copyEntry?.activity?.id;
-    if (isOpen && sourceActId) {
-      form.setFieldValue('activityId', sourceActId.toString());
-    }
-  }, [isOpen, editEntry, copyEntry]);
-
   const handleApplyPreset = (presetId: string | null) => {
     setSelectedPresetId(presetId);
     if (!presetId) return;
@@ -220,6 +146,135 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       }
     }
   };
+
+  const initializedTargetRef = useRef<string | null>(null);
+
+  /// <summary>
+  /// Manages form initialization and complete state cleanup across modal open/close lifecycles.
+  /// When closed, completely cleans up all form fields, errors, presets, and custom fields to avoid stale data leaking.
+  /// When opened, initializes values according to the requested edit entry, copy entry, or date preset.
+  /// </summary>
+  useEffect(() => {
+    if (!isOpen) {
+      if (initializedTargetRef.current !== null) {
+        initializedTargetRef.current = null;
+        form.reset();
+        form.clearErrors();
+        setFormResult(null);
+        setSelectedPresetId(null);
+        setCustomFieldValues({});
+      }
+      return;
+    }
+
+    const currentTargetKey = editEntry
+      ? `edit_${editEntry.id}`
+      : copyEntry
+      ? `copy_${copyEntry.id}_${defaultDate || ''}`
+      : `new_${defaultDate || ''}_${initialPresetId || ''}`;
+
+    // Only populate if opening freshly or switching to a different entry/date/preset
+    if (initializedTargetRef.current !== currentTargetKey) {
+      initializedTargetRef.current = currentTargetKey;
+      form.clearErrors();
+      setFormResult(null);
+
+      if (editEntry) {
+        form.setValues({
+          projectId: editEntry.project?.id?.toString() || '',
+          taskId: editEntry.issue?.id?.toString() || '',
+          activityId: editEntry.activity?.id?.toString() || '',
+          hours: editEntry.hours,
+          spentOn: editEntry.spent_on,
+          comments: editEntry.comments || '',
+        });
+
+        const initialValues: Record<number, string> = {};
+        if (editEntry.custom_fields) {
+          editEntry.custom_fields.forEach(f => {
+            initialValues[f.id] = f.value;
+          });
+        }
+        setCustomFieldValues(initialValues);
+        setSelectedPresetId(null);
+      } else if (copyEntry) {
+        form.setValues({
+          projectId: copyEntry.project?.id?.toString() || '',
+          taskId: copyEntry.issue?.id?.toString() || '',
+          activityId: copyEntry.activity?.id?.toString() || '',
+          hours: copyEntry.hours,
+          spentOn: defaultDate || '',
+          comments: copyEntry.comments || '',
+        });
+
+        const initialValues: Record<number, string> = {};
+        if (copyEntry.custom_fields) {
+          copyEntry.custom_fields.forEach(f => {
+            initialValues[f.id] = f.value;
+          });
+        }
+        setCustomFieldValues(initialValues);
+        setSelectedPresetId(null);
+      } else {
+        form.setValues({
+          projectId: '',
+          taskId: '',
+          activityId: '',
+          hours: '',
+          spentOn: defaultDate || new Date().toISOString().split('T')[0],
+          comments: '',
+        });
+        setSelectedPresetId(initialPresetId || null);
+
+        const initialValues: Record<number, string> = {};
+        const bId = localStorage.getItem('billableFieldId');
+        customFields.forEach(field => {
+          if (field.id === Number(bId)) {
+            initialValues[field.id] = '1';
+          } else {
+            initialValues[field.id] = field.default_value || '';
+          }
+        });
+        setCustomFieldValues(initialValues);
+
+        if (initialPresetId) {
+          handleApplyPreset(initialPresetId);
+        }
+      }
+
+      const sourceActId = editEntry?.activity?.id || copyEntry?.activity?.id;
+      if (sourceActId) {
+        form.setFieldValue('activityId', sourceActId.toString());
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editEntry, copyEntry, defaultDate, initialPresetId]);
+
+  /// <summary>
+  /// Sets default values for newly loaded custom fields without resetting any existing user input.
+  /// </summary>
+  useEffect(() => {
+    if (!isOpen || isEditing || customFields.length === 0) return;
+
+    setCustomFieldValues(prev => {
+      const bId = localStorage.getItem('billableFieldId');
+      const updated = { ...prev };
+      let changed = false;
+
+      customFields.forEach(field => {
+        if (updated[field.id] === undefined) {
+          changed = true;
+          if (field.id === Number(bId)) {
+            updated[field.id] = '1';
+          } else {
+            updated[field.id] = field.default_value || '';
+          }
+        }
+      });
+
+      return changed ? updated : prev;
+    });
+  }, [isOpen, isEditing, customFields]);
 
   const [isSavePresetModalOpen, setIsSavePresetModalOpen] = useState(false);
 
@@ -264,15 +319,9 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     setIsSubmitting(true);
     setFormResult(null);
     try {
-      const payloadCustomFields = Object.entries(customFieldValues)
-        .filter(([_, value]) => value !== '')
-        .map(([id, value]) => ({
-          id: parseInt(id, 10),
-          value: value,
-        }));
-
-      const cleanTaskId = values.taskId ? values.taskId.toString().replace(/^#/, '').trim() : '';
-      const parsedTaskId = cleanTaskId ? parseInt(cleanTaskId, 10) : undefined;
+      const payloadCustomFields = formatCustomFieldsPayload(customFieldValues);
+      const cleanId = cleanTaskId(values.taskId);
+      const parsedTaskId = cleanId ? parseInt(cleanId, 10) : undefined;
       const validTaskId = (parsedTaskId && !isNaN(parsedTaskId)) ? parsedTaskId : undefined;
 
       const cleanProjectId = values.projectId && values.projectId !== 'my_issues' ? values.projectId.toString().trim() : '';
@@ -357,9 +406,11 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                   <ProjectTaskActivityFields
                     projectId={form.values.projectId}
                     onProjectChange={(val) => {
-                      form.setFieldValue('projectId', val);
-                      if (!val) form.setFieldValue('taskId', '');
-                      form.setFieldValue('activityId', '');
+                      if (form.values.projectId !== val) {
+                        form.setFieldValue('projectId', val);
+                        if (!val) form.setFieldValue('taskId', '');
+                        form.setFieldValue('activityId', '');
+                      }
                     }}
                     taskId={form.values.taskId}
                     onTaskChange={(val) => form.setFieldValue('taskId', val)}

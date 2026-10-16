@@ -7,10 +7,12 @@ import { AssignedTasksPanel } from './AssignedTasksPanel';
 import { StandardLogPanel } from './StandardLogPanel';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { Card, Button, TextInput, Group, Stack, Badge, Text, List, ThemeIcon, Paper, Grid, SegmentedControl, Center } from '@mantine/core';
-import { IconClipboardList, IconPlus, IconCheck } from '@tabler/icons-react';
+import { Card, Button, TextInput, Group, Stack, Badge, Text, ThemeIcon, Paper, Grid, SegmentedControl, Center, Timeline } from '@mantine/core';
+import { IconClipboardList, IconPlus, IconCheck, IconClock } from '@tabler/icons-react';
 
-/** "Performed Tasks" panel showing activities logged during the timer session */
+/// <summary>
+/// Sub-panel for viewing and recording incremental activities with an ongoing timeline during an active timer session.
+/// </summary>
 const PerformedTasks: React.FC = () => {
   const timer = useQueueTimer();
   const [newActivityText, setNewActivityText] = useState('');
@@ -43,41 +45,56 @@ const PerformedTasks: React.FC = () => {
         <Group justify="space-between">
           <Group gap="xs">
             <IconClipboardList size={20} />
-            <Text fw={500}>Performed Tasks</Text>
+            <Text fw={500}>Ongoing Task Timeline</Text>
           </Group>
           <Badge size="lg" circle>{timer.activities.length}</Badge>
         </Group>
       </Card.Section>
 
-      <Stack mt="md">
+      <Stack mt="md" gap="md">
         {timer.activities.length === 0 ? (
           <Text c="dimmed" size="sm" ta="center" py="md">
-            No performed tasks recorded yet. Add one below.
+            No activities recorded in this session yet. Add what you are working on below.
           </Text>
         ) : (
-          <List
-            spacing="sm"
-            size="sm"
-            center
-            icon={
-              <ThemeIcon color="teal" size={24} radius="xl">
-                <IconCheck size={16} />
-              </ThemeIcon>
-            }
-          >
-            {timer.activities.map((act, i) => (
-              <List.Item key={i}>
-                <Group justify="space-between">
-                  <Text>{act.text}</Text>
-                  {act.durationSeconds !== undefined && act.durationSeconds > 0 && (
-                    <Text size="xs" c="dimmed" fw={500}>
-                      {formatDuration(act.durationSeconds)}
+          <Timeline active={timer.activities.length - 1} bulletSize={24} lineWidth={2}>
+            {timer.activities.map((act, i) => {
+              const isCurrent = i === timer.activities.length - 1 && timer.isRunning;
+              return (
+                <Timeline.Item
+                  key={i}
+                  bullet={
+                    <ThemeIcon
+                      size={22}
+                      radius="xl"
+                      color={isCurrent ? 'blue' : 'teal'}
+                      variant={isCurrent ? 'filled' : 'light'}
+                    >
+                      {isCurrent ? <IconClock size={12} /> : <IconCheck size={12} />}
+                    </ThemeIcon>
+                  }
+                  title={
+                    <Group justify="space-between" align="baseline">
+                      <Text size="sm" fw={isCurrent ? 600 : 500} c={isCurrent ? 'blue' : undefined}>
+                        {act.text}
+                      </Text>
+                      {act.durationSeconds !== undefined && act.durationSeconds > 0 && (
+                        <Badge size="xs" variant="light" color={isCurrent ? 'blue' : 'gray'}>
+                          {formatDuration(act.durationSeconds)}
+                        </Badge>
+                      )}
+                    </Group>
+                  }
+                >
+                  {act.timestamp && (
+                    <Text c="dimmed" size="xs">
+                      {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </Text>
                   )}
-                </Group>
-              </List.Item>
-            ))}
-          </List>
+                </Timeline.Item>
+              );
+            })}
+          </Timeline>
         )}
 
         {timer.isRunning && (
@@ -103,6 +120,10 @@ const PerformedTasks: React.FC = () => {
   );
 };
 
+
+/// <summary>
+/// Main Tracker dashboard combining timer bar, queue management, assigned issues, and presets.
+/// </summary>
 export const TrackerDashboard: React.FC = () => {
   const timer = useQueueTimer();
   const { usePerformedTasksList, setUsePerformedTasksList } = useSettings();
@@ -131,7 +152,7 @@ export const TrackerDashboard: React.FC = () => {
                 </Text>
                 <SegmentedControl
                   fullWidth
-                  size="lg"
+                  size="md"
                   radius="md"
                   color="blue"
                   value={usePerformedTasksList ? 'performed' : 'direct'}
@@ -140,8 +161,8 @@ export const TrackerDashboard: React.FC = () => {
                     {
                       label: (
                         <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
-                          <Text fw={700} size="sm" c={!usePerformedTasksList ? 'white' : undefined}>Direct Time Logging</Text>
-                          <Text size="xs" c={!usePerformedTasksList ? 'blue.1' : 'dimmed'} fw={!usePerformedTasksList ? 600 : 400}>No Sub-tasks</Text>
+                          <Text fw={600} size="sm">Direct Time Logging</Text>
+                          <Text size="xs" c="dimmed">No Sub-tasks</Text>
                         </Center>
                       ),
                       value: 'direct',
@@ -149,8 +170,8 @@ export const TrackerDashboard: React.FC = () => {
                     {
                       label: (
                         <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
-                          <Text fw={700} size="sm" c={usePerformedTasksList ? 'white' : undefined}>Performed Tasks List</Text>
-                          <Text size="xs" c={usePerformedTasksList ? 'blue.1' : 'dimmed'} fw={usePerformedTasksList ? 600 : 400}>With Sub-tasks</Text>
+                          <Text fw={600} size="sm">Performed Tasks List</Text>
+                          <Text size="xs" c="dimmed">With Sub-tasks</Text>
                         </Center>
                       ),
                       value: 'performed',
@@ -175,7 +196,9 @@ export const TrackerDashboard: React.FC = () => {
         </Grid.Col>
       </Grid>
 
-      <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} />
+      {isSummaryOpen && (
+        <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} />
+      )}
     </Stack>
   );
 };

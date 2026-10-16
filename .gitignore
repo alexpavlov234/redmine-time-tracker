@@ -26,3 +26,4 @@ dist-ssr
 # Local runtime & server config
 server-config.json
 timer-state.json
+personal-tasks.json

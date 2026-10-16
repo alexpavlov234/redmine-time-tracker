@@ -250,6 +250,67 @@
   background-color: #f8fafc;
 }
 
+/* Parent Task Header Row */
+.client-report-parent-task-row {
+  background-color: #f1f5f9 !important;
+  border-top: 2px solid #6366f1 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+
+.client-report-parent-task-row td {
+  background-color: #f1f5f9 !important;
+  border-left: 3px solid #4f46e5;
+}
+
+.client-report-parent-badge {
+  display: inline-block;
+  background-color: #e0e7ff;
+  color: #3730a3;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.client-report-subtasks-count {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+/* Child Task Subheader Row */
+.client-report-child-task-row {
+  background-color: #fafbfc;
+  border-top: 1px dashed #cbd5e1;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.client-report-child-task-row td {
+  padding: 6px 10px !important;
+  background-color: #fafbfc;
+  border-left: 2px solid #cbd5e1;
+}
+
+.client-report-child-task-id {
+  font-weight: 700;
+  color: #334155;
+  font-size: 11.5px;
+  margin-right: 4px;
+}
+
+.client-report-child-task-subject {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 12px;
+}
+
+.client-report-child-entry-row .client-report-sub-date {
+  padding-left: 32px !important;
+}
+
 .client-report-task-group-header-content {
   display: flex;
   justify-content: space-between;
@@ -478,6 +539,8 @@
   /* Avoid awkward page breaks inside rows and blocks */
   .client-report-table tr,
   .client-report-task-group-row,
+  .client-report-parent-task-row,
+  .client-report-child-task-row,
   .client-report-sub-entry-row,
   .client-report-summary-bar,
   .client-report-signatures,
@@ -494,6 +557,28 @@
 
   .client-report-task-group-row td {
     background-color: #f1f5f9 !important;
+  }
+
+  .client-report-parent-task-row {
+    background-color: #f1f5f9 !important;
+    border-top: 1.5px solid #4f46e5 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .client-report-parent-task-row td {
+    background-color: #f1f5f9 !important;
+    border-left: 2.5px solid #4f46e5 !important;
+  }
+
+  .client-report-child-task-row {
+    background-color: #fafbfc !important;
+    border-top: 1px dashed #cbd5e1 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  .client-report-child-task-row td {
+    background-color: #fafbfc !important;
+    border-left: 2px solid #cbd5e1 !important;
   }
 
   .client-report-table .action-col,

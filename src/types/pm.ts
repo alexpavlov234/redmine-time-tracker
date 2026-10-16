@@ -128,6 +128,23 @@ export interface TaskTimeSummary {
   entryIds?: number[];
   /// <summary>Underlying time entries belonging to this task.</summary>
   entries?: TimeEntry[];
+  /// <summary>Parent task reference if this task is a subtask/child.</summary>
+  parent?: {
+    id: number;
+    subject?: string;
+  };
+  /// <summary>Whether this task is a parent task grouping child tasks.</summary>
+  isParent?: boolean;
+  /// <summary>Hours spent directly on this task (excluding child tasks).</summary>
+  directHours?: number;
+  /// <summary>Billable hours spent directly on this task.</summary>
+  directBillableHours?: number;
+  /// <summary>Direct time entry IDs belonging strictly to this task.</summary>
+  directEntryIds?: number[];
+  /// <summary>Direct time entries belonging strictly to this task.</summary>
+  directEntries?: TimeEntry[];
+  /// <summary>Child task summaries belonging under this parent task.</summary>
+  children?: TaskTimeSummary[];
 }
 
 /// <summary>
@@ -206,6 +223,8 @@ export interface ClientExportConfig {
   showTeamMembers: boolean;
   /// <summary>Whether to show task numbers / IDs.</summary>
   showTaskIds: boolean;
+  /// <summary>Whether to detect and show parent task hierarchy and columns.</summary>
+  showParentTask?: boolean;
   /// <summary>Whether to show activities column.</summary>
   showActivities: boolean;
   /// <summary>Whether to show descriptions / comments column.</summary>

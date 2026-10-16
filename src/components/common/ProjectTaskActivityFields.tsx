@@ -37,6 +37,8 @@ export interface ProjectTaskActivityFieldsProps {
   additionalTaskOptions?: Array<{ value: string; label: string }>;
   /// <summary>Additional activity dropdown options (e.g. from an existing time entry).</summary>
   additionalActivityOptions?: Array<{ value: string; label: string }>;
+  /// <summary>Whether to hide the activity selection field completely.</summary>
+  hideActivity?: boolean;
   /// <summary>Layout arrangement of the fields: 'stacked' (vertical) or 'grid' (project/activity/task rows).</summary>
   layout?: 'stacked' | 'standard';
 }
@@ -59,16 +61,25 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
   disabled = false,
   additionalTaskOptions = [],
   additionalActivityOptions = [],
+  hideActivity = false,
   layout = 'standard',
 }) => {
-  const { getProjectSelectData } = useProjects();
+  const { getProjectSelectData, ensureProjectsLoaded, isLoadingProjects } = useProjects();
   const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
   const lastSearchedIdRef = useRef<string>('');
 
+  // Ensure projects are loaded if a project ID is already pre-selected (e.g. from edit/preset/issue lookup)
+  useEffect(() => {
+    if (projectId && projectId !== 'my_issues') {
+      ensureProjectsLoaded();
+    }
+  }, [projectId, ensureProjectsLoaded]);
+
   const { tasks: projectTasks, isLoading: isLoadingTasks } = useTasksForProject(projectId || null);
   const { activities: projectActivities, isLoading: isLoadingActivities, defaultActivityId } = useActivitiesForProject(
-    projectId || null
+    projectId || null,
+    !hideActivity
   );
 
   // Grouped project options with 'Recently Used' at the top
@@ -170,6 +181,17 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
     [onTaskChange, onProjectChange, applyLastActivityForTask]
   );
 
+  /// <summary>
+  /// Clears loaded task details and search cache when taskId is empty or cleared.
+  /// Prevents old task options or search cache from lingering across openings.
+  /// </summary>
+  useEffect(() => {
+    if (!taskId) {
+      setLoadedTask(null);
+      lastSearchedIdRef.current = '';
+    }
+  }, [taskId]);
+
   // Debounced auto-fetch when user types task ID (500ms after typing digits)
   useEffect(() => {
     const clean = taskId.replace(/^#/, '').trim();
@@ -248,13 +270,17 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
   const projectField = (
     <Select
       label="Project"
-      placeholder="Search projects..."
+      placeholder={isLoadingProjects ? 'Loading projects...' : 'Search projects...'}
       data={projectOptions}
       searchable
       clearable
       withAsterisk={projectRequired}
       value={projectId || null}
       onChange={handleProjectDropdownChange}
+      onDropdownOpen={ensureProjectsLoaded}
+      onClick={ensureProjectsLoaded}
+      nothingFoundMessage={isLoadingProjects ? 'Loading projects...' : 'No projects found'}
+      rightSection={isLoadingProjects ? <Loader size="xs" /> : undefined}
       disabled={disabled}
     />
   );
@@ -311,7 +337,7 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
       <Stack gap="md">
         {projectField}
         {taskFields}
-        {activityField}
+        {!hideActivity && activityField}
       </Stack>
     );
   }
@@ -319,7 +345,7 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
   return (
     <Stack gap="md">
       {projectField}
-      {activityField}
+      {!hideActivity && activityField}
       {taskFields}
     </Stack>
   );

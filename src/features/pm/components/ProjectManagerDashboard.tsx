@@ -34,7 +34,10 @@ export const ProjectManagerDashboard: React.FC = () => {
     filterMode,
     setFilterMode,
     managedProjectIds,
+    hasRequestedProjects,
+    isLoadingProjectsList,
     isLoadingProjects,
+    loadProjectsForDropdown,
 
     projectDetails,
     budgetMetadata,
@@ -80,7 +83,7 @@ export const ProjectManagerDashboard: React.FC = () => {
   }, [displayedProjects]);
 
   const activeProject = displayedProjects.find(p => String(p.id) === selectedProjectId);
-  const projectName = activeProject?.name || projectDetails?.name || 'Проект';
+  const projectName = activeProject?.name || projectDetails?.name || 'Project';
 
   return (
     <Stack gap="lg" style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
@@ -89,9 +92,9 @@ export const ProjectManagerDashboard: React.FC = () => {
         <Group gap="xs">
           <IconBriefcase size={28} color="var(--mantine-color-blue-filled)" />
           <div>
-            <Title order={2}>Ръководител проекти</Title>
-            <Text size="xs" c="dimmed">
-              Мониторинг на бюджети, отчетено време и клиентски отчети
+            <Title order={2}>Project Management</Title>
+            <Text size="sm" c="dimmed">
+              Monitor budgets, track team time logs, and generate client reports.
             </Text>
           </div>
         </Group>
@@ -101,38 +104,45 @@ export const ProjectManagerDashboard: React.FC = () => {
           <SegmentedControl
             size="sm"
             value={filterMode}
-            onChange={val => setFilterMode(val as 'managed' | 'all')}
+            onChange={val => {
+              loadProjectsForDropdown();
+              setFilterMode(val as 'managed' | 'all');
+            }}
             data={[
               {
                 value: 'managed',
-                label: `Моите проекти (${managedProjectIds.size})`,
+                label: hasRequestedProjects ? `My Projects (${managedProjectIds.size})` : 'My Projects',
               },
               {
                 value: 'all',
-                label: 'Всички проекти',
+                label: 'All Projects',
               },
             ]}
           />
 
-          {/* Project Dropdown */}
+          {/* Project Dropdown - loads projects on click/open */}
           <Select
             size="sm"
-            placeholder="Изберете проект..."
+            placeholder={isLoadingProjectsList ? 'Loading projects...' : 'Select a project...'}
             data={projectSelectData}
-            value={selectedProjectId}
+            value={selectedProjectId || null}
             onChange={val => setSelectedProjectId(val || '')}
+            onDropdownOpen={loadProjectsForDropdown}
+            onClick={loadProjectsForDropdown}
             searchable
-            nothingFoundMessage="Няма намерени проекти"
+            clearable
+            nothingFoundMessage={isLoadingProjectsList ? 'Loading projects...' : 'No projects found'}
             style={{ width: 280 }}
             leftSection={<IconFolder size={16} />}
+            rightSection={isLoadingProjectsList ? <Loader size="xs" /> : undefined}
           />
 
           <ActionIcon
             size="lg"
             variant="light"
             onClick={refetchAll}
-            loading={isLoadingProjects || isLoadingEntries}
-            aria-label="Обнови данните"
+            loading={isLoadingProjectsList || isLoadingProjects || isLoadingEntries}
+            aria-label="Refresh project data"
           >
             <IconRefresh size={18} />
           </ActionIcon>
@@ -144,14 +154,14 @@ export const ProjectManagerDashboard: React.FC = () => {
         <Center py="xl">
           <Stack align="center" gap="sm">
             <Loader size="lg" />
-            <Text c="dimmed">Зареждане на данни за проекта...</Text>
+            <Text c="dimmed">Loading project data...</Text>
           </Stack>
         </Center>
-      ) : !selectedProjectId || displayedProjects.length === 0 ? (
-        <Alert icon={<IconAlertCircle size={18} />} title="Няма избран проект" color="blue">
-          {filterMode === 'managed' && managedProjectIds.size === 0
-            ? 'Нямате проекти, маркирани като ръководени от вас в Redmine. Можете да превключите на "Всички проекти" от бутона горе.'
-            : 'Моля, изберете проект от падащото меню горе, за да прегледате бюджета и отчетеното време.'}
+      ) : !selectedProjectId ? (
+        <Alert icon={<IconAlertCircle size={18} />} title="No Project Selected" color="blue">
+          {hasRequestedProjects && !isLoadingProjectsList && filterMode === 'managed' && managedProjectIds.size === 0
+            ? 'No projects are marked as managed by you in Redmine. You can switch to "All Projects" using the control above.'
+            : 'Click on the project dropdown above to load projects, then select a project to view its budget health and time logs.'}
         </Alert>
       ) : (
         <Stack gap="lg">

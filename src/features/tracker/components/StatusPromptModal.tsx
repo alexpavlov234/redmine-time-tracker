@@ -22,18 +22,28 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
   onConfirmStart,
 }) => {
   const isMobile = useMediaQuery('(max-width: 48em)');
-  const { issueStatuses } = useProjects();
+  const { issueStatuses, ensureStatusesLoaded } = useProjects();
   const { redmineUrl } = useSettings();
-  const [selectedStatusId, setSelectedStatusId] = useState<string | null>(() => {
-    const inProgress = issueStatuses.find(s => 
-      s.name.toLowerCase().includes('in progress') || 
-      s.name.toLowerCase().includes('в процес') ||
-      s.name.toLowerCase().includes('progress')
-    );
-    return inProgress ? String(inProgress.id) : (issueStatuses.length > 0 ? String(issueStatuses[0].id) : null);
-  });
+  const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusResult, setStatusResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      ensureStatusesLoaded();
+    }
+  }, [isOpen, ensureStatusesLoaded]);
+
+  React.useEffect(() => {
+    if (issueStatuses.length > 0 && !selectedStatusId) {
+      const inProgress = issueStatuses.find(s => 
+        s.name.toLowerCase().includes('in progress') || 
+        s.name.toLowerCase().includes('в процес') ||
+        s.name.toLowerCase().includes('progress')
+      );
+      setSelectedStatusId(inProgress ? String(inProgress.id) : String(issueStatuses[0].id));
+    }
+  }, [issueStatuses, selectedStatusId]);
 
   const handleUpdateAndStart = async () => {
     if (!taskId) return;

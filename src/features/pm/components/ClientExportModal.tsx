@@ -98,8 +98,8 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
     ? user.name || `${user.firstname || ''} ${user.lastname || ''}`.trim()
     : '';
 
-  // Export Language: 'bg' | 'en'
-  const [language, setLanguage] = useState<ExportLanguage>('bg');
+  // Export Language: 'bg' | 'en' (defaults to 'en')
+  const [language, setLanguage] = useState<ExportLanguage>('en');
 
   // Active translation dictionary
   const t = exportTranslations[language];
@@ -137,9 +137,9 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
 
   // Configuration options for client export
   const [clientName, setClientName] = useState<string>(metadata.clientName || 'Client');
-  const [reportTitle, setReportTitle] = useState<string>(exportTranslations.bg.reportTitleDefault);
+  const [reportTitle, setReportTitle] = useState<string>(exportTranslations.en.reportTitleDefault);
   const [periodLabel, setPeriodLabel] = useState<string>(() =>
-    getLocalizedPeriodLabel('bg', dateRangePreset, dateFrom, dateTo, metadata.startDate, metadata.contractEndDate, dateLabel)
+    getLocalizedPeriodLabel('en', dateRangePreset, dateFrom, dateTo, metadata.startDate, metadata.contractEndDate, dateLabel)
   );
   const [groupBy, setGroupBy] = useState<'task' | 'date'>('task');
 
@@ -163,17 +163,20 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
   const [showIssueDate, setShowIssueDate] = useState<boolean>(true);
 
   // Column / table toggles
+  const [showParentTask, setShowParentTask] = useState<boolean>(true);
   const [showTeamMembers, setShowTeamMembers] = useState<boolean>(true);
   const [showTaskIds, setShowTaskIds] = useState<boolean>(true);
   const [showActivities, setShowActivities] = useState<boolean>(true);
   const [showDescriptions, setShowDescriptions] = useState<boolean>(true);
   const [showBillableOnly, setShowBillableOnly] = useState<boolean>(false);
-  const [showFinancials, setShowFinancials] = useState<boolean>(defaultHourlyRate > 0);
+  /// <summary>Whether financial rate and total amounts are displayed in the export.</summary>
+  const [showFinancials, setShowFinancials] = useState<boolean>(false);
 
   // Financial inputs
   const [hourlyRate, setHourlyRate] = useState<number>(defaultHourlyRate);
   const [currency, setCurrency] = useState<string>(defaultCurrency);
-  const [customNotes, setCustomNotes] = useState<string>(DEFAULT_NOTES.bg);
+  /// <summary>Custom note text appended to the report footer (empty by default).</summary>
+  const [customNotes, setCustomNotes] = useState<string>('');
 
   // Copy status feedback
   const [isCopied, setIsCopied] = useState<boolean>(false);
@@ -261,7 +264,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
   // Revision state to re-evaluate grouped tables when issue subjects are fetched
   const [subjectsRevision, setSubjectsRevision] = useState<number>(0);
 
-  // Fetch issue subjects for any entries lacking subject data
+  // Fetch issue subjects and parent tasks for any entries lacking details
   useEffect(() => {
     const missingIssueIds = Array.from(
       new Set(
@@ -270,27 +273,36 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
           .filter((id): id is number => typeof id === 'number' && id > 0)
           .filter(id => {
             const entry = entries.find(e => e.issue?.id === id);
-            return !entry?.issue?.subject;
+            return !entry?.issue?.subject || !entry?.issue?.parent;
           })
       )
     );
 
     if (missingIssueIds.length > 0) {
-      getIssues(missingIssueIds)
+      getIssues(missingIssueIds, true)
         .then(issues => {
-          const issueMap = new Map<number, string>();
+          const issueMap = new Map<number, (typeof issues)[0]>();
           for (const issue of issues) {
-            if (issue && issue.id && issue.subject) {
-              issueMap.set(issue.id, issue.subject);
+            if (issue && issue.id) {
+              issueMap.set(issue.id, issue);
             }
           }
           let hasChanges = false;
           for (const entry of entries) {
-            if (entry.issue?.id && !entry.issue.subject) {
-              const sub = issueMap.get(entry.issue.id);
-              if (sub) {
-                entry.issue.subject = sub;
-                hasChanges = true;
+            if (entry.issue?.id) {
+              const issueObj = issueMap.get(entry.issue.id);
+              if (issueObj) {
+                if (!entry.issue.subject && issueObj.subject) {
+                  entry.issue.subject = issueObj.subject;
+                  hasChanges = true;
+                }
+                if (!entry.issue.parent && issueObj.parent?.id) {
+                  entry.issue.parent = {
+                    id: issueObj.parent.id,
+                    subject: issueObj.parent.subject,
+                  };
+                  hasChanges = true;
+                }
               }
             }
           }
@@ -299,7 +311,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
           }
         })
         .catch(err => {
-          console.warn('Failed to fetch missing issue subjects in modal:', err);
+          console.warn('Failed to fetch missing issue details in modal:', err);
         });
     }
   }, [entries]);
@@ -428,6 +440,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
     showBillableHours,
     showTeamMembers,
     showTaskIds,
+    showParentTask,
     showActivities,
     showDescriptions,
     showBillableOnly,
@@ -549,6 +562,28 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
     .client-report-task-group-row td {
       background-color: #f1f5f9 !important;
     }
+    .client-report-parent-task-row {
+      background-color: #f1f5f9 !important;
+      border-top: 1.5px solid #4f46e5 !important;
+      border-bottom: 1px solid #cbd5e1 !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    .client-report-parent-task-row td {
+      background-color: #f1f5f9 !important;
+      border-left: 2.5px solid #4f46e5 !important;
+    }
+    .client-report-child-task-row {
+      background-color: #fafbfc !important;
+      border-top: 1px dashed #cbd5e1 !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    .client-report-child-task-row td {
+      background-color: #fafbfc !important;
+      border-left: 2px solid #cbd5e1 !important;
+    }
     .client-report-sub-entry-row {
       break-inside: avoid !important;
       page-break-inside: avoid !important;
@@ -661,11 +696,29 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
           ? ` (${(task.totalHours * hourlyRate).toFixed(2)} ${currency})`
           : '';
       const taskIdStr = showTaskIds && task.issueId ? `#${task.issueId} ` : '';
-      md += `- **${taskIdStr}${task.subject}**: ${task.totalHours.toFixed(2)} ${t.hoursShort}${taskCost}\n`;
-      if (showDescriptions && task.comments.length > 0) {
-        task.comments.slice(0, 3).forEach(c => {
-          md += `  * ${c}\n`;
+
+      if (task.isParent && task.children && task.children.length > 0) {
+        md += `- **[${language === 'bg' ? 'Родителска задача' : 'Parent Task'}] ${taskIdStr}${task.subject}**: ${task.totalHours.toFixed(2)} ${t.hoursShort}${taskCost} (${task.children.length} ${t.subtasks})\n`;
+        task.children.forEach(child => {
+          const childCost =
+            showFinancials && hourlyRate > 0
+              ? ` (${(child.totalHours * hourlyRate).toFixed(2)} ${currency})`
+              : '';
+          const childIdStr = showTaskIds && child.issueId ? `#${child.issueId} ` : '';
+          md += `  * **↳ ${childIdStr}${child.subject}**: ${child.totalHours.toFixed(2)} ${t.hoursShort}${childCost}\n`;
+          if (showDescriptions && child.comments.length > 0) {
+            child.comments.slice(0, 3).forEach(c => {
+              md += `    - ${c}\n`;
+            });
+          }
         });
+      } else {
+        md += `- **${taskIdStr}${task.subject}**: ${task.totalHours.toFixed(2)} ${t.hoursShort}${taskCost}\n`;
+        if (showDescriptions && task.comments.length > 0) {
+          task.comments.slice(0, 3).forEach(c => {
+            md += `  * ${c}\n`;
+          });
+        }
       }
     });
 
@@ -707,7 +760,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
       title={
         <Group gap="xs">
           <IconBriefcase size={22} color="var(--mantine-color-blue-filled)" />
-          <Title order={3}>{language === 'bg' ? 'Експорт на отчет за клиент' : 'Client Report Export'}</Title>
+          <Title order={3}>Client Report Export</Title>
         </Group>
       }
       size="92%"
@@ -721,9 +774,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
           <Stack gap="md">
             <Paper withBorder p="md" radius="md" bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))">
               <Group justify="space-between" align="center" mb="xs">
-                <Title order={5}>
-                  {language === 'bg' ? 'Настройки на отчета' : 'Report Settings'}
-                </Title>
+                <Title order={5}>Report Settings</Title>
                 <IconAdjustments size={18} color="gray" />
               </Group>
 
@@ -733,7 +784,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                   <Text size="xs" fw={600} c="dimmed" mb={4}>
                     <Group gap={4}>
                       <IconLanguage size={14} />
-                      <span>{language === 'bg' ? 'Език на експорта' : 'Export Language'}:</span>
+                      <span>Export Language:</span>
                     </Group>
                   </Text>
                   <SegmentedControl
@@ -775,7 +826,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                         <FileButton onChange={handleLogoUpload} accept="image/png,image/jpeg,image/webp,image/svg+xml">
                           {props => (
                             <Button {...props} size="xs" variant="light" color="blue">
-                              {language === 'bg' ? 'Смени' : 'Change'}
+                              Change
                             </Button>
                           )}
                         </FileButton>
@@ -821,8 +872,8 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                 {/* Editable Document Title */}
                 <TextInput
                   size="xs"
-                  label={language === 'bg' ? 'Заглавие на документа' : 'Document Title'}
-                  description={language === 'bg' ? 'Можете свободно да редактирате заглавието' : 'Freely edit document title'}
+                  label="Document Title"
+                  description="Freely edit document title"
                   value={reportTitle}
                   onChange={e => {
                     setReportTitle(e.target.value);
@@ -849,7 +900,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                   <TextInput
                     size="xs"
                     label={t.createdBy}
-                    placeholder={language === 'bg' ? 'Име на създател' : 'Creator name'}
+                    placeholder="Creator name"
                     value={createdBy}
                     onChange={e => {
                       setCreatedBy(e.target.value);
@@ -938,7 +989,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                 {/* Grouping Mode */}
                 <div>
                   <Text size="xs" fw={600} c="dimmed" mb={4}>
-                    {language === 'bg' ? 'Формат на таблицата:' : 'Table Format:'}
+                    Table Format:
                   </Text>
                   <SegmentedControl
                     size="xs"
@@ -946,21 +997,21 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                     value={groupBy}
                     onChange={val => setGroupBy(val as 'task' | 'date')}
                     data={[
-                      { value: 'task', label: language === 'bg' ? 'По задачи' : 'By Task' },
-                      { value: 'date', label: language === 'bg' ? 'Хронологично' : 'Chronological' },
+                      { value: 'task', label: 'By Task' },
+                      { value: 'date', label: 'Chronological' },
                     ]}
                   />
                 </div>
 
                 {/* Modular Toggles Section */}
                 <Text size="xs" fw={700} c="dimmed" tt="uppercase" mt="xs">
-                  {language === 'bg' ? 'Обобщени показатели (Summary):' : 'Summary Metrics:'}
+                  Summary Metrics:
                 </Text>
 
                 <SimpleGrid cols={1} spacing="xs">
                   <Switch
                     size="xs"
-                    label={language === 'bg' ? 'Обобщена лента' : 'Summary metrics bar'}
+                    label="Summary metrics bar"
                     checked={showSummaryStats}
                     onChange={e => setShowSummaryStats(e.currentTarget.checked)}
                   />
@@ -999,48 +1050,55 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                 <Divider my="xs" />
 
                 <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-                  {language === 'bg' ? 'Колони и детайли в таблицата:' : 'Table Columns & Details:'}
+                  Table Columns & Details:
                 </Text>
 
                 <SimpleGrid cols={1} spacing="xs">
                   <Switch
                     size="xs"
-                    label={language === 'bg' ? 'Номера на задачи (#)' : 'Task numbers (#)'}
+                    label={t.showParentTask}
+                    checked={showParentTask}
+                    onChange={e => setShowParentTask(e.currentTarget.checked)}
+                  />
+
+                  <Switch
+                    size="xs"
+                    label="Task numbers (#)"
                     checked={showTaskIds}
                     onChange={e => setShowTaskIds(e.currentTarget.checked)}
                   />
 
                   <Switch
                     size="xs"
-                    label={language === 'bg' ? 'Колона за дейности' : 'Activity column'}
+                    label="Activity column"
                     checked={showActivities}
                     onChange={e => setShowActivities(e.currentTarget.checked)}
                   />
 
                   <Switch
                     size="xs"
-                    label={language === 'bg' ? 'Служители от екипа' : 'Team member names'}
+                    label="Team member names"
                     checked={showTeamMembers}
                     onChange={e => setShowTeamMembers(e.currentTarget.checked)}
                   />
 
                   <Switch
                     size="xs"
-                    label={language === 'bg' ? 'Описания / коментари' : 'Descriptions / comments'}
+                    label="Descriptions / comments"
                     checked={showDescriptions}
                     onChange={e => setShowDescriptions(e.currentTarget.checked)}
                   />
 
                   <Switch
                     size="xs"
-                    label={language === 'bg' ? 'Само фактурируеми часове' : 'Billable hours only'}
+                    label="Billable hours only"
                     checked={showBillableOnly}
                     onChange={e => setShowBillableOnly(e.currentTarget.checked)}
                   />
 
                   <Switch
                     size="xs"
-                    label={language === 'bg' ? 'Финансова стойност (Ставка)' : 'Financial values (Rate)'}
+                    label="Financial values (Rate)"
                     checked={showFinancials}
                     onChange={e => setShowFinancials(e.currentTarget.checked)}
                   />
@@ -1057,7 +1115,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                     />
                     <Select
                       size="xs"
-                      label={language === 'bg' ? 'Валута' : 'Currency'}
+                      label="Currency"
                       data={['EUR', 'BGN', 'USD']}
                       value={currency}
                       onChange={val => setCurrency(val || 'EUR')}
@@ -1068,6 +1126,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                 <Textarea
                   size="xs"
                   label={t.notesTitle}
+                  placeholder="Enter an additional note or explanation..."
                   rows={2}
                   value={customNotes}
                   onChange={e => setCustomNotes(e.target.value)}
@@ -1084,7 +1143,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                 onClick={handlePrint}
                 fullWidth
               >
-                {language === 'bg' ? 'Печат / Запази като PDF' : 'Print / Save as PDF'}
+                Print / Save as PDF
               </Button>
 
               <Button
@@ -1095,7 +1154,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                 onClick={handleExcelExport}
                 fullWidth
               >
-                {language === 'bg' ? 'Експорт в Excel (CSV с BOM)' : 'Export to Excel (CSV)'}
+                Export to Excel (CSV)
               </Button>
 
               <Button
@@ -1106,9 +1165,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                 onClick={handleCopyEmailSummary}
                 fullWidth
               >
-                {isCopied
-                  ? (language === 'bg' ? 'Копирано в клипборда!' : 'Copied to clipboard!')
-                  : (language === 'bg' ? 'Копирай обобщение за Имейл' : 'Copy Email Summary')}
+                {isCopied ? 'Copied to clipboard!' : 'Copy Email Summary'}
               </Button>
             </Stack>
           </Stack>
@@ -1120,7 +1177,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
             <Group justify="space-between" align="center" className="client-preview-header-bar">
               <Group gap="xs">
                 <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-                  {language === 'bg' ? 'Предварителен преглед на документа' : 'Document Preview'}
+                  Document Preview
                 </Text>
                 <Text size="11px" c="dimmed">
                   ({t.excludeHint})
@@ -1134,7 +1191,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                   </Badge>
                 )}
                 <Badge size="sm" color="blue" variant="light">
-                  {includedEntries.length} / {exportEntries.length} {language === 'bg' ? 'записа' : 'entries'}
+                  {includedEntries.length} / {exportEntries.length} entries
                 </Badge>
               </Group>
             </Group>
@@ -1144,9 +1201,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
               <Alert color="orange" variant="light" p="xs" radius="sm" className="client-preview-alert">
                 <Group justify="space-between" align="center">
                   <Text size="xs" fw={500}>
-                    {language === 'bg'
-                      ? `Изключени са ${excludedEntryIds.size} записа. Те са скрити от финалния PDF, Excel и имейл.`
-                      : `${excludedEntryIds.size} entries excluded. They are omitted from final PDF, Excel, and Email.`}
+                    {`${excludedEntryIds.size} entries excluded. They are omitted from final PDF, Excel, and Email.`}
                   </Text>
                   <Button size="compact-xs" variant="white" color="orange" onClick={handleRestoreAll}>
                     {t.restoreAll}
@@ -1310,7 +1365,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                               checked={isAllIncluded}
                               indeterminate={isPartiallyExcluded}
                               onChange={toggleAllExclusion}
-                              aria-label="Включи / изключи всички"
+                              aria-label="Toggle select all"
                             />
                           </th>
                           <th style={{ width: '85px' }}>{t.date}</th>
@@ -1344,23 +1399,15 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                           </tr>
                         ) : (
                           allGroupedTasks.map(task => {
+                            const isParent = Boolean(showParentTask && task.isParent && task.children && task.children.length > 0);
+                            const allTaskEntryIds = task.entryIds || [];
                             const isTaskExcluded =
-                              task.entryIds &&
-                              task.entryIds.length > 0 &&
-                              task.entryIds.every(id => excludedEntryIds.has(id));
+                              allTaskEntryIds.length > 0 &&
+                              allTaskEntryIds.every(id => excludedEntryIds.has(id));
                             const isTaskPartiallyExcluded =
-                              task.entryIds &&
-                              task.entryIds.length > 0 &&
-                              task.entryIds.some(id => excludedEntryIds.has(id)) &&
+                              allTaskEntryIds.length > 0 &&
+                              allTaskEntryIds.some(id => excludedEntryIds.has(id)) &&
                               !isTaskExcluded;
-
-                            const taskIncludedEntries = (task.entries || []).filter(e => !excludedEntryIds.has(e.id));
-                            const taskIncludedHours = taskIncludedEntries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
-                            const taskIncludedCost = Math.round(taskIncludedHours * hourlyRate * 100) / 100;
-
-                            const taskTitle = task.issueId === 0
-                              ? (language === 'bg' ? 'Общ проект (без конкретна задача)' : 'General project (no specific task)')
-                              : (task.subject || `#${task.issueId}`);
 
                             const taskColSpan =
                               1 +
@@ -1369,6 +1416,188 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                               (showDescriptions ? 1 : 0) +
                               1 +
                               (showFinancials && hourlyRate > 0 ? 1 : 0);
+
+                            const taskTitle = task.issueId === 0
+                              ? (language === 'bg' ? 'Общ проект (без конкретна задача)' : 'General project (no specific task)')
+                              : (task.subject || `#${task.issueId}`);
+
+                            if (isParent) {
+                              const parentDirectEntries = task.directEntries || [];
+                              const allChildrenEntries = (task.children || []).flatMap(c => c.entries || []);
+                              const allParentAndChildrenEntries = [...parentDirectEntries, ...allChildrenEntries];
+                              const taskIncludedEntries = allParentAndChildrenEntries.filter(e => !excludedEntryIds.has(e.id));
+                              const taskIncludedHours = taskIncludedEntries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+                              const taskIncludedCost = Math.round(taskIncludedHours * hourlyRate * 100) / 100;
+
+                              return (
+                                <React.Fragment key={`task-group-${task.issueId}`}>
+                                  {/* Parent Task Group Header Row */}
+                                  <tr className={`client-report-task-group-row client-report-parent-task-row ${isTaskExcluded ? 'is-excluded' : ''}`}>
+                                    <td className="action-col">
+                                      <Checkbox
+                                        size="xs"
+                                        checked={!isTaskExcluded}
+                                        indeterminate={isTaskPartiallyExcluded}
+                                        onChange={() => toggleTaskExclusion(allTaskEntryIds)}
+                                        aria-label="Toggle parent task and subtasks"
+                                      />
+                                    </td>
+                                    <td colSpan={taskColSpan}>
+                                      <div className="client-report-task-group-header-content">
+                                        <div className="client-report-task-group-title">
+                                          <span className="client-report-parent-badge">
+                                            {language === 'bg' ? 'Родителска задача' : 'Parent Task'}
+                                          </span>
+                                          {showTaskIds && task.issueId > 0 && (
+                                            <span className="client-report-task-group-id">#{task.issueId}</span>
+                                          )}
+                                          <span className="client-report-task-group-subject">{taskTitle}</span>
+                                          <span className="client-report-subtasks-count">
+                                            ({task.children!.length} {language === 'bg' ? (task.children!.length === 1 ? 'подзадача' : 'подзадачи') : (task.children!.length === 1 ? 'subtask' : 'subtasks')})
+                                          </span>
+                                        </div>
+                                        <div className="client-report-task-group-subtotal">
+                                          <span>{taskIncludedHours.toFixed(2)} {t.hoursShort}</span>
+                                          {showFinancials && hourlyRate > 0 && (
+                                            <span className="client-report-task-group-cost">
+                                              ({taskIncludedCost.toLocaleString(language === 'bg' ? 'bg-BG' : 'en-US', { minimumFractionDigits: 2 })} {currency})
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+
+                                  {/* Direct entries on parent task if any */}
+                                  {parentDirectEntries.map(entry => {
+                                    const isEntryExcluded = excludedEntryIds.has(entry.id);
+                                    const h = Number(entry.hours) || 0;
+                                    const cost = Math.round(h * hourlyRate * 100) / 100;
+
+                                    return (
+                                      <tr
+                                        key={`entry-${entry.id}`}
+                                        className={`client-report-sub-entry-row ${isEntryExcluded ? 'is-excluded' : ''}`}
+                                      >
+                                        <td className="action-col">
+                                          <Checkbox
+                                            size="xs"
+                                            checked={!isEntryExcluded}
+                                            onChange={() => toggleEntryExclusion(entry.id)}
+                                            aria-label="Toggle entry"
+                                          />
+                                        </td>
+                                        <td className="client-report-sub-date" style={{ paddingLeft: '20px' }}>{entry.spent_on}</td>
+                                        {showActivities && <td>{entry.activity?.name || '-'}</td>}
+                                        {showTeamMembers && <td>{entry.user?.name || '-'}</td>}
+                                        {showDescriptions && <td>{entry.comments || '-'}</td>}
+                                        <td className="text-right" style={{ fontWeight: 600 }}>
+                                          {h.toFixed(2)}
+                                        </td>
+                                        {showFinancials && hourlyRate > 0 && (
+                                          <td className="text-right" style={{ fontWeight: 500 }}>
+                                            {cost.toFixed(2)}
+                                          </td>
+                                        )}
+                                      </tr>
+                                    );
+                                  })}
+
+                                  {/* Child Tasks Rows */}
+                                  {task.children!.map(child => {
+                                    const isChildExcluded =
+                                      child.entryIds &&
+                                      child.entryIds.length > 0 &&
+                                      child.entryIds.every(id => excludedEntryIds.has(id));
+                                    const isChildPartiallyExcluded =
+                                      child.entryIds &&
+                                      child.entryIds.length > 0 &&
+                                      child.entryIds.some(id => excludedEntryIds.has(id)) &&
+                                      !isChildExcluded;
+
+                                    const childIncludedEntries = (child.entries || []).filter(e => !excludedEntryIds.has(e.id));
+                                    const childIncludedHours = childIncludedEntries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+                                    const childIncludedCost = Math.round(childIncludedHours * hourlyRate * 100) / 100;
+
+                                    return (
+                                      <React.Fragment key={`child-task-group-${child.issueId}`}>
+                                        {/* Child Task Subheader Row */}
+                                        <tr className={`client-report-child-task-row ${isChildExcluded ? 'is-excluded' : ''}`}>
+                                          <td className="action-col">
+                                            <Checkbox
+                                              size="xs"
+                                              checked={!isChildExcluded}
+                                              indeterminate={isChildPartiallyExcluded}
+                                              onChange={() => toggleTaskExclusion(child.entryIds)}
+                                              aria-label="Toggle subtask"
+                                            />
+                                          </td>
+                                          <td colSpan={taskColSpan}>
+                                            <div className="client-report-task-group-header-content" style={{ paddingLeft: '14px' }}>
+                                              <div className="client-report-task-group-title">
+                                                <span style={{ color: '#64748b', fontWeight: 700, marginRight: 2 }}>↳</span>
+                                                {showTaskIds && child.issueId > 0 && (
+                                                  <span className="client-report-child-task-id">#{child.issueId}</span>
+                                                )}
+                                                <span className="client-report-child-task-subject">{child.subject}</span>
+                                              </div>
+                                              <div className="client-report-task-group-subtotal">
+                                                <span>{childIncludedHours.toFixed(2)} {t.hoursShort}</span>
+                                                {showFinancials && hourlyRate > 0 && (
+                                                  <span className="client-report-task-group-cost">
+                                                    ({childIncludedCost.toLocaleString(language === 'bg' ? 'bg-BG' : 'en-US', { minimumFractionDigits: 2 })} {currency})
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </td>
+                                        </tr>
+
+                                        {/* Entries belonging to this child task */}
+                                        {(child.entries || []).map(entry => {
+                                          const isEntryExcluded = excludedEntryIds.has(entry.id);
+                                          const h = Number(entry.hours) || 0;
+                                          const cost = Math.round(h * hourlyRate * 100) / 100;
+
+                                          return (
+                                            <tr
+                                              key={`entry-${entry.id}`}
+                                              className={`client-report-sub-entry-row client-report-child-entry-row ${isEntryExcluded ? 'is-excluded' : ''}`}
+                                            >
+                                              <td className="action-col">
+                                                <Checkbox
+                                                  size="xs"
+                                                  checked={!isEntryExcluded}
+                                                  onChange={() => toggleEntryExclusion(entry.id)}
+                                                  aria-label="Toggle entry"
+                                                />
+                                              </td>
+                                              <td className="client-report-sub-date" style={{ paddingLeft: '32px' }}>{entry.spent_on}</td>
+                                              {showActivities && <td>{entry.activity?.name || '-'}</td>}
+                                              {showTeamMembers && <td>{entry.user?.name || '-'}</td>}
+                                              {showDescriptions && <td>{entry.comments || '-'}</td>}
+                                              <td className="text-right" style={{ fontWeight: 600 }}>
+                                                {h.toFixed(2)}
+                                              </td>
+                                              {showFinancials && hourlyRate > 0 && (
+                                                <td className="text-right" style={{ fontWeight: 500 }}>
+                                                  {cost.toFixed(2)}
+                                                </td>
+                                              )}
+                                            </tr>
+                                          );
+                                        })}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              );
+                            }
+
+                            // Standalone task (not a parent)
+                            const taskIncludedEntries = (task.entries || []).filter(e => !excludedEntryIds.has(e.id));
+                            const taskIncludedHours = taskIncludedEntries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+                            const taskIncludedCost = Math.round(taskIncludedHours * hourlyRate * 100) / 100;
 
                             return (
                               <React.Fragment key={`task-group-${task.issueId}`}>
@@ -1380,7 +1609,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                                       checked={!isTaskExcluded}
                                       indeterminate={isTaskPartiallyExcluded}
                                       onChange={() => toggleTaskExclusion(task.entryIds)}
-                                      aria-label="Включи задача"
+                                      aria-label="Toggle task"
                                     />
                                   </td>
                                   <td colSpan={taskColSpan}>
@@ -1419,7 +1648,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                                           size="xs"
                                           checked={!isEntryExcluded}
                                           onChange={() => toggleEntryExclusion(entry.id)}
-                                          aria-label="Включи запис"
+                                          aria-label="Toggle entry"
                                         />
                                       </td>
                                       <td className="client-report-sub-date">{entry.spent_on}</td>
@@ -1473,10 +1702,11 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                               checked={isAllIncluded}
                               indeterminate={isPartiallyExcluded}
                               onChange={toggleAllExclusion}
-                              aria-label="Включи / изключи всички"
+                              aria-label="Toggle select all"
                             />
                           </th>
                           <th style={{ width: '85px' }}>{t.date}</th>
+                          {showParentTask && <th style={{ width: '130px' }}>{t.parentTask}</th>}
                           {showTaskIds && <th style={{ width: '75px' }}>{t.taskNo}</th>}
                           <th>{t.task}</th>
                           {showActivities && <th style={{ width: '110px' }}>{t.activity}</th>}
@@ -1493,7 +1723,21 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                       <tbody>
                         {exportEntries.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="text-center" style={{ padding: '20px' }}>
+                            <td
+                              colSpan={
+                                2 +
+                                (showParentTask ? 1 : 0) +
+                                (showTaskIds ? 1 : 0) +
+                                1 +
+                                (showActivities ? 1 : 0) +
+                                (showTeamMembers ? 1 : 0) +
+                                (showDescriptions ? 1 : 0) +
+                                1 +
+                                (showFinancials && hourlyRate > 0 ? 1 : 0)
+                              }
+                              className="text-center"
+                              style={{ padding: '20px' }}
+                            >
                               {t.noEntries}
                             </td>
                           </tr>
@@ -1510,10 +1754,26 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                                     size="xs"
                                     checked={!isExcluded}
                                     onChange={() => toggleEntryExclusion(e.id)}
-                                    aria-label="Включи запис"
+                                    aria-label="Toggle entry"
                                   />
                                 </td>
                                 <td>{e.spent_on}</td>
+                                {showParentTask && (
+                                  <td style={{ fontSize: '11px', color: '#475569' }}>
+                                    {e.issue?.parent?.id ? (
+                                      <span title={e.issue.parent.subject || ''}>
+                                        <strong>#{e.issue.parent.id}</strong>
+                                        {e.issue.parent.subject && (
+                                          <span style={{ display: 'block', maxWidth: 130, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#64748b' }}>
+                                            {e.issue.parent.subject}
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </td>
+                                )}
                                 {showTaskIds && (
                                   <td>
                                     <strong>{e.issue?.id ? `#${e.issue.id}` : '-'}</strong>
@@ -1542,6 +1802,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                         <tr>
                           <td className="action-col" />
                           <td>{t.total}</td>
+                          {showParentTask && <td></td>}
                           {showTaskIds && <td></td>}
                           <td></td>
                           {showActivities && <td></td>}

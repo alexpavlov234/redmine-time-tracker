@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Button, Select, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Anchor, Grid, Paper } from '@mantine/core';
+import React, { useState, useEffect, useRef } from 'react';
+import { Modal, Button, Select, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Grid, Paper } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
-import { useQueue } from '../../../contexts/QueueContext';
-import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { redmineApiRequest } from '../../../services/redmine';
-import { formatTime } from '../../../utils/formatters';
-import { IconSend, IconCheck, IconExternalLink } from '@tabler/icons-react';
+import { formatTime, cleanTaskId, formatCustomFieldsPayload } from '../../../utils/formatters';
+import { IconSend, IconCheck } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
+import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
 import { CustomFieldsSection } from '../../../components/common/CustomFieldsSection';
 import { getLastActivityForTask, setLastActivityForTask } from '../../../services/taskActivity';
+import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
 
 /// <summary>
 /// Properties for configuring the SummaryModal component.
@@ -29,16 +29,16 @@ interface SummaryModalProps {
 /// </summary>
 export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) => {
   const isMobile = useMediaQuery('(max-width: 48em)');
-  const { usePerformedTasksList, redmineUrl } = useSettings();
+  const { usePerformedTasksList } = useSettings();
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
-  const { } = useQueue();
-  const { allProjects, issueStatuses, setIssueStatuses, refreshRecentProjects } = useProjects();
+  const { allProjects, issueStatuses, ensureStatusesLoaded, refreshRecentProjects } = useProjects();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
-
-  const projectId = activeTodo?.projectId || selectedProjectId || '';
-  const { activities: projectActivities, defaultActivityId } = useActivitiesForProject(projectId || null);
+  const { activities: projectActivities } = useActivitiesForProject(
+    activeTodo?.projectId || selectedProjectId || null,
+    isOpen
+  );
 
   const [comments, setComments] = useState('');
   const [activityId, setActivityId] = useState<string | null>(null);
@@ -59,11 +59,33 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
   };
 
   const { customFields } = useCustomFields();
-  const billableFieldId = localStorage.getItem('billableFieldId');
 
-  // Populate form when modal opens
+  const prevIsOpenRef = useRef(false);
+
+  /// <summary>
+  /// Populates form only when the modal dialog transitions from closed to open.
+  /// Prevents background re-renders and timer intervals from erasing user edits.
+  /// </summary>
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      if (prevIsOpenRef.current) {
+        prevIsOpenRef.current = false;
+        setSelectedProjectId('');
+        setSelectedTaskId('');
+        setComments('');
+        setManualHours(0.1);
+        setActivityId(null);
+        setSubmitResult(null);
+        setChangeStatus(false);
+        setStatusId(null);
+        setCustomFieldValues({});
+      }
+      return;
+    }
+
+    if (!prevIsOpenRef.current) {
+      prevIsOpenRef.current = true;
+
       setSelectedProjectId(activeTodo?.projectId || (allProjects.length > 0 ? allProjects[0].id.toString() : ''));
       setSelectedTaskId(activeTodo?.taskId || '');
 
@@ -92,32 +114,22 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       }
       setManualHours(parseFloat(hoursCalc.toFixed(2)));
 
-      // Set activity from todo, or check last used activity for task, or default
+      // Set activity from todo, or check last used activity for task
       if (activeTodo?.activityId) {
         setActivityId(String(activeTodo.activityId));
       } else if (activeTodo?.taskId) {
         getLastActivityForTask(activeTodo.taskId).then(actId => {
           if (actId) {
             setActivityId(actId);
-          } else if (defaultActivityId) {
-            setActivityId(String(defaultActivityId));
           }
         });
-      } else if (defaultActivityId) {
-        setActivityId(String(defaultActivityId));
-      }
-
-      // Load issue statuses if needed
-      if (issueStatuses.length === 0) {
-        redmineApiRequest('/issue_statuses.json')
-          .then(data => setIssueStatuses(data.issue_statuses || []))
-          .catch(() => {});
       }
 
       // Initialize custom field values
       const initialValues: Record<number, string> = {};
+      const bId = localStorage.getItem('billableFieldId');
       customFields.forEach(field => {
-        if (field.id === Number(billableFieldId)) {
+        if (field.id === Number(bId)) {
           initialValues[field.id] = '1'; // Default billable to true
         } else {
           initialValues[field.id] = field.default_value || '';
@@ -126,20 +138,37 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
       setCustomFieldValues(initialValues);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activities, activeTodo, defaultActivityId, issueStatuses.length, setIssueStatuses, customFields, billableFieldId, allProjects]);
+  }, [isOpen]);
 
-  // Update activity when project activities load
+  /// <summary>
+  /// Sets default values for newly loaded custom fields without overwriting user input.
+  /// </summary>
   useEffect(() => {
-    if (activeTodo?.activityId) {
-      setActivityId(String(activeTodo.activityId));
-    } else if (defaultActivityId) {
-      setActivityId(String(defaultActivityId));
-    }
-  }, [projectActivities, defaultActivityId, activeTodo?.activityId]);
+    if (!isOpen || customFields.length === 0) return;
+
+    setCustomFieldValues(prev => {
+      const bId = localStorage.getItem('billableFieldId');
+      const updated = { ...prev };
+      let changed = false;
+
+      customFields.forEach(field => {
+        if (updated[field.id] === undefined) {
+          changed = true;
+          if (field.id === Number(bId)) {
+            updated[field.id] = '1';
+          } else {
+            updated[field.id] = field.default_value || '';
+          }
+        }
+      });
+
+      return changed ? updated : prev;
+    });
+  }, [isOpen, customFields]);
 
   const handleSubmit = async () => {
     const rawIssueId = selectedTaskId || activeTodo?.taskId || '';
-    const cleanIssueStr = rawIssueId.replace(/^#/, '').trim();
+    const cleanIssueStr = cleanTaskId(rawIssueId);
     const parsedIssueId = cleanIssueStr ? parseInt(cleanIssueStr, 10) : undefined;
     const validIssueId = (parsedIssueId && !isNaN(parsedIssueId)) ? parsedIssueId : undefined;
 
@@ -167,12 +196,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
     try {
       // Build payload
-      const payloadCustomFields = Object.entries(customFieldValues)
-        .filter(([_, value]) => value !== '')
-        .map(([id, value]) => ({
-          id: parseInt(id, 10),
-          value: value,
-        }));
+      const payloadCustomFields = formatCustomFieldsPayload(customFieldValues);
 
       const timeEntryPayload: any = {
         time_entry: {
@@ -239,12 +263,12 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                     <Text size="xs" fw={700} c="dimmed" tt="uppercase">
                       {activeTodo.projectName}
                     </Text>
-                    <Group gap={6} wrap="nowrap">
-                      <Anchor href={`${redmineUrl}/issues/${activeTodo.taskId}`} target="_blank" size="md" fw={700} underline="hover">
-                        #{activeTodo.taskId} - {activeTodo.taskSubject}
-                      </Anchor>
-                      <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
-                    </Group>
+                    <RedmineIssueLink
+                      issueId={activeTodo.taskId}
+                      subject={activeTodo.taskSubject}
+                      size="md"
+                      fw={700}
+                    />
                   </Stack>
                 </Paper>
 
@@ -310,7 +334,13 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
               <Checkbox
                 label="Update Status"
                 checked={changeStatus}
-                onChange={e => setChangeStatus(e.currentTarget.checked)}
+                onChange={e => {
+                  const checked = e.currentTarget.checked;
+                  setChangeStatus(checked);
+                  if (checked) {
+                    ensureStatusesLoaded();
+                  }
+                }}
                 mb={8}
               />
 
@@ -319,6 +349,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                   placeholder="-- Select status --"
                   value={statusId}
                   onChange={setStatusId}
+                  onDropdownOpen={ensureStatusesLoaded}
                   data={issueStatuses.map(s => ({ value: s.id.toString(), label: s.name }))}
                   style={{ flex: 1 }}
                 />

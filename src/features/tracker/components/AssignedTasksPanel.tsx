@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Select, Group, Text, Stack, ActionIcon, Loader, Badge, Anchor, Paper } from '@mantine/core';
+import { Card, Select, Group, Text, Stack, ActionIcon, Loader, Badge, Paper } from '@mantine/core';
 import { useProjects } from '../../../contexts/ProjectsContext';
-import { useSettings } from '../../../contexts/SettingsContext';
 import { redmineApiRequest } from '../../../services/redmine';
 import type { RedmineIssue } from '../../../types';
-import { IconExternalLink, IconListCheck, IconPlayerPlay } from '@tabler/icons-react';
+import { IconListCheck, IconPlayerPlay } from '@tabler/icons-react';
 import { useQueue } from '../../../contexts/QueueContext';
+import { TaskNoteButton } from '../../../components/common/TaskNoteButton';
+import { getTaskNote } from '../../../services/taskNotes';
+import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
 
 export const AssignedTasksPanel: React.FC = () => {
-  const { allProjects, getProjectSelectData } = useProjects();
-  const { redmineUrl } = useSettings();
+  const { allProjects, getProjectSelectData, ensureProjectsLoaded, isLoadingProjects } = useProjects();
   const { addTodo } = useQueue();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<string | null>('none');
@@ -22,12 +23,13 @@ export const AssignedTasksPanel: React.FC = () => {
 
   const handleAddToQueue = (task: RedmineIssue) => {
     const project = allProjects.find(p => p.id.toString() === selectedProjectId);
+    const existingNote = getTaskNote(task.id);
     addTodo({
       projectId: selectedProjectId || '',
       projectName: project?.name || `Project ${selectedProjectId}`,
       taskId: task.id.toString(),
       taskSubject: task.subject,
-      note: '',
+      note: existingNote || '',
     });
   };
 
@@ -112,11 +114,15 @@ export const AssignedTasksPanel: React.FC = () => {
         <Group grow align="flex-end">
           <Select
             label="Project"
-            placeholder="-- Select a Project --"
+            placeholder={isLoadingProjects ? 'Loading projects...' : '-- Select a Project --'}
             value={selectedProjectId}
             onChange={setSelectedProjectId}
+            onDropdownOpen={ensureProjectsLoaded}
+            onClick={ensureProjectsLoaded}
             data={projectOptions}
             searchable
+            nothingFoundMessage={isLoadingProjects ? 'Loading projects...' : 'No projects found'}
+            rightSection={isLoadingProjects ? <Loader size="xs" /> : undefined}
           />
           <Select
             label="Group By"
@@ -164,19 +170,19 @@ export const AssignedTasksPanel: React.FC = () => {
                 <Stack gap="xs">
                   {groupTasks.map(task => (
                     <Group key={task.id} justify="space-between" wrap="nowrap" style={{ borderBottom: '1px solid var(--mantine-color-default-border)', paddingBottom: '0.25rem' }}>
-                      <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                        <Anchor href={`${redmineUrl}/issues/${task.id}`} target="_blank" size="sm" fw={500} style={{ whiteSpace: 'nowrap' }}>
-                          #{task.id}
-                        </Anchor>
-                        <Text size="sm" truncate>{task.subject}</Text>
-                      </Group>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <RedmineIssueLink
+                          issueId={task.id}
+                          subject={task.subject}
+                          size="sm"
+                          fw={500}
+                        />
+                      </div>
                       
-                      <Group gap={4}>
-                        <ActionIcon variant="subtle" color="blue" onClick={() => handleAddToQueue(task)} title="Add to Timer Queue">
+                      <Group gap={4} wrap="nowrap">
+                        <TaskNoteButton taskId={task.id} taskSubject={task.subject} size="sm" />
+                        <ActionIcon variant="subtle" color="blue" onClick={() => handleAddToQueue(task)} title="Add to Timer Queue" aria-label="Add to Timer Queue">
                           <IconPlayerPlay size={16} />
-                        </ActionIcon>
-                        <ActionIcon variant="subtle" color="gray" component="a" href={`${redmineUrl}/issues/${task.id}`} target="_blank" title="Open in Redmine">
-                          <IconExternalLink size={16} />
                         </ActionIcon>
                       </Group>
                     </Group>

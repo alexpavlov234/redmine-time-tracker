@@ -9,6 +9,12 @@ import { useUser } from '../../../contexts/UserContext';
  */
 const monthCache = new Map<string, Record<string, TimeEntry[]>>();
 
+/// <summary>
+/// Hook to retrieve and cache time entries for a given month grouped by date.
+/// Batches issue subject queries and minimizes Redmine API roundtrips.
+/// </summary>
+/// <param name="currentMonth">Target month date.</param>
+/// <returns>Grouped entries, loading state, error, and refetch handler.</returns>
 export const useCalendarEntries = (currentMonth: Date) => {
   const { user } = useUser();
   const [entriesByDate, setEntriesByDate] = useState<Record<string, TimeEntry[]>>({});
@@ -42,7 +48,7 @@ export const useCalendarEntries = (currentMonth: Date) => {
 
       const timeEntries = await getTimeEntries({ from, to, user_id: user.id });
 
-      // Fetch missing issue subjects in chunks concurrently
+      // Fetch missing issue subjects in chunks of up to 100 without resolving parent hierarchies
       const issueIdsToFetch = new Set<number>();
       timeEntries.forEach(entry => {
         if (entry.issue && entry.issue.id && !entry.issue.subject) {
@@ -53,11 +59,12 @@ export const useCalendarEntries = (currentMonth: Date) => {
       if (issueIdsToFetch.size > 0) {
         const ids = Array.from(issueIdsToFetch);
         const chunkPromises = [];
+        const BATCH_SIZE = 100;
         
-        for (let i = 0; i < ids.length; i += 20) {
-          const chunk = ids.slice(i, i + 20);
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+          const chunk = ids.slice(i, i + BATCH_SIZE);
           chunkPromises.push(
-            getIssues(chunk).catch(e => {
+            getIssues(chunk, false).catch(e => {
               console.error('Failed to fetch issue chunk:', e);
               return [];
             })
@@ -104,6 +111,11 @@ export const useCalendarEntries = (currentMonth: Date) => {
   return { entriesByDate, isLoading, error, refetch: () => fetchEntries(true) };
 };
 
+/// <summary>
+/// Formats a JavaScript Date object as YYYY-MM-DD.
+/// </summary>
+/// <param name="date">Date instance to format.</param>
+/// <returns>Date string formatted as YYYY-MM-DD.</returns>
 function formatDate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

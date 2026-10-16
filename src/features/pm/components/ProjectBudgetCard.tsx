@@ -17,6 +17,7 @@ import {
   Button,
   Divider,
   Alert,
+  Paper,
 } from '@mantine/core';
 import {
   IconTrendingUp,
@@ -82,20 +83,20 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
     if (stats.healthStatus === 'over_budget') {
       return (
         <Badge color="red" size="lg" variant="light" leftSection={<IconAlertTriangle size={14} />}>
-          Критично / Надвишен бюджет ({stats.percentageUsed}%)
+          Critical / Over Budget ({stats.percentageUsed}%)
         </Badge>
       );
     }
     if (stats.healthStatus === 'warning') {
       return (
         <Badge color="orange" size="lg" variant="light" leftSection={<IconAlertTriangle size={14} />}>
-          Внимание: Наближава лимита ({stats.percentageUsed}%)
+          Warning: Near Limit ({stats.percentageUsed}%)
         </Badge>
       );
     }
     return (
       <Badge color="teal" size="lg" variant="light" leftSection={<IconCheck size={14} />}>
-        В норма ({stats.percentageUsed}%)
+        On Track ({stats.percentageUsed}%)
       </Badge>
     );
   };
@@ -114,7 +115,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
               <Title order={3}>{projectName}</Title>
               {metadata.clientName && (
                 <Badge color="blue" size="md" variant="outline">
-                  Клиент: {metadata.clientName}
+                  Client: {metadata.clientName}
                 </Badge>
               )}
               {metadata.contractType && (
@@ -124,7 +125,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
               )}
               {metadata.isUmbrella && (
                 <Badge color="grape" size="sm" variant="light">
-                  Umbrella проект
+                  Umbrella Project
                 </Badge>
               )}
             </Group>
@@ -134,7 +135,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
                 <Group gap={4}>
                   <IconCalendar size={14} color="gray" />
                   <Text size="xs" c="dimmed">
-                    Начало: <Text span fw={600}>{metadata.startDate}</Text>
+                    Start: <Text span fw={600}>{metadata.startDate}</Text>
                   </Text>
                 </Group>
               )}
@@ -142,7 +143,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
                 <Group gap={4}>
                   <IconCalendar size={14} color="gray" />
                   <Text size="xs" c="dimmed">
-                    Край по договор: <Text span fw={600}>{metadata.contractEndDate}</Text>
+                    Contract End: <Text span fw={600}>{metadata.contractEndDate}</Text>
                   </Text>
                 </Group>
               )}
@@ -151,7 +152,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
 
           <Group gap="xs">
             {getStatusBadge()}
-            <Tooltip label="Настройки на часова ставка и валута">
+            <Tooltip label="Configure billing hourly rate and currency">
               <Button
                 variant={showFinancialSettings ? 'light' : 'subtle'}
                 color="gray"
@@ -159,7 +160,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
                 leftSection={<IconAdjustments size={14} />}
                 onClick={() => setShowFinancialSettings(prev => !prev)}
               >
-                Финанси
+                Financials
               </Button>
             </Tooltip>
           </Group>
@@ -170,42 +171,42 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
           <Card withBorder padding="sm" radius="sm" bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))">
             <Group gap="md" align="flex-end">
               <NumberInput
-                label="Часова ставка"
-                description="За изчисляване на стойност по проекта"
-                placeholder="напр. 60"
+                label="Hourly Billing Rate"
+                description="Used to compute financial value and burn rate"
+                placeholder="e.g. 60"
                 min={0}
                 value={hourlyRate}
                 onChange={val => onHourlyRateChange(typeof val === 'number' ? val : 0)}
-                style={{ width: 180 }}
+                style={{ width: 220 }}
                 leftSection={<IconCurrencyEuro size={16} />}
               />
               <Select
-                label="Валута"
+                label="Currency"
                 data={[
                   { value: 'EUR', label: 'EUR (€)' },
-                  { value: 'BGN', label: 'BGN (лв.)' },
                   { value: 'USD', label: 'USD ($)' },
+                  { value: 'BGN', label: 'BGN (лв.)' },
                 ]}
                 value={currency}
                 onChange={val => onCurrencyChange(val || 'EUR')}
-                style={{ width: 130 }}
+                style={{ width: 140 }}
               />
             </Group>
           </Card>
         </Collapse>
 
         {metadata.isUmbrella && (
-          <Alert icon={<IconAlertTriangle size={16} />} color="grape" title="Контейнерен (Umbrella) проект" radius="sm">
-            Този проект е обозначен в Redmine като Umbrella (структурна папка). Договорните бюджети и отчетеното време се следят в отделните подпроекти (напр. по конкретен договор). Изберете съответния подпроект от списъка горе за преглед на точните часове.
+          <Alert icon={<IconAlertTriangle size={16} />} color="grape" title="Container (Umbrella) Project" radius="sm">
+            This project is designated in Redmine as an Umbrella folder. Contractual budgets and logged time are tracked inside individual subprojects. Please select a specific subproject from the dropdown above to inspect detailed hours.
           </Alert>
         )}
 
         <Divider />
 
         {/* Budget Threshold Switcher */}
-        <Group justify="space-between" align="center">
+        <Group justify="space-between" align="center" wrap="wrap">
           <Text size="sm" fw={600} c="dimmed">
-            Следен бюджет от полетата на Redmine:
+            Active Redmine Budget Threshold:
           </Text>
           <SegmentedControl
             size="xs"
@@ -214,17 +215,17 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             data={[
               {
                 value: 'contract',
-                label: `Договор: ${metadata.budget2Contract} ч.`,
+                label: `Contract: ${metadata.budget2Contract}h`,
                 disabled: metadata.budget2Contract <= 0,
               },
               {
                 value: 'estimate',
-                label: `Оценка: ${metadata.budget1Estimate} ч.`,
+                label: `Estimate: ${metadata.budget1Estimate}h`,
                 disabled: metadata.budget1Estimate <= 0,
               },
               {
                 value: 'profitability',
-                label: `Рентабилност: ${metadata.budget3Profitability} ч.`,
+                label: `Profitability: ${metadata.budget3Profitability}h`,
                 disabled: metadata.budget3Profitability <= 0,
               },
             ]}
@@ -235,7 +236,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
         <div>
           <Group justify="space-between" mb={6}>
             <Text size="sm" fw={600}>
-              Усвоени часове: <Text span fw={700} c={getStatusColor()}>{stats.totalSpentHours} ч.</Text> от {stats.targetHours} ч.
+              Consumed Hours: <Text span fw={700} c={getStatusColor()}>{stats.totalSpentHours}h</Text> of {stats.targetHours}h
             </Text>
             <Text size="sm" fw={700} c={getStatusColor()}>
               {stats.percentageUsed}%
@@ -251,18 +252,23 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
           />
         </div>
 
-        {/* KPI Metrics Grid */}
+        {/* KPI Metrics Grid matching other dashboards */}
         <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
-          {/* Total Budget Hours */}
-          <Card withBorder padding="xs" radius="sm">
-            <Group justify="space-between">
+          {/* Target Budget Hours */}
+          <Paper withBorder p="md" radius="md">
+            <Group justify="space-between" align="flex-start">
               <div>
-                <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                  Целеви бюджет
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+                  Target Budget
                 </Text>
-                <Text size="xl" fw={700}>
-                  {stats.targetHours} <Text span size="sm" fw={500} c="dimmed">ч.</Text>
-                </Text>
+                <Group align="baseline" gap="xs" mt="xs">
+                  <Text fz={28} fw={700}>
+                    {stats.targetHours}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    hours
+                  </Text>
+                </Group>
               </div>
               <ThemeIcon variant="light" color="blue" size="lg" radius="md">
                 <IconClock size={20} />
@@ -270,21 +276,26 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             </Group>
             {hourlyRate > 0 && (
               <Text size="xs" c="dimmed" mt={4}>
-                Стойност: {targetCost.toLocaleString()} {currency}
+                Value: {targetCost.toLocaleString()} {currency}
               </Text>
             )}
-          </Card>
+          </Paper>
 
           {/* Spent Hours */}
-          <Card withBorder padding="xs" radius="sm">
-            <Group justify="space-between">
+          <Paper withBorder p="md" radius="md">
+            <Group justify="space-between" align="flex-start">
               <div>
-                <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                  Отчетени общо
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+                  Total Logged
                 </Text>
-                <Text size="xl" fw={700} c={getStatusColor()}>
-                  {stats.totalSpentHours} <Text span size="sm" fw={500} c="dimmed">ч.</Text>
-                </Text>
+                <Group align="baseline" gap="xs" mt="xs">
+                  <Text fz={28} fw={700} c={getStatusColor()}>
+                    {stats.totalSpentHours}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    hours
+                  </Text>
+                </Group>
               </div>
               <ThemeIcon variant="light" color={getStatusColor()} size="lg" radius="md">
                 <IconCheck size={20} />
@@ -292,21 +303,26 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             </Group>
             {hourlyRate > 0 && (
               <Text size="xs" c="dimmed" mt={4}>
-                Стойност: {spentCost.toLocaleString()} {currency}
+                Cost: {spentCost.toLocaleString()} {currency}
               </Text>
             )}
-          </Card>
+          </Paper>
 
           {/* Remaining Hours */}
-          <Card withBorder padding="xs" radius="sm">
-            <Group justify="space-between">
+          <Paper withBorder p="md" radius="md">
+            <Group justify="space-between" align="flex-start">
               <div>
-                <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                  Оставащ бюджет
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+                  Remaining Budget
                 </Text>
-                <Text size="xl" fw={700} c={stats.remainingHours < 0 ? 'red' : 'teal'}>
-                  {stats.remainingHours} <Text span size="sm" fw={500} c="dimmed">ч.</Text>
-                </Text>
+                <Group align="baseline" gap="xs" mt="xs">
+                  <Text fz={28} fw={700} c={stats.remainingHours < 0 ? 'red' : 'teal'}>
+                    {stats.remainingHours}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    hours
+                  </Text>
+                </Group>
               </div>
               <ThemeIcon variant="light" color={stats.remainingHours < 0 ? 'red' : 'teal'} size="lg" radius="md">
                 <IconCoin size={20} />
@@ -314,30 +330,35 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             </Group>
             {hourlyRate > 0 && (
               <Text size="xs" c="dimmed" mt={4}>
-                Остатък: {remainingCost.toLocaleString()} {currency}
+                Balance: {remainingCost.toLocaleString()} {currency}
               </Text>
             )}
-          </Card>
+          </Paper>
 
           {/* Burn Rate / Velocity */}
-          <Card withBorder padding="xs" radius="sm">
-            <Group justify="space-between">
+          <Paper withBorder p="md" radius="md">
+            <Group justify="space-between" align="flex-start">
               <div>
-                <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-                  Burn Rate (Темп)
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+                  Weekly Burn Rate
                 </Text>
-                <Text size="xl" fw={700}>
-                  {stats.weeklyBurnRate} <Text span size="sm" fw={500} c="dimmed">ч./седм.</Text>
-                </Text>
+                <Group align="baseline" gap="xs" mt="xs">
+                  <Text fz={28} fw={700} c="violet">
+                    {stats.weeklyBurnRate}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    h/week
+                  </Text>
+                </Group>
               </div>
               <ThemeIcon variant="light" color="violet" size="lg" radius="md">
                 <IconTrendingUp size={20} />
               </ThemeIcon>
             </Group>
             <Text size="xs" c="dimmed" mt={4}>
-              Този м.: {stats.spentThisMonth} ч. | Мин. м.: {stats.spentLastMonth} ч.
+              This mo: {stats.spentThisMonth}h | Last mo: {stats.spentLastMonth}h
             </Text>
-          </Card>
+          </Paper>
         </SimpleGrid>
       </Stack>
     </Card>

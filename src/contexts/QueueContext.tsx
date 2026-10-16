@@ -75,6 +75,11 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isSyncingFromServerRef = useRef(false);
   const lastBroadcastRef = useRef<string>('');
+  const stateRef = useRef({ todos, activeTodoId });
+
+  useEffect(() => {
+    stateRef.current = { todos, activeTodoId };
+  }, [todos, activeTodoId]);
 
   // Persist todos whenever they change
   useEffect(() => {
@@ -83,14 +88,20 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Synchronize state with proxy timer server
   useEffect(() => {
+    /// <summary>
+    /// Polls the local proxy server for background timer synchronization with low network priority.
+    /// </summary>
     const pollServerTimer = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+
       try {
-        const response = await fetch(PROXY_TIMER_ENDPOINT);
+        const response = await fetch(PROXY_TIMER_ENDPOINT, { priority: 'low' } as RequestInit);
         if (!response.ok) return;
         const serverTimer = await response.json();
         if (!serverTimer || typeof serverTimer !== 'object') return;
 
-        const currentActive = todos.find(t => t.id === activeTodoId);
+        const { todos: currentTodos, activeTodoId: currentActiveTodoId } = stateRef.current;
+        const currentActive = currentTodos.find(t => t.id === currentActiveTodoId);
 
         // Case 1: Server timer is RUNNING
         if (serverTimer.isRunning && serverTimer.issueId) {
@@ -99,9 +110,9 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (!sameIssue || !currentActive?.isRunning) {
             isSyncingFromServerRef.current = true;
 
-            const existingIndex = todos.findIndex(t => String(t.taskId) === String(serverTimer.issueId));
+            const existingIndex = currentTodos.findIndex(t => String(t.taskId) === String(serverTimer.issueId));
             if (existingIndex >= 0) {
-              const targetTodo = todos[existingIndex];
+              const targetTodo = currentTodos[existingIndex];
               setTodos(prev => prev.map(t => {
                 if (t.id === targetTodo.id) {
                   return {
@@ -197,14 +208,14 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     pollServerTimer();
-    const interval = setInterval(pollServerTimer, 2000);
+    const interval = setInterval(pollServerTimer, 5000);
     window.addEventListener('focus', pollServerTimer);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', pollServerTimer);
     };
-  }, [todos, activeTodoId]);
+  }, []);
 
   // Broadcast local changes to proxy server
   useEffect(() => {
@@ -230,7 +241,8 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: serialized,
-    }).catch(() => {
+      priority: 'low',
+    } as RequestInit).catch(() => {
       // Proxy server might be offline; fail silently
     });
   }, [todos, activeTodoId]);

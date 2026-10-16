@@ -10,6 +10,7 @@ import { usePresets } from '../../../hooks/usePresets';
 import { SavePresetModal } from './SavePresetModal';
 import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
 import { CustomFieldsSection } from '../../../components/common/CustomFieldsSection';
+import { cleanTaskId, formatCustomFieldsPayload } from '../../../utils/formatters';
 
 /// <summary>
 /// Properties for configuring the BulkLogForm component.
@@ -65,19 +66,27 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     },
   });
 
-  // Initialize custom fields when they load
+  /// <summary>
+  /// Sets default values for newly loaded custom fields without overwriting user selections.
+  /// </summary>
   React.useEffect(() => {
     if (customFields.length > 0) {
-      const initialValues: Record<number, string> = {};
-      const billableFieldId = localStorage.getItem('billableFieldId');
-      customFields.forEach(field => {
-        if (field.id === Number(billableFieldId)) {
-          initialValues[field.id] = '1';
-        } else {
-          initialValues[field.id] = field.default_value || '';
-        }
+      setCustomFieldValues(prev => {
+        const initialValues: Record<number, string> = { ...prev };
+        let hasChanges = false;
+        const billableFieldId = localStorage.getItem('billableFieldId');
+        customFields.forEach(field => {
+          if (initialValues[field.id] === undefined) {
+            hasChanges = true;
+            if (field.id === Number(billableFieldId)) {
+              initialValues[field.id] = '1';
+            } else {
+              initialValues[field.id] = field.default_value || '';
+            }
+          }
+        });
+        return hasChanges ? initialValues : prev;
       });
-      setCustomFieldValues(initialValues);
     }
   }, [customFields]);
 
@@ -163,17 +172,11 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     let successCount = 0;
     let failCount = 0;
 
-    const payloadCustomFields = Object.entries(customFieldValues)
-      .filter(([_, value]) => value !== '')
-      .map(([id, value]) => ({
-        id: parseInt(id, 10),
-        value: value,
-      }));
-
+    const payloadCustomFields = formatCustomFieldsPayload(customFieldValues);
     const hoursNum = typeof values.hours === 'string' ? parseFloat(values.hours) : values.hours;
 
-    const cleanTaskId = values.taskId ? values.taskId.toString().replace(/^#/, '').trim() : '';
-    const parsedTaskId = cleanTaskId ? parseInt(cleanTaskId, 10) : undefined;
+    const cleanId = cleanTaskId(values.taskId);
+    const parsedTaskId = cleanId ? parseInt(cleanId, 10) : undefined;
     const validTaskId = (parsedTaskId && !isNaN(parsedTaskId)) ? parsedTaskId : undefined;
 
     const cleanProjectId = values.projectId && values.projectId !== 'my_issues' ? values.projectId.toString().trim() : '';
@@ -256,9 +259,11 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
             <ProjectTaskActivityFields
               projectId={form.values.projectId}
               onProjectChange={(val) => {
-                form.setFieldValue('projectId', val);
-                if (!val) form.setFieldValue('taskId', '');
-                form.setFieldValue('activityId', '');
+                if (form.values.projectId !== val) {
+                  form.setFieldValue('projectId', val);
+                  if (!val) form.setFieldValue('taskId', '');
+                  form.setFieldValue('activityId', '');
+                }
               }}
               taskId={form.values.taskId}
               onTaskChange={(val) => form.setFieldValue('taskId', val)}

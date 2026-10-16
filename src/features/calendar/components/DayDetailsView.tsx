@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import type { TimeEntry } from '../../../types';
-import { Card, Button, Group, Text, Progress, Stack, ActionIcon, Badge, Paper, Anchor } from '@mantine/core';
-import { IconClock, IconEdit, IconTrash, IconPlus, IconExternalLink, IconCopy } from '@tabler/icons-react';
-import { useSettings } from '../../../contexts/SettingsContext';
+import { Card, Button, Group, Text, Progress, Stack, ActionIcon, Badge, Paper } from '@mantine/core';
+import { IconClock, IconEdit, IconTrash, IconPlus, IconCopy } from '@tabler/icons-react';
+import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
 
 interface DayDetailsViewProps {
   dateStr: string;
@@ -28,7 +28,6 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
   const getProjectColor = (projectName: string): string => {
     return projectColorMap.get(projectName) || 'blue';
   };
-  const { redmineUrl } = useSettings();
   const dateObj = new Date(dateStr + 'T00:00:00');
   const formattedDate = dateObj.toLocaleDateString(undefined, {
     weekday: 'long',
@@ -114,14 +113,13 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <Group gap={6} align="center" wrap="nowrap">
                               {entry.issue?.id ? (
-                                <>
-                                  <Anchor href={`${redmineUrl}/issues/${entry.issue.id}`} target="_blank" size="sm" fw={600} truncate underline="hover" style={{ flex: 1, minWidth: 0 }}>
-                                    #{entry.issue.id} {entry.issue.subject || ''}
-                                  </Anchor>
-                                  <ActionIcon component="a" href={`${redmineUrl}/issues/${entry.issue.id}`} target="_blank" size="18px" variant="subtle" color="gray" title="Open in Redmine" style={{ flexShrink: 0 }}>
-                                    <IconExternalLink size={12} />
-                                  </ActionIcon>
-                                </>
+                                <RedmineIssueLink
+                                  issueId={entry.issue.id}
+                                  subject={entry.issue.subject}
+                                  size="sm"
+                                  fw={600}
+                                  style={{ flex: 1, minWidth: 0 }}
+                                />
                               ) : (
                                 <Text size="sm" c="dimmed" truncate style={{ flex: 1 }}>General Entry</Text>
                               )}

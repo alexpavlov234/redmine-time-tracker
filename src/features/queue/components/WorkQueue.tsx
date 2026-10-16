@@ -2,18 +2,24 @@ import React, { useState, useRef } from 'react';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { IconGripVertical, IconTrash, IconListCheck, IconPlayerPlay, IconPlayerPause, IconExternalLink } from '@tabler/icons-react';
+import { IconGripVertical, IconTrash, IconListCheck, IconPlayerPlay, IconPlayerPause } from '@tabler/icons-react';
 import { formatTime } from '../../../utils/formatters';
-import { Card, Button, Group, Text, ActionIcon, Stack, Badge, Paper, Modal, TextInput, Anchor } from '@mantine/core';
+import { Card, Button, Group, Text, ActionIcon, Stack, Badge, Paper, Modal, TextInput } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 
 import { useSettings } from '../../../contexts/SettingsContext';
 import { StatusPromptModal } from '../../tracker/components/StatusPromptModal';
+import { TaskNoteButton } from '../../../components/common/TaskNoteButton';
+import { getTaskNote } from '../../../services/taskNotes';
+import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
 
+/// <summary>
+/// Drag-and-drop work queue component for managing and tracking queued Redmine tasks.
+/// </summary>
 export const WorkQueue: React.FC = () => {
   const isMobile = useMediaQuery('(max-width: 48em)');
-  const { todos, removeTodo, reorderTodos, activeTodoId } = useQueue();
-  const { promptStatusOnStart, redmineUrl } = useSettings();
+  const { todos, removeTodo, reorderTodos, activeTodoId, updateTodo } = useQueue();
+  const { promptStatusOnStart } = useSettings();
   const timer = useQueueTimer();
   const confirm = useConfirm();
 
@@ -56,7 +62,7 @@ export const WorkQueue: React.FC = () => {
   const handlePromptSubmit = () => {
     if (!promptText.trim() || promptTodoId === null) return;
     const todo = todos.find(t => t.id === promptTodoId);
-    (timer as any).startAfterPrompt(promptTodoId, promptText.trim());
+    timer.startAfterPrompt(promptTodoId, promptText.trim());
     setShowPrompt(false);
     setPromptText('');
     setPromptTodoId(null);
@@ -162,19 +168,28 @@ export const WorkQueue: React.FC = () => {
 
                       <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
                         <Text size="xs" fw={700} c="dimmed" tt="uppercase" truncate>{todo.projectName}</Text>
-                        <Group gap={4} wrap="nowrap">
-                          <Anchor href={`${redmineUrl}/issues/${todo.taskId}`} target="_blank" size="sm" fw={600} truncate underline="hover">
-                            #{todo.taskId} - {todo.taskSubject}
-                          </Anchor>
-                          <ActionIcon component="a" href={`${redmineUrl}/issues/${todo.taskId}`} target="_blank" size="xs" variant="subtle" color="gray" title="Open in Redmine">
-                            <IconExternalLink size={12} />
-                          </ActionIcon>
-                        </Group>
+                        <RedmineIssueLink
+                          issueId={todo.taskId}
+                          subject={todo.taskSubject}
+                          size="sm"
+                          fw={600}
+                        />
                         {todo.activityName && <Text size="xs" c="dimmed" truncate>{todo.activityName}</Text>}
-                        {todo.note && <Text size="xs" mt={4} truncate>{todo.note}</Text>}
+                        {(todo.note || getTaskNote(todo.taskId)) && (
+                          <Text size="xs" mt={4} c="dimmed" style={{ fontStyle: 'italic' }} truncate>
+                            Note: {todo.note || getTaskNote(todo.taskId)}
+                          </Text>
+                        )}
                       </Stack>
 
                       <Group gap="xs" wrap="nowrap" align="center">
+                        <TaskNoteButton
+                          taskId={todo.taskId}
+                          taskSubject={todo.taskSubject}
+                          size="md"
+                          onNoteUpdated={(newNote) => updateTodo(todo.id, { note: newNote })}
+                        />
+
                         {(elapsedSec > 0 || isThisRunning) && (
                           <Text size="sm" fw={700} c={isThisRunning ? 'blue' : 'dimmed'} style={{ fontVariantNumeric: 'tabular-nums' }}>
                             {isThisRunning ? formatTime(timer.totalElapsedTime) : formatTime(elapsedSec)}

@@ -11,15 +11,25 @@ import type {
   ExportLanguage,
 } from '../types/pm';
 
+// In-memory caches for PM dashboard data to avoid redundant server load
+let cachedMemberships: RedmineProjectMembership[] | null = null;
+const projectDetailsCache = new Map<string, RedmineProjectFull>();
+const projectEntriesCache = new Map<string, TimeEntry[]>();
+
 /// <summary>
-/// Fetches current user information along with their project memberships and roles.
+/// Fetches current user information along with their project memberships and roles, with in-memory caching.
 /// </summary>
+/// <param name="forceRefresh">Whether to bypass the in-memory cache.</param>
 /// <returns>Array of project memberships for current user.</returns>
-export async function getUserMemberships(): Promise<RedmineProjectMembership[]> {
+export async function getUserMemberships(forceRefresh = false): Promise<RedmineProjectMembership[]> {
+  if (!forceRefresh && cachedMemberships !== null) {
+    return cachedMemberships;
+  }
   try {
     const response = await redmineApiRequest('/users/current.json?include=memberships');
     const memberships = response.user?.memberships;
-    return Array.isArray(memberships) ? memberships : [];
+    cachedMemberships = Array.isArray(memberships) ? memberships : [];
+    return cachedMemberships;
   } catch (error) {
     console.error('Failed to fetch user memberships:', error);
     return [];
@@ -49,14 +59,23 @@ export function isUserProjectManager(
 }
 
 /// <summary>
-/// Fetches detailed project information from Redmine including all custom fields.
+/// Fetches detailed project information from Redmine including all custom fields, with in-memory caching.
 /// </summary>
 /// <param name="projectId">Numeric or slug identifier of the project.</param>
+/// <param name="forceRefresh">Whether to bypass the in-memory cache.</param>
 /// <returns>Full project data or null if not found.</returns>
-export async function getProjectDetails(projectId: number | string): Promise<RedmineProjectFull | null> {
+export async function getProjectDetails(projectId: number | string, forceRefresh = false): Promise<RedmineProjectFull | null> {
+  const key = String(projectId);
+  if (!forceRefresh && projectDetailsCache.has(key)) {
+    return projectDetailsCache.get(key)!;
+  }
   try {
     const response = await redmineApiRequest(`/projects/${projectId}.json?include=custom_fields,trackers`);
-    return response.project || null;
+    const proj = response.project || null;
+    if (proj) {
+      projectDetailsCache.set(key, proj);
+    }
+    return proj;
   } catch (error) {
     console.error(`Failed to fetch project details for ${projectId}:`, error);
     return null;
@@ -147,18 +166,25 @@ export function extractBudgetMetadata(project: RedmineProjectFull | null): Proje
 }
 
 /// <summary>
-/// Retrieves all time entries for a project with automated pagination and enriches them with issue subjects.
+/// Retrieves all time entries for a project with automated pagination, enriches them with issue subjects, and caches the result in memory.
 /// </summary>
 /// <param name="projectId">ID of project.</param>
 /// <param name="fromDate">Optional start date (YYYY-MM-DD).</param>
 /// <param name="toDate">Optional end date (YYYY-MM-DD).</param>
+/// <param name="forceRefresh">Whether to bypass the in-memory cache.</param>
 /// <returns>Complete list of time entries for the project in the specified range with issue subjects populated.</returns>
 export async function getAllProjectTimeEntries(
   projectId: number | string,
   fromDate?: string,
-  toDate?: string
+  toDate?: string,
+  forceRefresh = false
 ): Promise<TimeEntry[]> {
   if (!projectId) return [];
+
+  const cacheKey = `${projectId}_${fromDate || ''}_${toDate || ''}`;
+  if (!forceRefresh && projectEntriesCache.has(cacheKey)) {
+    return projectEntriesCache.get(cacheKey)!;
+  }
 
   const allEntries: TimeEntry[] = [];
   const limit = 100;
@@ -188,7 +214,7 @@ export async function getAllProjectTimeEntries(
     console.error(`Failed to fetch time entries for project ${projectId}:`, error);
   }
 
-  // Enrich time entries with issue subjects
+  // Enrich time entries with issue subjects and parent tasks
   const issueIds = Array.from(
     new Set(
       allEntries
@@ -199,27 +225,36 @@ export async function getAllProjectTimeEntries(
 
   if (issueIds.length > 0) {
     try {
-      const issues = await getIssues(issueIds);
-      const issueMap = new Map<number, string>();
+      const issues = await getIssues(issueIds, true);
+      const issueMap = new Map<number, typeof issues[0]>();
       for (const issue of issues) {
-        if (issue && issue.id && issue.subject) {
-          issueMap.set(issue.id, issue.subject);
+        if (issue && issue.id) {
+          issueMap.set(issue.id, issue);
         }
       }
 
       for (const entry of allEntries) {
         if (entry.issue?.id) {
-          const sub = issueMap.get(entry.issue.id);
-          if (sub) {
-            entry.issue.subject = sub;
+          const issueObj = issueMap.get(entry.issue.id);
+          if (issueObj) {
+            if (issueObj.subject) {
+              entry.issue.subject = issueObj.subject;
+            }
+            if (issueObj.parent?.id) {
+              entry.issue.parent = {
+                id: issueObj.parent.id,
+                subject: issueObj.parent.subject,
+              };
+            }
           }
         }
       }
     } catch (err) {
-      console.warn('Failed to populate issue subjects for time entries:', err);
+      console.warn('Failed to populate issue subjects and parents for time entries:', err);
     }
   }
 
+  projectEntriesCache.set(cacheKey, allEntries);
   return allEntries;
 }
 
@@ -309,10 +344,12 @@ export function calculateBudgetStats(timeEntries: TimeEntry[], targetHours: numb
 
 /// <summary>
 /// Groups a list of time entries by issue/task for structured presentation and export.
+/// Automatically detects parent tasks and groups child tasks under their respective parent task.
 /// </summary>
 /// <param name="entries">Time entries to aggregate.</param>
+/// <param name="hierarchical">Whether to group child tasks under their parent tasks (default true).</param>
 /// <returns>Array of task summaries sorted by highest spent hours.</returns>
-export function groupEntriesByTask(entries: TimeEntry[]): TaskTimeSummary[] {
+export function groupEntriesByTask(entries: TimeEntry[], hierarchical: boolean = true): TaskTimeSummary[] {
   const map = new Map<number, TaskTimeSummary>();
   const noTaskKey = 0;
 
@@ -332,20 +369,38 @@ export function groupEntriesByTask(entries: TimeEntry[]): TaskTimeSummary[] {
         subject,
         totalHours: 0,
         billableHours: 0,
+        directHours: 0,
+        directBillableHours: 0,
         activities: [],
         comments: [],
         members: [],
         entryIds: [],
+        directEntryIds: [],
         entries: [],
+        directEntries: [],
+        parent: entry.issue?.parent ? {
+          id: entry.issue.parent.id,
+          subject: entry.issue.parent.subject,
+        } : undefined,
       };
       map.set(issueId, item);
+    } else if (!item.parent && entry.issue?.parent) {
+      item.parent = {
+        id: entry.issue.parent.id,
+        subject: entry.issue.parent.subject,
+      };
     }
 
     item.entryIds?.push(entry.id);
+    item.directEntryIds?.push(entry.id);
     item.entries?.push(entry);
+    item.directEntries?.push(entry);
     item.totalHours += hours;
+    item.directHours = (item.directHours || 0) + hours;
+
     if (isBillable || !entry.custom_fields || entry.custom_fields.length === 0) {
       item.billableHours += hours;
+      item.directBillableHours = (item.directBillableHours || 0) + hours;
     }
 
     const activityName = entry.activity?.name;
@@ -366,12 +421,118 @@ export function groupEntriesByTask(entries: TimeEntry[]): TaskTimeSummary[] {
 
   // Sort sub-entries chronologically within each task
   for (const item of map.values()) {
+    item.totalHours = Math.round(item.totalHours * 100) / 100;
+    item.billableHours = Math.round(item.billableHours * 100) / 100;
+    item.directHours = Math.round((item.directHours || 0) * 100) / 100;
+    item.directBillableHours = Math.round((item.directBillableHours || 0) * 100) / 100;
+
     if (item.entries) {
       item.entries.sort((a, b) => (a.spent_on || '').localeCompare(b.spent_on || ''));
     }
+    if (item.directEntries) {
+      item.directEntries.sort((a, b) => (a.spent_on || '').localeCompare(b.spent_on || ''));
+    }
   }
 
-  return Array.from(map.values()).sort((a, b) => b.totalHours - a.totalHours);
+  if (!hierarchical) {
+    return Array.from(map.values()).sort((a, b) => b.totalHours - a.totalHours);
+  }
+
+  // Detect parent tasks and assemble hierarchy
+  const parentsMap = new Map<number, TaskTimeSummary>();
+  const childIds = new Set<number>();
+
+  for (const item of map.values()) {
+    if (item.parent && item.parent.id > 0 && item.parent.id !== item.issueId) {
+      const pId = item.parent.id;
+      childIds.add(item.issueId);
+
+      let parentSummary = map.get(pId) || parentsMap.get(pId);
+      if (!parentSummary) {
+        parentSummary = {
+          issueId: pId,
+          subject: item.parent.subject || `#${pId}`,
+          totalHours: 0,
+          billableHours: 0,
+          directHours: 0,
+          directBillableHours: 0,
+          activities: [],
+          comments: [],
+          members: [],
+          entryIds: [],
+          directEntryIds: [],
+          entries: [],
+          directEntries: [],
+          isParent: true,
+          children: [],
+        };
+        parentsMap.set(pId, parentSummary);
+      } else {
+        parentSummary.isParent = true;
+        if (!parentSummary.children) {
+          parentSummary.children = [];
+        }
+        if (item.parent.subject && (!parentSummary.subject || parentSummary.subject === `#${parentSummary.issueId}`)) {
+          parentSummary.subject = item.parent.subject;
+        }
+      }
+
+      if (!parentSummary.children!.some(c => c.issueId === item.issueId)) {
+        parentSummary.children!.push(item);
+      }
+    }
+  }
+
+  // Aggregate children into parent summaries
+  const allParents = new Set<TaskTimeSummary>([
+    ...parentsMap.values(),
+    ...Array.from(map.values()).filter(t => t.isParent && t.children && t.children.length > 0),
+  ]);
+
+  for (const parent of allParents) {
+    // Sort children by total hours descending
+    parent.children?.sort((a, b) => b.totalHours - a.totalHours);
+
+    let childHours = 0;
+    let childBillable = 0;
+    const combinedEntryIds = new Set<number>(parent.directEntryIds || []);
+    const combinedActivities = new Set<string>(parent.activities);
+    const combinedMembers = new Set<string>(parent.members);
+    const combinedComments = new Set<string>(parent.comments);
+
+    for (const child of parent.children || []) {
+      childHours += child.totalHours;
+      childBillable += child.billableHours;
+      child.entryIds?.forEach(id => combinedEntryIds.add(id));
+      child.activities.forEach(a => combinedActivities.add(a));
+      child.members.forEach(m => combinedMembers.add(m));
+      child.comments.forEach(c => combinedComments.add(c));
+    }
+
+    parent.totalHours = Math.round(((parent.directHours || 0) + childHours) * 100) / 100;
+    parent.billableHours = Math.round(((parent.directBillableHours || 0) + childBillable) * 100) / 100;
+    parent.entryIds = Array.from(combinedEntryIds);
+    parent.activities = Array.from(combinedActivities);
+    parent.members = Array.from(combinedMembers);
+    parent.comments = Array.from(combinedComments);
+  }
+
+  // Build top-level list
+  const topLevelList: TaskTimeSummary[] = [];
+
+  // 1. Add all synthetic parents from parentsMap
+  for (const parent of parentsMap.values()) {
+    topLevelList.push(parent);
+  }
+
+  // 2. Add tasks from map that are NOT children of another task
+  for (const item of map.values()) {
+    if (!childIds.has(item.issueId)) {
+      topLevelList.push(item);
+    }
+  }
+
+  return topLevelList.sort((a, b) => b.totalHours - a.totalHours);
 }
 
 /// <summary>
@@ -491,6 +652,11 @@ export const exportTranslations = {
     showPeriod: 'Показвай период',
     showCreatedBy: 'Показвай създател (горе вдясно)',
     showIssueDate: 'Показвай дата на издаване',
+    parentTaskNo: 'Родителска задача №',
+    parentTask: 'Родителска задача',
+    subtasks: 'подзадачи',
+    directEntries: 'Директни записи',
+    showParentTask: 'Показвай родителска задача',
   },
   en: {
     reportTitleDefault: 'Time Tracking Report',
@@ -553,6 +719,11 @@ export const exportTranslations = {
     showPeriod: 'Show Period',
     showCreatedBy: 'Show Created by (top right)',
     showIssueDate: 'Show Date of Issue',
+    parentTaskNo: 'Parent Task #',
+    parentTask: 'Parent Task',
+    subtasks: 'subtasks',
+    directEntries: 'Direct entries',
+    showParentTask: 'Show Parent Task',
   },
 } as const;
 
@@ -636,12 +807,14 @@ export function exportToCsv(entries: TimeEntry[], config: ClientExportConfig, pr
   // UTF-8 BOM is required for Excel to recognize Cyrillic encoding
   const BOM = '\uFEFF';
   const delimiter = ';'; // Standard semicolon delimiter for European locale Excel
+  const showParent = config.showParentTask !== false;
 
   // Header row based on language and toggles
   const headers = [
     t.date,
     t.project,
     t.client,
+    ...(showParent ? [t.parentTaskNo, t.parentTask] : []),
     ...(config.showTaskIds ? [t.taskNo] : []),
     t.task,
     ...(config.showActivities ? [t.activity] : []),
@@ -675,10 +848,16 @@ export function exportToCsv(entries: TimeEntry[], config: ClientExportConfig, pr
       .replace(/[\r\n]+/g, ' ')
       .replace(/"/g, '""');
 
+    const parentIdStr = entry.issue?.parent?.id ? `#${entry.issue.parent.id}` : '-';
+    const parentSubject = (entry.issue?.parent?.subject || '-')
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/"/g, '""');
+
     const row = [
       entry.spent_on || '',
       `"${projectName.replace(/"/g, '""')}"`,
       `"${config.clientName.replace(/"/g, '""')}"`,
+      ...(showParent ? [parentIdStr, `"${parentSubject}"`] : []),
       ...(config.showTaskIds ? [entry.issue?.id ? `#${entry.issue.id}` : '-'] : []),
       `"${taskSubject}"`,
       ...(config.showActivities ? [`"${(entry.activity?.name || '').replace(/"/g, '""')}"`] : []),
@@ -699,6 +878,7 @@ export function exportToCsv(entries: TimeEntry[], config: ClientExportConfig, pr
     t.total,
     '',
     '',
+    ...(showParent ? ['', ''] : []),
     ...(config.showTaskIds ? [''] : []),
     '',
     ...(config.showActivities ? [''] : []),

@@ -7,36 +7,42 @@ export interface ActivityOption {
   is_default?: boolean;
 }
 
-/**
- * DIP-compliant hook: loads activities for a given project (or global activities if no project).
- * Falls back to global activities if project-specific fetch fails or returns empty.
- */
-export const useActivitiesForProject = (projectId: string | null) => {
+/// <summary>
+/// DIP-compliant hook: loads activities for a given project (or global activities if no project).
+/// Fetches project-specific activities first when a project is selected, falling back to global activities only if needed.
+/// </summary>
+/// <param name="projectId">Selected project ID or null.</param>
+/// <param name="enabled">Whether activity fetching is enabled (default true).</param>
+/// <returns>Loaded activities, loading flag, and default activity ID.</returns>
+export const useActivitiesForProject = (projectId: string | null, enabled: boolean = true) => {
   const [activities, setActivities] = useState<ActivityOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let cancelled = false;
 
     const fetchActivities = async () => {
       setIsLoading(true);
       try {
-        // Always load global activities first as fallback
-        const globalActivities = await getTimeEntryActivities();
-
-        if (!projectId || projectId === 'my_issues') {
-          if (!cancelled) setActivities(globalActivities);
-          return;
+        if (projectId && projectId !== 'my_issues') {
+          try {
+            const projActivities = await getProjectActivities(projectId);
+            if (projActivities.length > 0) {
+              if (!cancelled) setActivities(projActivities);
+              return;
+            }
+          } catch {
+            // Fall through to global activities fallback
+          }
         }
 
-        // Try project-specific activities
-        try {
-          const projActivities = await getProjectActivities(projectId);
-          if (!cancelled) {
-            setActivities(projActivities.length > 0 ? projActivities : globalActivities);
-          }
-        } catch {
-          if (!cancelled) setActivities(globalActivities);
+        const globalActivities = await getTimeEntryActivities();
+        if (!cancelled) {
+          setActivities(globalActivities);
         }
       } catch (err) {
         console.error('Failed to load activities:', err);
@@ -48,7 +54,7 @@ export const useActivitiesForProject = (projectId: string | null) => {
 
     fetchActivities();
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, enabled]);
 
   const defaultActivityId = activities.find(a => a.is_default)?.id
     ?? (activities.length > 0 ? activities[0].id : null);

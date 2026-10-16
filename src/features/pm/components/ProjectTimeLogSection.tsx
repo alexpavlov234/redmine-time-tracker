@@ -15,6 +15,7 @@ import {
   Anchor,
   SimpleGrid,
   Paper,
+  ActionIcon,
 } from '@mantine/core';
 import {
   IconCalendar,
@@ -23,6 +24,8 @@ import {
   IconChecklist,
   IconUsers,
   IconDownload,
+  IconChevronDown,
+  IconChevronRight,
 } from '@tabler/icons-react';
 import type { TimeEntry } from '../../../types';
 import type { DateRangePreset } from '../hooks/useProjectManagerData';
@@ -103,7 +106,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
   // Extract unique members for filter dropdown
   const memberOptions = useMemo(() => {
     const map = new Map<string, string>();
-    map.set('all', 'Всички членове на екипа');
+    map.set('all', 'All Team Members');
     for (const e of allEntries) {
       if (e.user?.id) {
         map.set(String(e.user.id), e.user.name || `User #${e.user.id}`);
@@ -115,7 +118,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
   // Extract unique activities for filter dropdown
   const activityOptions = useMemo(() => {
     const map = new Map<string, string>();
-    map.set('all', 'Всички дейности');
+    map.set('all', 'All Activities');
     for (const e of allEntries) {
       if (e.activity?.id) {
         map.set(String(e.activity.id), e.activity.name || `Activity #${e.activity.id}`);
@@ -153,10 +156,44 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
     };
   }, [filteredEntries]);
 
-  // Grouped task summaries
+  // Grouped task summaries (hierarchical with detected parents)
   const taskSummaries = useMemo(() => {
     return groupEntriesByTask(filteredEntries);
   }, [filteredEntries]);
+
+  // Detected parent tasks with children
+  const parentTasks = useMemo(() => {
+    return taskSummaries.filter(t => t.isParent && t.children && t.children.length > 0);
+  }, [taskSummaries]);
+
+  // Set of collapsed parent task IDs (empty set = all expanded by default)
+  const [collapsedParentIds, setCollapsedParentIds] = useState<Set<number>>(() => new Set());
+
+  /// <summary>
+  /// Toggles expansion for an individual parent task.
+  /// </summary>
+  /// <param name="parentId">ID of the parent task.</param>
+  const toggleParentExpand = (parentId: number) => {
+    setCollapsedParentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  };
+
+  const isAllParentsExpanded = parentTasks.length > 0 && parentTasks.every(p => !collapsedParentIds.has(p.issueId));
+
+  /// <summary>
+  /// Toggles expansion for all parent tasks simultaneously.
+  /// </summary>
+  const toggleExpandAll = () => {
+    if (isAllParentsExpanded) {
+      setCollapsedParentIds(new Set(parentTasks.map(p => p.issueId)));
+    } else {
+      setCollapsedParentIds(new Set());
+    }
+  };
 
   // Grouped member summaries
   const memberSummaries = useMemo(() => {
@@ -169,11 +206,11 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
     <Card shadow="sm" padding="lg" radius="md" withBorder>
       <Stack gap="md">
         {/* Header & Export Button */}
-        <Group justify="space-between" align="center">
+        <Group justify="space-between" align="center" wrap="wrap">
           <div>
-            <Title order={3}>Отчетено време по проекта</Title>
+            <Title order={3}>Project Time Logs</Title>
             <Text size="sm" c="dimmed">
-              {dateLabel} • Общо {filteredEntries.length} записа
+              {dateLabel} • Total {filteredEntries.length} entries
             </Text>
           </div>
 
@@ -185,46 +222,66 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
             disabled={filteredEntries.length === 0}
             loading={isLoading}
           >
-            Експорт за клиент
+            Export for Client
           </Button>
         </Group>
 
         {/* View Statistics Cards */}
-        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
-          <Paper withBorder p="xs" radius="sm">
-            <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-              Отработени в периода
+        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
+          <Paper withBorder p="md" radius="md">
+            <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+              Logged in Period
             </Text>
-            <Text size="lg" fw={700}>
-              {viewStats.totalHours} <Text span size="xs" fw={500} c="dimmed">ч.</Text>
-            </Text>
+            <Group align="baseline" gap="xs" mt="xs">
+              <Text fz={28} fw={700}>
+                {viewStats.totalHours}
+              </Text>
+              <Text size="sm" c="dimmed">
+                hours
+              </Text>
+            </Group>
           </Paper>
 
-          <Paper withBorder p="xs" radius="sm">
-            <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-              Фактурируеми (Billable)
+          <Paper withBorder p="md" radius="md">
+            <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+              Billable Hours
             </Text>
-            <Text size="lg" fw={700} c="teal">
-              {viewStats.billableHours} <Text span size="xs" fw={500} c="dimmed">ч.</Text>
-            </Text>
+            <Group align="baseline" gap="xs" mt="xs">
+              <Text fz={28} fw={700} c="teal">
+                {viewStats.billableHours}
+              </Text>
+              <Text size="sm" c="dimmed">
+                hours
+              </Text>
+            </Group>
           </Paper>
 
-          <Paper withBorder p="xs" radius="sm">
-            <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-              Отработени задачи
+          <Paper withBorder p="md" radius="md">
+            <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+              Tasks Worked On
             </Text>
-            <Text size="lg" fw={700}>
-              {viewStats.taskCount}
-            </Text>
+            <Group align="baseline" gap="xs" mt="xs">
+              <Text fz={28} fw={700}>
+                {viewStats.taskCount}
+              </Text>
+              <Text size="sm" c="dimmed">
+                tasks
+              </Text>
+            </Group>
           </Paper>
 
-          <Paper withBorder p="xs" radius="sm">
-            <Text size="xs" c="dimmed" fw={600} tt="uppercase">
-              Активни служители
+          <Paper withBorder p="md" radius="md">
+            <Text size="xs" c="dimmed" fw={700} tt="uppercase">
+              Active Team Members
             </Text>
-            <Text size="lg" fw={700}>
-              {viewStats.userCount}
-            </Text>
+            <Group align="baseline" gap="xs" mt="xs">
+              <Text fz={28} fw={700}>
+                {viewStats.userCount}
+              </Text>
+              <Text size="sm" c="dimmed">
+                members
+              </Text>
+            </Group>
           </Paper>
         </SimpleGrid>
 
@@ -239,11 +296,11 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                   value={dateRangePreset}
                   onChange={val => onDateRangeChange(val as DateRangePreset)}
                   data={[
-                    { value: 'this_month', label: 'Този месец' },
-                    { value: 'last_month', label: 'Миналия месец' },
-                    { value: 'last_30_days', label: 'Последните 30 дни' },
-                    { value: 'contract_period', label: 'Срок по договор' },
-                    { value: 'all', label: 'Всички' },
+                    { value: 'this_month', label: 'This Month' },
+                    { value: 'last_month', label: 'Last Month' },
+                    { value: 'last_30_days', label: 'Last 30 Days' },
+                    { value: 'contract_period', label: 'Contract Period' },
+                    { value: 'all', label: 'All / Custom' },
                   ]}
                 />
               </Group>
@@ -253,7 +310,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                   <TextInput
                     size="xs"
                     type="date"
-                    placeholder="От дата"
+                    placeholder="From"
                     value={customFromDate}
                     onChange={e => onCustomFromDateChange(e.target.value)}
                     style={{ width: 135 }}
@@ -262,7 +319,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                   <TextInput
                     size="xs"
                     type="date"
-                    placeholder="До дата"
+                    placeholder="To"
                     value={customToDate}
                     onChange={e => onCustomToDateChange(e.target.value)}
                     style={{ width: 135 }}
@@ -273,11 +330,11 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
               <Group gap="xs">
                 <Select
                   size="xs"
-                  placeholder="Фактурируемост"
+                  placeholder="Billable status"
                   data={[
-                    { value: 'all', label: 'Всички часове' },
-                    { value: 'billable', label: 'Само фактурируеми' },
-                    { value: 'non_billable', label: 'Нефактурируеми' },
+                    { value: 'all', label: 'All Hours' },
+                    { value: 'billable', label: 'Billable Only' },
+                    { value: 'non_billable', label: 'Non-billable Only' },
                   ]}
                   value={selectedBillableFilter}
                   onChange={val => onBillableFilterChange((val as 'all' | 'billable' | 'non_billable') || 'all')}
@@ -285,7 +342,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                 />
                 <Select
                   size="xs"
-                  placeholder="Служител"
+                  placeholder="Team Member"
                   data={memberOptions}
                   value={selectedMemberId}
                   onChange={val => onMemberChange(val || 'all')}
@@ -293,7 +350,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                 />
                 <Select
                   size="xs"
-                  placeholder="Дейност"
+                  placeholder="Activity"
                   data={activityOptions}
                   value={selectedActivityId}
                   onChange={val => onActivityChange(val || 'all')}
@@ -305,7 +362,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
             {/* Search Input */}
             <TextInput
               size="xs"
-              placeholder="Търсене по задача, име на задача, служител или коментар..."
+              placeholder="Search by task #ID, subject, team member, or comment..."
               value={searchQuery}
               onChange={e => onSearchChange(e.target.value)}
               leftSection={<IconSearch size={14} />}
@@ -317,13 +374,13 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="entries" leftSection={<IconList size={16} />}>
-              Всички записи ({filteredEntries.length})
+              All Entries ({filteredEntries.length})
             </Tabs.Tab>
             <Tabs.Tab value="tasks" leftSection={<IconChecklist size={16} />}>
-              По задачи ({taskSummaries.length})
+              By Task ({taskSummaries.length})
             </Tabs.Tab>
             <Tabs.Tab value="members" leftSection={<IconUsers size={16} />}>
-              По екип ({memberSummaries.length})
+              By Team Member ({memberSummaries.length})
             </Tabs.Tab>
           </Tabs.List>
 
@@ -331,20 +388,20 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
           <Tabs.Panel value="entries" pt="xs">
             {filteredEntries.length === 0 ? (
               <Text c="dimmed" size="sm" ta="center" py="xl">
-                Няма намерени отчетени часове за избрания период и филтри.
+                No logged hours found for the selected period and filters.
               </Text>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <Table striped highlightOnHover withTableBorder withColumnBorders fz="xs">
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th style={{ width: 95 }}>Дата</Table.Th>
-                      <Table.Th style={{ width: 140 }}>Служител</Table.Th>
-                      <Table.Th style={{ width: 220 }}>Задача</Table.Th>
-                      <Table.Th style={{ width: 110 }}>Дейност</Table.Th>
-                      <Table.Th style={{ width: 70, textAlign: 'right' }}>Часове</Table.Th>
-                      <Table.Th>Описание на дейността</Table.Th>
-                      <Table.Th style={{ width: 90, textAlign: 'center' }}>Фактурируемо</Table.Th>
+                      <Table.Th style={{ width: 95 }}>Date</Table.Th>
+                      <Table.Th style={{ width: 140 }}>Team Member</Table.Th>
+                      <Table.Th style={{ width: 220 }}>Task</Table.Th>
+                      <Table.Th style={{ width: 110 }}>Activity</Table.Th>
+                      <Table.Th style={{ width: 70, textAlign: 'right' }}>Hours</Table.Th>
+                      <Table.Th>Activity Description / Comment</Table.Th>
+                      <Table.Th style={{ width: 90, textAlign: 'center' }}>Billable</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -363,37 +420,51 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                           <Table.Td fw={500}>{entry.user?.name || '-'}</Table.Td>
                           <Table.Td>
                             {issueId ? (
-                              <Group gap={4} wrap="nowrap">
-                                {issueLink ? (
-                                  <Anchor href={issueLink} target="_blank" rel="noopener noreferrer" fw={600}>
-                                    #{issueId}
-                                  </Anchor>
-                                ) : (
-                                  <Text fw={600}>#{issueId}</Text>
+                              <Stack gap={2}>
+                                <Group gap={4} wrap="nowrap">
+                                  {issueLink ? (
+                                    <Anchor href={issueLink} target="_blank" rel="noopener noreferrer" fw={600}>
+                                      #{issueId}
+                                    </Anchor>
+                                  ) : (
+                                    <Text fw={600}>#{issueId}</Text>
+                                  )}
+                                  {entry.issue?.subject && (
+                                    <Text size="xs" truncate style={{ maxWidth: 170 }} title={entry.issue.subject}>
+                                      {entry.issue.subject}
+                                    </Text>
+                                  )}
+                                </Group>
+                                {entry.issue?.parent && (
+                                  <Group gap={4} wrap="nowrap">
+                                    <Badge size="xs" variant="light" color="indigo" style={{ textTransform: 'none' }}>
+                                      ↳ Parent: #{entry.issue.parent.id}
+                                    </Badge>
+                                    {entry.issue.parent.subject && (
+                                      <Text size="10px" c="dimmed" truncate style={{ maxWidth: 150 }} title={entry.issue.parent.subject}>
+                                        {entry.issue.parent.subject}
+                                      </Text>
+                                    )}
+                                  </Group>
                                 )}
-                                {entry.issue?.subject && (
-                                  <Text size="xs" truncate style={{ maxWidth: 170 }}>
-                                    {entry.issue.subject}
-                                  </Text>
-                                )}
-                              </Group>
+                              </Stack>
                             ) : (
-                              <Text c="dimmed">Общ проект</Text>
+                              <Text c="dimmed">General Project</Text>
                             )}
                           </Table.Td>
                           <Table.Td>{entry.activity?.name || '-'}</Table.Td>
                           <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
-                            {Number(entry.hours).toFixed(2)} ч.
+                            {Number(entry.hours).toFixed(2)} h
                           </Table.Td>
                           <Table.Td>{entry.comments || '-'}</Table.Td>
                           <Table.Td style={{ textAlign: 'center' }}>
                             {isBillable ? (
                               <Badge size="xs" color="teal" variant="light">
-                                Да
+                                Yes
                               </Badge>
                             ) : (
                               <Badge size="xs" color="gray" variant="subtle">
-                                Не
+                                No
                               </Badge>
                             )}
                           </Table.Td>
@@ -406,56 +477,183 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
             )}
           </Tabs.Panel>
 
-          {/* TAB 2: Grouped by Task */}
+          {/* TAB 2: Grouped by Task (with Parent Task Hierarchy) */}
           <Tabs.Panel value="tasks" pt="xs">
             {taskSummaries.length === 0 ? (
               <Text c="dimmed" size="sm" ta="center" py="xl">
-                Няма данни за задачи в избрания период.
+                No task entries found for the selected period.
               </Text>
             ) : (
-              <Table striped highlightOnHover withTableBorder fz="xs">
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th style={{ width: 100 }}>Задача №</Table.Th>
-                    <Table.Th>Заглавие на задача</Table.Th>
-                    <Table.Th style={{ width: 90, textAlign: 'right' }}>Общо часове</Table.Th>
-                    <Table.Th style={{ width: 100, textAlign: 'right' }}>Фактурируеми</Table.Th>
-                    <Table.Th style={{ width: 150 }}>Дейности</Table.Th>
-                    <Table.Th style={{ width: 180 }}>Служители</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {taskSummaries.map(t => {
-                    const issueLink = t.issueId && cleanUrl ? `${cleanUrl}/issues/${t.issueId}` : null;
-                    return (
-                      <Table.Tr key={t.issueId}>
-                        <Table.Td>
-                          {t.issueId ? (
-                            issueLink ? (
-                              <Anchor href={issueLink} target="_blank" rel="noopener noreferrer" fw={700}>
-                                #{t.issueId}
-                              </Anchor>
+              <Stack gap="xs">
+                {parentTasks.length > 0 && (
+                  <Group justify="flex-end">
+                    <Button
+                      size="xs"
+                      variant="subtle"
+                      leftSection={isAllParentsExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                      onClick={toggleExpandAll}
+                    >
+                      {isAllParentsExpanded ? 'Collapse all parent tasks' : 'Expand all parent tasks'}
+                    </Button>
+                  </Group>
+                )}
+                <Table striped highlightOnHover withTableBorder fz="xs">
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th style={{ width: 110 }}>Task #</Table.Th>
+                      <Table.Th>Task Subject</Table.Th>
+                      <Table.Th style={{ width: 110, textAlign: 'right' }}>Total Hours</Table.Th>
+                      <Table.Th style={{ width: 100, textAlign: 'right' }}>Billable</Table.Th>
+                      <Table.Th style={{ width: 150 }}>Activities</Table.Th>
+                      <Table.Th style={{ width: 180 }}>Team Members</Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {taskSummaries.map(t => {
+                      const isParent = Boolean(t.isParent && t.children && t.children.length > 0);
+                      const isExpanded = !collapsedParentIds.has(t.issueId);
+                      const issueLink = t.issueId && cleanUrl ? `${cleanUrl}/issues/${t.issueId}` : null;
+
+                      if (isParent) {
+                        return (
+                          <React.Fragment key={`parent-${t.issueId}`}>
+                            {/* Parent Task Header Row */}
+                            <Table.Tr bg="light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-6))">
+                              <Table.Td>
+                                <Group gap={4} wrap="nowrap">
+                                  <ActionIcon
+                                    size="xs"
+                                    variant="subtle"
+                                    color="blue"
+                                    onClick={() => toggleParentExpand(t.issueId)}
+                                    title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                                  >
+                                    {isExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                                  </ActionIcon>
+                                  {t.issueId ? (
+                                    issueLink ? (
+                                      <Anchor href={issueLink} target="_blank" rel="noopener noreferrer" fw={700}>
+                                        #{t.issueId}
+                                      </Anchor>
+                                    ) : (
+                                      <Text fw={700}>#{t.issueId}</Text>
+                                    )
+                                  ) : (
+                                    <Text c="dimmed">Total</Text>
+                                  )}
+                                </Group>
+                              </Table.Td>
+                              <Table.Td>
+                                <Group gap="xs" wrap="wrap">
+                                  <Badge size="xs" color="indigo" variant="filled">
+                                    Parent Task
+                                  </Badge>
+                                  <Text fw={700}>{t.subject}</Text>
+                                  <Badge size="xs" color="gray" variant="light">
+                                    {t.children?.length} {t.children?.length === 1 ? 'sub-task' : 'sub-tasks'}
+                                  </Badge>
+                                </Group>
+                              </Table.Td>
+                              <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>
+                                <Text fw={700} span>{t.totalHours.toFixed(2)} h</Text>
+                                {t.directHours && t.directHours > 0 ? (
+                                  <Text size="10px" c="dimmed" display="block">
+                                    (direct: {t.directHours.toFixed(2)} h)
+                                  </Text>
+                                ) : null}
+                              </Table.Td>
+                              <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)', fontWeight: 700 }}>
+                                {t.billableHours.toFixed(2)} h
+                              </Table.Td>
+                              <Table.Td>{t.activities.join(', ') || '-'}</Table.Td>
+                              <Table.Td>{t.members.join(', ') || '-'}</Table.Td>
+                            </Table.Tr>
+
+                            {/* Direct hours row if parent had direct entries */}
+                            {isExpanded && t.directHours && t.directHours > 0 ? (
+                              <Table.Tr key={`parent-direct-${t.issueId}`} style={{ fontStyle: 'italic' }}>
+                                <Table.Td style={{ paddingLeft: 28 }}>
+                                  <Text size="xs" c="dimmed">↳ #{t.issueId}</Text>
+                                </Table.Td>
+                                <Table.Td>
+                                  <Text size="xs" c="dimmed">Direct entries for task #{t.issueId}</Text>
+                                </Table.Td>
+                                <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
+                                  {t.directHours.toFixed(2)} h
+                                </Table.Td>
+                                <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
+                                  {(t.directBillableHours || 0).toFixed(2)} h
+                                </Table.Td>
+                                <Table.Td>-</Table.Td>
+                                <Table.Td>-</Table.Td>
+                              </Table.Tr>
+                            ) : null}
+
+                            {/* Child Tasks Rows */}
+                            {isExpanded &&
+                              t.children?.map(child => {
+                                const childLink = child.issueId && cleanUrl ? `${cleanUrl}/issues/${child.issueId}` : null;
+                                return (
+                                  <Table.Tr key={`child-${child.issueId}`}>
+                                    <Table.Td style={{ paddingLeft: 28 }}>
+                                      <Group gap={4} wrap="nowrap">
+                                        <Text size="xs" c="dimmed">↳</Text>
+                                        {childLink ? (
+                                          <Anchor href={childLink} target="_blank" rel="noopener noreferrer" fw={600} size="xs">
+                                            #{child.issueId}
+                                          </Anchor>
+                                        ) : (
+                                          <Text fw={600} size="xs">#{child.issueId}</Text>
+                                        )}
+                                      </Group>
+                                    </Table.Td>
+                                    <Table.Td fw={500}>{child.subject}</Table.Td>
+                                    <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
+                                      {child.totalHours.toFixed(2)} h
+                                    </Table.Td>
+                                    <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
+                                      {child.billableHours.toFixed(2)} h
+                                    </Table.Td>
+                                    <Table.Td>{child.activities.join(', ') || '-'}</Table.Td>
+                                    <Table.Td>{child.members.join(', ') || '-'}</Table.Td>
+                                  </Table.Tr>
+                                );
+                              })}
+                          </React.Fragment>
+                        );
+                      }
+
+                      // Standalone Task (not a parent)
+                      return (
+                        <Table.Tr key={t.issueId}>
+                          <Table.Td>
+                            {t.issueId ? (
+                              issueLink ? (
+                                <Anchor href={issueLink} target="_blank" rel="noopener noreferrer" fw={700}>
+                                  #{t.issueId}
+                                </Anchor>
+                              ) : (
+                                <Text fw={700}>#{t.issueId}</Text>
+                              )
                             ) : (
-                              <Text fw={700}>#{t.issueId}</Text>
-                            )
-                          ) : (
-                            <Text c="dimmed">Общо</Text>
-                          )}
-                        </Table.Td>
-                        <Table.Td fw={500}>{t.subject}</Table.Td>
-                        <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>
-                          {t.totalHours.toFixed(2)} ч.
-                        </Table.Td>
-                        <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
-                          {t.billableHours.toFixed(2)} ч.
-                        </Table.Td>
-                        <Table.Td>{t.activities.join(', ') || '-'}</Table.Td>
-                        <Table.Td>{t.members.join(', ') || '-'}</Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
+                              <Text c="dimmed">Total</Text>
+                            )}
+                          </Table.Td>
+                          <Table.Td fw={500}>{t.subject}</Table.Td>
+                          <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>
+                            {t.totalHours.toFixed(2)} h
+                          </Table.Td>
+                          <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
+                            {t.billableHours.toFixed(2)} h
+                          </Table.Td>
+                          <Table.Td>{t.activities.join(', ') || '-'}</Table.Td>
+                          <Table.Td>{t.members.join(', ') || '-'}</Table.Td>
+                        </Table.Tr>
+                      );
+                    })}
+                  </Table.Tbody>
+                </Table>
+              </Stack>
             )}
           </Tabs.Panel>
 
@@ -463,17 +661,17 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
           <Tabs.Panel value="members" pt="xs">
             {memberSummaries.length === 0 ? (
               <Text c="dimmed" size="sm" ta="center" py="xl">
-                Няма данни за служители в избрания период.
+                No team member data found for the selected period.
               </Text>
             ) : (
               <Table striped highlightOnHover withTableBorder fz="xs">
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Служител</Table.Th>
-                    <Table.Th style={{ width: 110, textAlign: 'right' }}>Общо часове</Table.Th>
-                    <Table.Th style={{ width: 120, textAlign: 'right' }}>Фактурируеми</Table.Th>
-                    <Table.Th style={{ width: 100, textAlign: 'center' }}>Брой задачи</Table.Th>
-                    <Table.Th style={{ width: 100, textAlign: 'right' }}>% от времето</Table.Th>
+                    <Table.Th>Team Member</Table.Th>
+                    <Table.Th style={{ width: 110, textAlign: 'right' }}>Total Hours</Table.Th>
+                    <Table.Th style={{ width: 120, textAlign: 'right' }}>Billable</Table.Th>
+                    <Table.Th style={{ width: 100, textAlign: 'center' }}>Task Count</Table.Th>
+                    <Table.Th style={{ width: 100, textAlign: 'right' }}>% of Time</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -486,10 +684,10 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                       <Table.Tr key={m.userId}>
                         <Table.Td fw={600}>{m.userName}</Table.Td>
                         <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>
-                          {m.totalHours.toFixed(2)} ч.
+                          {m.totalHours.toFixed(2)} h
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
-                          {m.billableHours.toFixed(2)} ч.
+                          {m.billableHours.toFixed(2)} h
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>{m.taskCount}</Table.Td>
                         <Table.Td style={{ textAlign: 'right' }}>{percent}%</Table.Td>

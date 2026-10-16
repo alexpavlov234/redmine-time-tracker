@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
 import type { RedmineIssue } from '../types';
-import { redmineApiRequest } from '../services/redmine';
+import { redmineApiRequest, cacheIssues } from '../services/redmine';
 
-/**
- * DIP-compliant hook: decouples UI components from direct API calls for task fetching.
- * Replaces inline useEffect + redmineApiRequest patterns in AddTaskForm, BulkLogForm, etc.
- */
+// In-memory cache of open tasks per project ID
+const projectTasksCache = new Map<string, RedmineIssue[]>();
+
+/// <summary>
+/// DIP-compliant hook: decouples UI components from direct API calls for task fetching,
+/// caching project tasks in memory and populating the global issue cache.
+/// </summary>
+/// <param name="projectId">Selected project ID or 'my_issues'.</param>
+/// <returns>Tasks list, loading flag, and error message.</returns>
 export const useTasksForProject = (projectId: string | null) => {
   const [tasks, setTasks] = useState<RedmineIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -14,6 +19,11 @@ export const useTasksForProject = (projectId: string | null) => {
   useEffect(() => {
     if (!projectId) {
       setTasks([]);
+      return;
+    }
+
+    if (projectTasksCache.has(projectId)) {
+      setTasks(projectTasksCache.get(projectId)!);
       return;
     }
 
@@ -30,8 +40,11 @@ export const useTasksForProject = (projectId: string | null) => {
           endpoint = `/issues.json?project_id=${projectId}&status_id=open&limit=100`;
         }
         const data = await redmineApiRequest(endpoint);
+        const fetched: RedmineIssue[] = data.issues || [];
+        cacheIssues(fetched);
+        projectTasksCache.set(projectId, fetched);
         if (!cancelled) {
-          setTasks(data.issues || []);
+          setTasks(fetched);
         }
       } catch (err: any) {
         if (!cancelled) {

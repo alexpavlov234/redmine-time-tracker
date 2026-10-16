@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Button, Group, Title, ActionIcon, Stack } from '@mantine/core';
-import { IconCalendar, IconRefresh, IconChecklist, IconSquareX } from '@tabler/icons-react';
+import { Button, Group, Title, ActionIcon, Stack, Tabs } from '@mantine/core';
+import { IconCalendar, IconRefresh, IconChecklist, IconSquareX, IconSearch } from '@tabler/icons-react';
 import { useCalendarEntries } from '../hooks/useCalendarEntries';
 import { CalendarGrid } from './CalendarGrid';
 import { DayDetailsView } from './DayDetailsView';
 import { BulkLogForm } from './BulkLogForm';
 import { TimeEntryFormModal } from './TimeEntryFormModal';
+import { TaskDaysSearch } from './TaskDaysSearch';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { deleteTimeEntry } from '../../../services/redmine';
 import type { TimeEntry } from '../../../types';
@@ -26,6 +27,7 @@ const PROJECT_PALETTE = [
 ];
 
 export const LoggedTimeDashboard: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<string | null>('calendar');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
@@ -153,88 +155,109 @@ export const LoggedTimeDashboard: React.FC = () => {
 
   return (
     <Stack gap="lg">
-      <Group justify="space-between">
-        <Group gap="xs">
-          <IconCalendar size={28} color="var(--mantine-color-blue-filled)" />
-          <Title order={2}>Calendar Log</Title>
-        </Group>
+      <Tabs value={activeTab} onChange={setActiveTab} color="blue">
+        <Tabs.List mb="lg">
+          <Tabs.Tab value="calendar" leftSection={<IconCalendar size={18} />}>
+            Calendar View
+          </Tabs.Tab>
+          <Tabs.Tab value="task-summary" leftSection={<IconSearch size={18} />}>
+            Task Days & Topic Search
+          </Tabs.Tab>
+        </Tabs.List>
 
-        <Group>
-          <Button
-            size="sm"
-            variant={isMultiSelectMode ? 'filled' : 'light'}
-            leftSection={isMultiSelectMode ? <IconSquareX size={16} /> : <IconChecklist size={16} />}
-            onClick={toggleMultiSelectMode}
-          >
-            {isMultiSelectMode ? 'Cancel Multi-Select' : 'Select Multiple Days'}
-          </Button>
+        <Tabs.Panel value="calendar">
+          <Stack gap="lg">
+            <Group justify="space-between">
+              <Group gap="xs">
+                <IconCalendar size={28} color="var(--mantine-color-blue-filled)" />
+                <Title order={2}>Calendar Log</Title>
+              </Group>
 
-          <ActionIcon
-            size="lg"
-            variant="light"
-            onClick={refetch}
-            loading={isLoading}
-            aria-label="Refresh calendar"
-          >
-            <IconRefresh size={20} />
-          </ActionIcon>
-        </Group>
-      </Group>
+              <Group>
+                <Button
+                  size="sm"
+                  variant={isMultiSelectMode ? 'filled' : 'light'}
+                  leftSection={isMultiSelectMode ? <IconSquareX size={16} /> : <IconChecklist size={16} />}
+                  onClick={toggleMultiSelectMode}
+                >
+                  {isMultiSelectMode ? 'Cancel Multi-Select' : 'Select Multiple Days'}
+                </Button>
 
-      <Group align="flex-start" wrap="nowrap" style={{ gap: '1.5rem' }}>
-        <div style={{ 
-          width: (!isMultiSelectMode && activeDayStr) ? '360px' : 'auto', 
-          flex: (!isMultiSelectMode && activeDayStr) ? '0 0 360px' : 1, 
-          minWidth: 0,
-          transition: 'all 0.3s ease'
-        }}>
-          <CalendarGrid
-            currentMonth={currentMonth}
-            onPrevMonth={handlePrevMonth}
-            onNextMonth={handleNextMonth}
-            entriesByDate={entriesByDate}
-            selectedDays={isMultiSelectMode ? selectedDays : new Set(activeDayStr ? [activeDayStr] : [])}
-            onDayClick={handleDayClick}
-            isLoading={isLoading}
-            isMultiSelectMode={isMultiSelectMode}
-            isActiveDaySelected={!isMultiSelectMode && !!activeDayStr}
-          />
-        </div>
+                <ActionIcon
+                  size="lg"
+                  variant="light"
+                  onClick={refetch}
+                  loading={isLoading}
+                  aria-label="Refresh calendar"
+                >
+                  <IconRefresh size={20} />
+                </ActionIcon>
+              </Group>
+            </Group>
 
-        {!isMultiSelectMode && activeDayStr && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <DayDetailsView
-              dateStr={activeDayStr}
-              entries={entriesByDate[activeDayStr] || []}
-              projectColorMap={projectColorMap}
-              onClose={() => setActiveDayStr(null)}
-              onEdit={handleEditEntry}
-              onCopy={handleCopyEntry}
-              onDelete={handleDeleteEntry}
-              onAdd={handleAddEntry}
-            />
-          </div>
-        )}
+            <Group align="flex-start" wrap="nowrap" style={{ gap: '1.5rem' }}>
+              <div style={{ 
+                width: (!isMultiSelectMode && activeDayStr) ? '360px' : 'auto', 
+                flex: (!isMultiSelectMode && activeDayStr) ? '0 0 360px' : 1, 
+                minWidth: 0,
+                transition: 'all 0.3s ease'
+              }}>
+                <CalendarGrid
+                  currentMonth={currentMonth}
+                  onPrevMonth={handlePrevMonth}
+                  onNextMonth={handleNextMonth}
+                  entriesByDate={entriesByDate}
+                  selectedDays={isMultiSelectMode ? selectedDays : new Set(activeDayStr ? [activeDayStr] : [])}
+                  onDayClick={handleDayClick}
+                  isLoading={isLoading}
+                  isMultiSelectMode={isMultiSelectMode}
+                  isActiveDaySelected={!isMultiSelectMode && !!activeDayStr}
+                />
+              </div>
 
-        {isMultiSelectMode && selectedDays.size > 0 && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <BulkLogForm
-              selectedDays={selectedDays}
-              onSuccess={handleBulkSuccess}
-              onCancel={toggleMultiSelectMode}
-            />
-          </div>
-        )}
-      </Group>
+              {!isMultiSelectMode && activeDayStr && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <DayDetailsView
+                    dateStr={activeDayStr}
+                    entries={entriesByDate[activeDayStr] || []}
+                    projectColorMap={projectColorMap}
+                    onClose={() => setActiveDayStr(null)}
+                    onEdit={handleEditEntry}
+                    onCopy={handleCopyEntry}
+                    onDelete={handleDeleteEntry}
+                    onAdd={handleAddEntry}
+                  />
+                </div>
+              )}
 
-      <TimeEntryFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => { setIsFormModalOpen(false); setEditingEntry(null); setCopyingEntry(null); setAddForDate(undefined); }}
-        onSuccess={handleFormSuccess}
-        editEntry={editingEntry}
-        copyEntry={copyingEntry}
-        defaultDate={addForDate}
-      />
+              {isMultiSelectMode && selectedDays.size > 0 && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <BulkLogForm
+                    selectedDays={selectedDays}
+                    onSuccess={handleBulkSuccess}
+                    onCancel={toggleMultiSelectMode}
+                  />
+                </div>
+              )}
+            </Group>
+          </Stack>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="task-summary">
+          {activeTab === 'task-summary' && <TaskDaysSearch />}
+        </Tabs.Panel>
+      </Tabs>
+
+      {isFormModalOpen && (
+        <TimeEntryFormModal
+          isOpen={isFormModalOpen}
+          onClose={() => { setIsFormModalOpen(false); setEditingEntry(null); setCopyingEntry(null); setAddForDate(undefined); }}
+          onSuccess={handleFormSuccess}
+          editEntry={editingEntry}
+          copyEntry={copyingEntry}
+          defaultDate={addForDate}
+        />
+      )}
     </Stack>
   );
 };

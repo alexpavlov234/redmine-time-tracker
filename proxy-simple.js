@@ -15,6 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const TIMER_STATE_FILE = path.join(__dirname, 'timer-state.json');
 const SERVER_CONFIG_FILE = path.join(__dirname, 'server-config.json');
+const PERSONAL_TASKS_FILE = path.join(__dirname, 'personal-tasks.json');
 
 const app = express();
 
@@ -252,6 +253,35 @@ app.post('/config', (req, res) => {
     isConfigured: Boolean(serverConfig.apiKey && serverConfig.redmineUrl),
     redmineUrl: serverConfig.redmineUrl
   });
+});
+
+/**
+ * GET /personal-tasks - Returns saved personal tasks from disk.
+ */
+app.get('/personal-tasks', (req, res) => {
+  try {
+    if (fs.existsSync(PERSONAL_TASKS_FILE)) {
+      const data = fs.readFileSync(PERSONAL_TASKS_FILE, 'utf-8');
+      return res.json(JSON.parse(data));
+    }
+  } catch (error) {
+    console.error('⚠️ Could not read personal-tasks.json:', error.message);
+  }
+  res.json([]);
+});
+
+/**
+ * POST /personal-tasks - Persists personal tasks array to disk.
+ */
+app.post('/personal-tasks', (req, res) => {
+  try {
+    const tasks = Array.isArray(req.body) ? req.body : [];
+    fs.writeFileSync(PERSONAL_TASKS_FILE, JSON.stringify(tasks, null, 2), 'utf-8');
+    res.json({ status: 'ok', count: tasks.length });
+  } catch (error) {
+    console.error('⚠️ Could not save personal-tasks.json:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Manual proxy for Redmine API

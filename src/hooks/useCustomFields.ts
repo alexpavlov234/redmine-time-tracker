@@ -31,7 +31,7 @@ export const useCustomFields = () => {
           if (Date.now() - timestamp < 1000 * 60 * 60) {
             cacheValid = true;
           }
-        } catch (e) {
+        } catch {
           localStorage.removeItem(CACHE_KEY);
         }
       }
