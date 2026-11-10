@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -n \"proxy,vite\" -c \"blue,green\" \"npm:proxy\" \"npm:dev:vite\"",
+    "dev:vite": "vite",
     "proxy": "node proxy-simple.js",
-    "dev:full": "concurrently -n \"proxy,vite\" -c \"blue,green\" --kill-others \"npm:proxy\" \"npm:dev\"",
+    "dev:full": "concurrently -n \"proxy,vite\" -c \"blue,green\" \"npm:proxy\" \"npm:dev:vite\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

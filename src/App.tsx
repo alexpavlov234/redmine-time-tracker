@@ -1,4 +1,5 @@
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { LanguageProvider } from './contexts/LanguageContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { UserProvider } from './contexts/UserContext';
 import { ProjectsProvider } from './contexts/ProjectsContext';
@@ -15,6 +16,7 @@ import { TrackerDashboard } from './features/tracker/components/TrackerDashboard
 import { LoggedTimeDashboard } from './features/calendar/components/LoggedTimeDashboard';
 import { ProjectManagerDashboard } from './features/pm/components/ProjectManagerDashboard';
 import { PersonalTasksDashboard } from './features/personal/components/PersonalTasksDashboard';
+import { PersonalTaskDetailView } from './features/personal/components/PersonalTaskDetailView';
 import { NotesDashboard } from './features/notes/components/NotesDashboard';
 
 /// <summary>
@@ -34,28 +36,31 @@ const theme = createTheme({
 function App() {
   return (
     <MantineProvider theme={theme} defaultColorScheme="auto">
-      <SettingsProvider>
-        <UserProvider>
-          <ProjectsProvider>
-            <QueueProvider>
-              <ConfirmProvider>
-                <Router>
-                  <Routes>
-                    <Route path="/" element={<AppShell />}>
-                      <Route index element={<TrackerDashboard />} />
-                      <Route path="tasks" element={<PersonalTasksDashboard />} />
-                      <Route path="notes" element={<NotesDashboard />} />
-                      <Route path="logged-time" element={<LoggedTimeDashboard />} />
-                      <Route path="projects" element={<ProjectManagerDashboard />} />
-                      <Route path="settings" element={<SettingsForm />} />
-                    </Route>
-                  </Routes>
-                </Router>
-              </ConfirmProvider>
-            </QueueProvider>
-          </ProjectsProvider>
-        </UserProvider>
-      </SettingsProvider>
+      <LanguageProvider>
+        <SettingsProvider>
+          <UserProvider>
+            <ProjectsProvider>
+              <QueueProvider>
+                <ConfirmProvider>
+                  <Router>
+                    <Routes>
+                      <Route path="/" element={<AppShell />}>
+                        <Route index element={<TrackerDashboard />} />
+                        <Route path="tasks" element={<PersonalTasksDashboard />} />
+                        <Route path="tasks/:taskId" element={<PersonalTaskDetailView />} />
+                        <Route path="notes" element={<NotesDashboard />} />
+                        <Route path="logged-time" element={<LoggedTimeDashboard />} />
+                        <Route path="projects" element={<ProjectManagerDashboard />} />
+                        <Route path="settings" element={<SettingsForm />} />
+                      </Route>
+                    </Routes>
+                  </Router>
+                </ConfirmProvider>
+              </QueueProvider>
+            </ProjectsProvider>
+          </UserProvider>
+        </SettingsProvider>
+      </LanguageProvider>
     </MantineProvider>
   );
 }

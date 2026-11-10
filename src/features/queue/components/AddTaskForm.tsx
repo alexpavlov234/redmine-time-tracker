@@ -3,14 +3,19 @@ import { Card, TextInput, Button, Group, Stack, ActionIcon, Text } from '@mantin
 import { useForm } from '@mantine/form';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useProjects } from '../../../contexts/ProjectsContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import type { RedmineIssue } from '../../../types';
 import { IconCirclePlus, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
 import { getTaskNote, setTaskNote } from '../../../services/taskNotes';
 
+/// <summary>
+/// Collapsible card form for manually adding a Redmine task to the work queue.
+/// </summary>
 export const AddTaskForm: React.FC = () => {
   const { addTodo } = useQueue();
   const { allProjects } = useProjects();
+  const { t } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedTask, setSelectedTask] = useState<RedmineIssue | null>(null);
 
@@ -70,7 +75,7 @@ export const AddTaskForm: React.FC = () => {
         <Group justify="space-between" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setIsExpanded(!isExpanded)}>
           <Group gap="xs">
             <IconCirclePlus size={20} />
-            <Text fw={500}>Add Task Manually</Text>
+            <Text fw={500}>{t('addTaskManuallyTitle')}</Text>
           </Group>
           <ActionIcon variant="subtle" color="gray">
             {isExpanded ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
@@ -100,14 +105,14 @@ export const AddTaskForm: React.FC = () => {
             />
 
             <TextInput
-              label="Note (optional)"
-              placeholder="Add a personal note..."
+              label={t('noteOptionalLabel')}
+              placeholder={t('noteOptionalPlaceholder')}
               {...form.getInputProps('note')}
             />
 
             <Group justify="flex-end">
               <Button type="submit" disabled={!form.values.projectId || !form.values.taskId}>
-                Add to Queue
+                {t('addToQueueBtn')}
               </Button>
             </Group>
           </Stack>

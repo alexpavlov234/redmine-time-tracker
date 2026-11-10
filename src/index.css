@@ -116,3 +116,25 @@ html, body {
   padding-left: 20px;
   margin: 4px 0;
 }
+
+/* Sticky Note card with clear border outline */
+.sticky-note-card {
+  position: relative;
+  border-radius: 10px;
+  border: 2px solid light-dark(var(--mantine-color-gray-4), var(--mantine-color-dark-3)) !important;
+  background-color: light-dark(var(--mantine-color-white), var(--mantine-color-dark-6));
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.sticky-note-card:hover {
+  transform: translateY(-2px);
+  border-color: light-dark(var(--mantine-color-blue-5), var(--mantine-color-blue-6)) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+@media (forced-colors: active) {
+  .sticky-note-card {
+    border: 2px solid CanvasText !important;
+  }
+}

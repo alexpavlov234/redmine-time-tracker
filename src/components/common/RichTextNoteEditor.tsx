@@ -22,6 +22,7 @@ import {
   IconUpload,
   IconLink,
 } from '@tabler/icons-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 /// <summary>
 /// Compresses and converts an image File into a compact base64 data URL.
@@ -115,13 +116,14 @@ export interface RichTextNoteViewerProps {
 /// Supports clicking embedded images to open a full-resolution preview modal.
 /// </summary>
 export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content, maxHeight }) => {
+  const { language } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   if (!content || !content.trim()) {
     return (
       <Text size="xs" c="dimmed">
-        No notes provided.
+        {language === 'bg' ? 'Няма въведен текст.' : 'No notes provided.'}
       </Text>
     );
   }
@@ -131,7 +133,8 @@ export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content,
   /// <summary>
   /// Copies the note text or formatted content to clipboard.
   /// </summary>
-  const handleCopyAll = async () => {
+  const handleCopyAll = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const textToCopy = isHtml
         ? content.replace(/<[^>]+>/g, '\n').replace(/\n{2,}/g, '\n').trim()
@@ -150,10 +153,13 @@ export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content,
   const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     if (target.tagName.toLowerCase() === 'img') {
+      e.stopPropagation();
       const src = (target as HTMLImageElement).src;
       if (src) {
         setPreviewImage(src);
       }
+    } else if (target.tagName.toLowerCase() === 'a') {
+      e.stopPropagation();
     }
   };
 
@@ -163,8 +169,8 @@ export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content,
         style={{
           maxHeight: maxHeight || undefined,
           overflowY: maxHeight ? 'auto' : undefined,
-          fontSize: '13px',
-          lineHeight: 1.5,
+          fontSize: '13.5px',
+          lineHeight: 1.55,
         }}
       >
         {isHtml ? (
@@ -174,7 +180,7 @@ export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content,
             dangerouslySetInnerHTML={{ __html: content }}
           />
         ) : (
-          <Text size="xs" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
             {content}
           </Text>
         )}
@@ -189,7 +195,9 @@ export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content,
             leftSection={copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
             onClick={handleCopyAll}
           >
-            {copied ? 'Copied' : 'Copy Text'}
+            {copied
+              ? language === 'bg' ? 'Копирано' : 'Copied'
+              : language === 'bg' ? 'Копирай текста' : 'Copy Text'}
           </Button>
         </Group>
       )}
@@ -198,7 +206,7 @@ export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content,
       <Modal
         opened={Boolean(previewImage)}
         onClose={() => setPreviewImage(null)}
-        title="Image Preview"
+        title={language === 'bg' ? 'Преглед на изображение' : 'Image Preview'}
         size="xl"
         centered
       >
@@ -225,7 +233,7 @@ export const RichTextNoteViewer: React.FC<RichTextNoteViewerProps> = ({ content,
                 target="_blank"
                 download="note-image.png"
               >
-                Open Original / Download
+                {language === 'bg' ? 'Отвори оригинал / Изтегли' : 'Open Original / Download'}
               </Button>
             </Group>
           </Box>
@@ -251,6 +259,8 @@ export interface RichTextNoteEditorProps {
   placeholder?: string;
   /// <summary>Minimum height of the editor content area in pixels.</summary>
   minHeight?: number;
+  /// <summary>Whether to automatically focus the editor on mount.</summary>
+  autoFocus?: boolean;
 }
 
 /// <summary>
@@ -261,10 +271,12 @@ export interface RichTextNoteEditorProps {
 export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
   value,
   onChange,
-  label = 'Notes',
+  label,
   description,
   minHeight = 130,
+  autoFocus = false,
 }) => {
+  const { language } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -282,6 +294,7 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
         allowBase64: true,
       }),
     ],
+    autofocus: autoFocus ? 'end' : false,
     editorProps: {
       handlePaste: (view, event) => {
         const items = Array.from(event.clipboardData?.items || []);
@@ -333,7 +346,6 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
     content: value || '',
     onUpdate: ({ editor: ed }) => {
       const html = ed.getHTML();
-      // If editor is empty paragraph, emit empty string
       if (html === '<p></p>') {
         onChange('');
       } else {
@@ -378,7 +390,7 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
   /// Prompts user for an image URL and inserts it into the editor document.
   /// </summary>
   const handleInsertImageUrl = () => {
-    const url = window.prompt('Enter image URL:');
+    const url = window.prompt(language === 'bg' ? 'Въведете URL на изображение:' : 'Enter image URL:');
     if (url && url.trim() && editor) {
       editor.chain().focus().setImage({ src: url.trim() }).run();
     }
@@ -398,30 +410,34 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
         style={{ display: 'none' }}
       />
 
-      <Group justify="space-between" align="center">
-        <div>
-          {label && (
-            <Text size="sm" fw={500}>
-              {label}
-            </Text>
-          )}
-          {description && (
-            <Text size="xs" c="dimmed">
-              {description}
-            </Text>
-          )}
-        </div>
+      {(label || description) && (
+        <Group justify="space-between" align="center">
+          <div>
+            {label && (
+              <Text size="sm" fw={500}>
+                {label}
+              </Text>
+            )}
+            {description && (
+              <Text size="xs" c="dimmed">
+                {description}
+              </Text>
+            )}
+          </div>
 
-        <Button
-          size="compact-xs"
-          variant="subtle"
-          color="blue"
-          leftSection={isExpanded ? <IconArrowsMinimize size={13} /> : <IconArrowsMaximize size={13} />}
-          onClick={() => setIsExpanded((prev) => !prev)}
-        >
-          {isExpanded ? 'Collapse' : 'Expand'}
-        </Button>
-      </Group>
+          <Button
+            size="compact-xs"
+            variant="subtle"
+            color="blue"
+            leftSection={isExpanded ? <IconArrowsMinimize size={13} /> : <IconArrowsMaximize size={13} />}
+            onClick={() => setIsExpanded((prev) => !prev)}
+          >
+            {isExpanded
+              ? language === 'bg' ? 'Свий' : 'Collapse'
+              : language === 'bg' ? 'Разшири' : 'Expand'}
+          </Button>
+        </Group>
+      )}
 
       <RichTextEditor editor={editor}>
         <RichTextEditor.Toolbar sticky stickyOffset={0}>
@@ -462,7 +478,7 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
               <Menu.Target>
                 <RichTextEditor.Control
                   aria-label="Insert image"
-                  title="Upload or insert image"
+                  title={language === 'bg' ? 'Добави изображение' : 'Upload or insert image'}
                 >
                   <IconPhoto size={16} />
                 </RichTextEditor.Control>
@@ -472,13 +488,13 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
                   leftSection={<IconUpload size={14} />}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  Upload Image
+                  {language === 'bg' ? 'Качи изображение' : 'Upload Image'}
                 </Menu.Item>
                 <Menu.Item
                   leftSection={<IconLink size={14} />}
                   onClick={handleInsertImageUrl}
                 >
-                  Insert from URL
+                  {language === 'bg' ? 'Вмъкни от URL' : 'Insert from URL'}
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
@@ -493,7 +509,7 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
             <RichTextEditor.Control
               onClick={() => setIsExpanded((prev) => !prev)}
               aria-label={isExpanded ? 'Collapse' : 'Expand'}
-              title={isExpanded ? 'Collapse' : 'Expand'}
+              title={isExpanded ? (language === 'bg' ? 'Свий' : 'Collapse') : (language === 'bg' ? 'Разшири' : 'Expand')}
             >
               {isExpanded ? <IconArrowsMinimize size={16} /> : <IconArrowsMaximize size={16} />}
             </RichTextEditor.Control>
@@ -503,7 +519,7 @@ export const RichTextNoteEditor: React.FC<RichTextNoteEditorProps> = ({
         <RichTextEditor.Content
           style={{
             minHeight: `${activeHeight}px`,
-            fontSize: '13px',
+            fontSize: '13.5px',
           }}
         />
       </RichTextEditor>

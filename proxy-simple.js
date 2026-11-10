@@ -19,6 +19,12 @@ const PERSONAL_TASKS_FILE = path.join(__dirname, 'personal-tasks.json');
 
 const app = express();
 
+// Allow Chrome Private Network Access (HTTPS Redmine -> HTTP localhost:3000)
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  next();
+});
+
 // Enable CORS for all routes (allows localhost frontend, extension, and Redmine page origin)
 app.use(cors({
   origin: true,
@@ -165,6 +171,8 @@ app.post('/timer/start', (req, res) => {
     activityName: activityName || (isSameTask ? currentTimer.activityName : ''),
     startTime: now,
     elapsedMs: newElapsedMs,
+    lastNote: isSameTask ? currentTimer.lastNote : null,
+    activities: isSameTask && Array.isArray(currentTimer.activities) ? currentTimer.activities : [],
     lastUpdated: now
   };
 
@@ -386,8 +394,17 @@ app.use('/api', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Custom proxy server running on http://localhost:${PORT}`);
   console.log(`🔗 Redmine API accessible via http://localhost:${PORT}/api/`);
   console.log(`💚 Health check: http://localhost:${PORT}/health`);
+});
+
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.log(`ℹ️ Proxy server is already running on port ${PORT}. Reusing existing instance.`);
+    process.exit(0);
+  } else {
+    console.error('Proxy server error:', err);
+  }
 });

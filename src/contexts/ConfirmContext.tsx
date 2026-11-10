@@ -1,5 +1,6 @@
 import React, { useState, createContext, useContext, useCallback } from 'react';
 import { Modal, Button, Text, Group } from '@mantine/core';
+import { useLanguage } from './LanguageContext';
 
 /// <summary>
 /// Options for configuring a confirmation prompt modal.
@@ -31,6 +32,7 @@ const ConfirmContext = createContext<ConfirmContextProps | undefined>(undefined)
 /// Provider component rendering the unified asynchronous confirmation modal.
 /// </summary>
 export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<ConfirmOptions | null>(null);
   const [resolver, setResolver] = useState<((value: boolean) => void) | null>(null);
@@ -59,7 +61,7 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
       <Modal
         opened={isOpen}
         onClose={handleCancel}
-        title={<Text fw={600}>Confirm Action</Text>}
+        title={<Text fw={600}>{t('confirmActionTitle')}</Text>}
         size="md"
         centered
         radius="md"
@@ -73,10 +75,10 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         <Group justify="flex-end" mt="xl">
           <Button variant="default" onClick={handleCancel}>
-            {options?.cancelText || 'Cancel'}
+            {options?.cancelText || t('cancelBtn')}
           </Button>
           <Button color={options?.variant === 'danger' ? 'red' : 'blue'} onClick={handleConfirm}>
-            {options?.confirmText || 'Confirm'}
+            {options?.confirmText || t('confirmBtn')}
           </Button>
         </Group>
       </Modal>

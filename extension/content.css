@@ -1,20 +1,33 @@
 /* Styling for injected Redmine Time Tracker controls and native Redmine-style modals */
 
+.rtt-toolbar-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex: 0 0 100%;
+  width: 100%;
+  margin-top: 6px;
+  clear: right;
+}
+
 .rtt-action-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
-  border-radius: 3px;
+  border-radius: 4px;
   cursor: pointer;
   text-decoration: none !important;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
   user-select: none;
   vertical-align: middle;
-  margin-left: 6px;
+}
+
+.rtt-action-button * {
+  pointer-events: none;
 }
 
 /* Idle / Start State */
@@ -75,8 +88,8 @@
   background: #868e96;
   color: #f1f3f5 !important;
   border: 1px solid #495057;
-  cursor: not-allowed;
-  opacity: 0.8;
+  cursor: pointer;
+  opacity: 0.85;
 }
 
 /* Single Pulse Dot Indicator */

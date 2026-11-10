@@ -1,20 +1,21 @@
-/**
- * Content script injected into Redmine issue pages.
- * Integrates interactive timer controls, status change prompts on start,
- * and activity description prompts on stop.
- */
+/// <summary>
+/// Content script injected into Redmine issue pages.
+/// Integrates interactive timer controls positioned below the Redmine action buttons row,
+/// status change prompts on start, and activity description prompts on stop.
+/// </summary>
 
 (function () {
   'use strict';
 
   const TIMER_API_BASE = 'http://localhost:3000/timer';
+  const ROW_CONTAINER_ID = 'rtt-injected-timer-row';
   const BUTTON_CONTAINER_ID = 'rtt-injected-timer-button';
   const MODAL_CONTAINER_ID = 'rtt-modal-container';
   let pollIntervalId = null;
   let isEnabled = true;
   let cachedStatuses = null;
 
-  // Clean vector SVG icons (replaces Unicode cartoon emoticons)
+  // Clean vector SVG icons
   const SVG_ICONS = {
     play: '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px;"><path d="M6 4l15 8-15 8V4z"/></svg>',
     stop: '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px;"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
@@ -23,12 +24,11 @@
     switch: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -1px;"><path d="M16 3l4 4-4 4"/><path d="M20 7H4"/><path d="M8 21l-4-4 4-4"/><path d="M4 17h16"/></svg>'
   };
 
-  /**
-   * Formats elapsed seconds into HH:MM:SS or MM:SS string.
-   * 
-   * @param {number} totalSeconds Total seconds elapsed.
-   * @returns {string} Formatted time string.
-   */
+  /// <summary>
+  /// Formats elapsed seconds into HH:MM:SS or MM:SS string.
+  /// </summary>
+  /// <param name="totalSeconds">Total seconds elapsed.</param>
+  /// <returns>Formatted time string.</returns>
   function formatSeconds(totalSeconds) {
     const sec = Math.max(0, Math.floor(totalSeconds));
     const hours = Math.floor(sec / 3600);
@@ -42,11 +42,10 @@
     return `${pad(minutes)}:${pad(seconds)}`;
   }
 
-  /**
-   * Extracts the current Redmine issue ID from the URL.
-   * 
-   * @returns {string|null} The issue ID, or null if not an issue page.
-   */
+  /// <summary>
+  /// Extracts the current Redmine issue ID from the URL.
+  /// </summary>
+  /// <returns>The issue ID, or null if not an issue page.</returns>
   function getIssueId() {
     const match = window.location.pathname.match(/\/issues\/(\d+)/);
     if (match && match[1]) {
@@ -55,11 +54,10 @@
     return null;
   }
 
-  /**
-   * Extracts the issue subject from the Redmine page DOM.
-   * 
-   * @returns {string} The subject text.
-   */
+  /// <summary>
+  /// Extracts the issue subject from the Redmine page DOM.
+  /// </summary>
+  /// <returns>The subject text.</returns>
   function getIssueSubject() {
     const subjectEl = document.querySelector('div.subject h3') ||
                       document.querySelector('#content > h2') ||
@@ -70,107 +68,129 @@
     return document.title.replace(/^[^:]+:\s*/, '').trim();
   }
 
-  /**
-   * Extracts the project name from the Redmine page DOM.
-   * 
-   * @returns {string} The project name.
-   */
+  /// <summary>
+  /// Extracts the project name from the Redmine page DOM.
+  /// </summary>
+  /// <returns>The project name.</returns>
   function getProjectName() {
     const projectEl = document.querySelector('#header h1') ||
                       document.querySelector('.current-project') ||
                       document.querySelector('#project-menu');
     if (projectEl) {
-      return projectEl.innerText.trim();
+      return projectEl.innerText.trim().replace(/\s*»\s*$/, '');
     }
     return '';
   }
 
-  /**
-   * Retrieves the Redmine CSRF token from meta tags or forms.
-   * 
-   * @returns {string} The CSRF token value.
-   */
-  function getCsrfToken() {
-    const meta = document.querySelector('meta[name="csrf-token"]');
-    if (meta) return meta.getAttribute('content') || '';
-    const input = document.querySelector('input[name="authenticity_token"]');
-    if (input) return input.value || '';
-    return '';
-  }
-
-  /**
-   * Executes an HTTP request via the extension background service worker.
-   * Bypasses Chrome Mixed Content (HTTPS -> HTTP) and Private Network Access restrictions.
-   * 
-   * @param {string} url The target URL.
-   * @param {RequestInit} [options={}] Fetch request options.
-   * @returns {Promise<any>} The parsed JSON or text response.
-   */
-  function apiRequest(url, options = {}) {
-    return new Promise((resolve, reject) => {
-      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-        chrome.runtime.sendMessage(
-          {
-            type: 'API_REQUEST',
-            url,
-            options
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              return reject(new Error(chrome.runtime.lastError.message));
-            }
-            if (!response) {
-              return reject(new Error('Няма отговор от background скрипта'));
-            }
-            if (!response.ok) {
-              return reject(new Error(response.error || `HTTP ${response.status}: ${response.statusText}`));
-            }
-            resolve(response.data);
-          }
-        );
+  /// <summary>
+  /// Performs a direct fetch request with fallback from localhost to 127.0.0.1.
+  /// </summary>
+  /// <param name="url">Target URL.</param>
+  /// <param name="options">Fetch options.</param>
+  /// <returns>Parsed response payload.</returns>
+  async function directFetch(url, options = {}) {
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (err) {
+      if (url.includes('http://localhost:3000')) {
+        const fallbackUrl = url.replace('http://localhost:3000', 'http://127.0.0.1:3000');
+        response = await fetch(fallbackUrl, options);
       } else {
-        fetch(url, options)
-          .then(async (res) => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-          })
-          .then(resolve)
-          .catch(reject);
+        throw err;
       }
-    });
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
   }
 
-  /**
-   * Fetches available issue statuses from Redmine via local proxy API to ensure authentication.
-   * 
-   * @returns {Promise<Array<{id: number, name: string}>>} List of statuses.
-   */
+  /// <summary>
+  /// Executes an HTTP request via the extension background service worker,
+  /// with automatic fallback to direct fetch if the extension context was reloaded.
+  /// </summary>
+  /// <param name="url">The target URL.</param>
+  /// <param name="options">Fetch request options.</param>
+  /// <returns>The parsed JSON or text response.</returns>
+  async function apiRequest(url, options = {}) {
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage) {
+      try {
+        const response = await new Promise((resolve, reject) => {
+          try {
+            chrome.runtime.sendMessage(
+              {
+                type: 'API_REQUEST',
+                url,
+                options,
+              },
+              (res) => {
+                if (chrome.runtime.lastError) {
+                  return reject(new Error(chrome.runtime.lastError.message));
+                }
+                if (!res) {
+                  return reject(new Error('No response from background service worker'));
+                }
+                if (!res.ok) {
+                  return reject(new Error(res.error || `HTTP ${res.status}: ${res.statusText}`));
+                }
+                resolve(res.data);
+              }
+            );
+          } catch (syncErr) {
+            reject(syncErr);
+          }
+        });
+        return response;
+      } catch {
+        // Fallback to direct fetch if service worker is unavailable or context invalidated
+        return await directFetch(url, options);
+      }
+    }
+
+    return await directFetch(url, options);
+  }
+
+  /// <summary>
+  /// Fetches available issue statuses from the Redmine DOM first (instant), then falls back to local proxy API.
+  /// </summary>
+  /// <returns>List of statuses.</returns>
   async function getRedmineStatuses() {
+    // 1. Try parsing select in Redmine's edit form if present in DOM (instant and issue-specific)
+    const select = document.getElementById('issue_status_id');
+    if (select && select.options && select.options.length > 0) {
+      const statuses = Array.from(select.options)
+        .filter((opt) => opt.value)
+        .map((opt) => ({ id: Number(opt.value), name: opt.text }));
+      if (statuses.length > 0) {
+        cachedStatuses = statuses;
+        return cachedStatuses;
+      }
+    }
+
     if (cachedStatuses && cachedStatuses.length > 0) {
       return cachedStatuses;
     }
 
+    // 2. Query through local proxy with a short timeout
     try {
-      // Query through local proxy which attaches configured API key and avoids browser basic auth prompt
-      const data = await apiRequest('http://localhost:3000/api/issue_statuses.json');
+      const data = await Promise.race([
+        apiRequest('http://localhost:3000/api/issue_statuses.json'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2500)),
+      ]);
       if (data && Array.isArray(data.issue_statuses) && data.issue_statuses.length > 0) {
         cachedStatuses = data.issue_statuses;
         return cachedStatuses;
       }
     } catch {
       // Ignore proxy errors and proceed to fallback
-    }
-
-    // Try parsing select in edit form if already rendered in DOM
-    const select = document.getElementById('issue_status_id');
-    if (select) {
-      const statuses = Array.from(select.options)
-        .filter(opt => opt.value)
-        .map(opt => ({ id: Number(opt.value), name: opt.text }));
-      if (statuses.length > 0) {
-        cachedStatuses = statuses;
-        return cachedStatuses;
-      }
     }
 
     return [
@@ -181,28 +201,27 @@
     ];
   }
 
-  /**
-   * Updates an issue's status in Redmine using the local proxy API.
-   * 
-   * @param {string} issueId The issue ID.
-   * @param {number|string} statusId The new status ID.
-   */
+  /// <summary>
+  /// Updates an issue's status in Redmine using the local proxy API.
+  /// </summary>
+  /// <param name="issueId">The issue ID.</param>
+  /// <param name="statusId">The new status ID.</param>
   async function updateIssueStatus(issueId, statusId) {
     if (!statusId) return;
     try {
       await apiRequest(`http://localhost:3000/api/issues/${issueId}.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issue: { status_id: Number(statusId) } })
+        body: JSON.stringify({ issue: { status_id: Number(statusId) } }),
       });
     } catch (e) {
       console.warn('Could not update status via proxy:', e);
     }
   }
 
-  /**
-   * Closes any open modal dialog.
-   */
+  /// <summary>
+  /// Closes any open modal dialog.
+  /// </summary>
   function closeModal() {
     const existing = document.getElementById(MODAL_CONTAINER_ID);
     if (existing) {
@@ -210,11 +229,10 @@
     }
   }
 
-  /**
-   * Detects whether the current Redmine page is using a dark theme.
-   * 
-   * @returns {boolean} True if dark background is detected.
-   */
+  /// <summary>
+  /// Detects whether the current Redmine page is using a dark theme.
+  /// </summary>
+  /// <returns>True if dark background is detected.</returns>
   function isDarkTheme() {
     try {
       const candidates = [document.body, document.getElementById('content'), document.getElementById('main')];
@@ -227,18 +245,19 @@
           return brightness < 130;
         }
       }
-    } catch {}
+    } catch {
+      // Ignore style check errors
+    }
     return false;
   }
 
-  /**
-   * Displays the modal asking whether to change the issue status before starting the timer.
-   * 
-   * @param {string} issueId The current issue ID.
-   * @param {string} subject The issue subject.
-   * @param {string} project The project name.
-   * @param {HTMLElement} btn The button element to update.
-   */
+  /// <summary>
+  /// Displays the modal asking whether to change the issue status before starting the timer.
+  /// </summary>
+  /// <param name="issueId">The current issue ID.</param>
+  /// <param name="subject">The issue subject.</param>
+  /// <param name="project">The project name.</param>
+  /// <param name="btn">The button element to update.</param>
   async function showStartModal(issueId, subject, project, btn) {
     closeModal();
     const statuses = await getRedmineStatuses();
@@ -248,8 +267,7 @@
     overlay.className = `rtt-modal-overlay ${isDarkTheme() ? 'rtt-dark' : 'rtt-light'}`;
 
     let optionsHtml = '<option value="">-- Не променяй статуса --</option>';
-    statuses.forEach(s => {
-      // Pre-select 'In Progress' if available
+    statuses.forEach((s) => {
       const isDefault = /in\s*progress|в\s*процес/i.test(s.name);
       optionsHtml += `<option value="${s.id}" ${isDefault ? 'selected' : ''}>${s.name}</option>`;
     });
@@ -258,7 +276,7 @@
       <div class="ui-dialog ui-corner-all ui-widget ui-widget-content rtt-modal-dialog" role="dialog">
         <div class="ui-dialog-titlebar ui-corner-all ui-widget-header ui-helper-clearfix rtt-modal-header">
           <span class="ui-dialog-title">Стартиране на таймер</span>
-          <a href="javascript:void(0)" class="ui-dialog-titlebar-close rtt-modal-close" id="rtt-close-btn" title="Затвори">&times;</a>
+          <a href="#" class="ui-dialog-titlebar-close rtt-modal-close" id="rtt-close-btn" title="Затвори">&times;</a>
         </div>
         <div class="ui-dialog-content ui-widget-content rtt-modal-body">
           <h3 class="title">#${issueId} - ${subject}</h3>
@@ -272,7 +290,7 @@
           </div>
           <p class="buttons">
             <input type="button" id="rtt-confirm-start-btn" value="Стартирай" class="button-positive">
-            <a href="javascript:void(0)" id="rtt-cancel-start-btn" class="button-cancel">Отказ</a>
+            <a href="#" id="rtt-cancel-start-btn" class="button-cancel">Отказ</a>
           </p>
         </div>
       </div>
@@ -284,8 +302,14 @@
       if (e.target === overlay) closeModal();
     });
 
-    document.getElementById('rtt-close-btn')?.addEventListener('click', closeModal);
-    document.getElementById('rtt-cancel-start-btn')?.addEventListener('click', closeModal);
+    document.getElementById('rtt-close-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeModal();
+    });
+    document.getElementById('rtt-cancel-start-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeModal();
+    });
 
     document.getElementById('rtt-confirm-start-btn')?.addEventListener('click', async () => {
       const select = document.getElementById('rtt-status-select');
@@ -293,12 +317,10 @@
 
       closeModal();
 
-      // If status selected, update in Redmine via proxy
       if (chosenStatusId) {
         await updateIssueStatus(issueId, chosenStatusId);
       }
 
-      // Start timer on proxy server
       try {
         const data = await apiRequest(`${TIMER_API_BASE}/start`, {
           method: 'POST',
@@ -306,8 +328,8 @@
           body: JSON.stringify({
             issueId: issueId,
             issueSubject: subject,
-            projectName: project
-          })
+            projectName: project,
+          }),
         });
 
         if (data && data.timer) {
@@ -319,14 +341,13 @@
     });
   }
 
-  /**
-   * Displays the modal asking for an activity note before stopping the timer.
-   * 
-   * @param {string} issueId The current issue ID.
-   * @param {string} subject The issue subject.
-   * @param {number} elapsedSeconds Total elapsed seconds.
-   * @param {HTMLElement} btn The button element to update.
-   */
+  /// <summary>
+  /// Displays the modal asking for an activity note before stopping the timer.
+  /// </summary>
+  /// <param name="issueId">The current issue ID.</param>
+  /// <param name="subject">The issue subject.</param>
+  /// <param name="elapsedSeconds">Total elapsed seconds.</param>
+  /// <param name="btn">The button element to update.</param>
   function showStopModal(issueId, subject, elapsedSeconds, btn) {
     closeModal();
     const formatted = formatSeconds(elapsedSeconds);
@@ -339,7 +360,7 @@
       <div class="ui-dialog ui-corner-all ui-widget ui-widget-content rtt-modal-dialog" role="dialog">
         <div class="ui-dialog-titlebar ui-corner-all ui-widget-header ui-helper-clearfix rtt-modal-header">
           <span class="ui-dialog-title">Спиране на отчитането (${formatted})</span>
-          <a href="javascript:void(0)" class="ui-dialog-titlebar-close rtt-modal-close" id="rtt-close-btn" title="Затвори">&times;</a>
+          <a href="#" class="ui-dialog-titlebar-close rtt-modal-close" id="rtt-close-btn" title="Затвори">&times;</a>
         </div>
         <div class="ui-dialog-content ui-widget-content rtt-modal-body">
           <h3 class="title">#${issueId} - ${subject}</h3>
@@ -354,7 +375,7 @@
           <p class="buttons">
             <input type="button" id="rtt-confirm-stop-btn" value="Запази и спри" class="button-positive">
             <input type="button" id="rtt-skip-stop-btn" value="Спри без описание">
-            <a href="javascript:void(0)" id="rtt-cancel-stop-btn" class="button-cancel">Отказ</a>
+            <a href="#" id="rtt-cancel-stop-btn" class="button-cancel">Отказ</a>
           </p>
         </div>
       </div>
@@ -369,8 +390,14 @@
       if (e.target === overlay) closeModal();
     });
 
-    document.getElementById('rtt-close-btn')?.addEventListener('click', closeModal);
-    document.getElementById('rtt-cancel-stop-btn')?.addEventListener('click', closeModal);
+    document.getElementById('rtt-close-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeModal();
+    });
+    document.getElementById('rtt-cancel-stop-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeModal();
+    });
 
     const handleStop = async (noteText) => {
       closeModal();
@@ -378,7 +405,7 @@
         const data = await apiRequest(`${TIMER_API_BASE}/stop`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ note: noteText })
+          body: JSON.stringify({ note: noteText }),
         });
         if (data && data.timer) {
           updateButtonUI(btn, data.timer, issueId);
@@ -395,37 +422,41 @@
     });
   }
 
-  /**
-   * Finds the most appropriate container in Redmine to inject the tracking button.
-   * 
-   * @returns {HTMLElement|null} The container element.
-   */
+  /// <summary>
+  /// Finds the primary action toolbar in Redmine to place the tracking button row underneath.
+  /// </summary>
+  /// <returns>The container element.</returns>
   function findActionToolbar() {
     return document.querySelector('#content > .contextual') ||
            document.querySelector('.contextual') ||
            document.querySelector('#content');
   }
 
-  /**
-   * Removes the injected timer button from the DOM.
-   */
+  /// <summary>
+  /// Removes the injected timer button row from the DOM.
+  /// </summary>
   function removeButton() {
-    const existing = document.getElementById(BUTTON_CONTAINER_ID);
-    if (existing) existing.remove();
+    const existingRow = document.getElementById(ROW_CONTAINER_ID);
+    if (existingRow) existingRow.remove();
+    const existingBtn = document.getElementById(BUTTON_CONTAINER_ID);
+    if (existingBtn) existingBtn.remove();
   }
 
-  /**
-   * Updates the button visuals based on the timer response from the proxy server.
-   * 
-   * @param {HTMLElement} btn The button element to update.
-   * @param {object|null} timerState The timer status object or null if offline.
-   * @param {string} issueId The current issue ID.
-   */
+  /// <summary>
+  /// Updates the button visuals based on the timer response from the proxy server.
+  /// Preserves child DOM nodes while ticking to avoid swallowing click events.
+  /// </summary>
+  /// <param name="btn">The button element to update.</param>
+  /// <param name="timerState">The timer status object or null if offline.</param>
+  /// <param name="issueId">The current issue ID.</param>
   function updateButtonUI(btn, timerState, issueId) {
     if (!timerState) {
-      btn.className = 'rtt-action-button rtt-button-offline';
-      btn.innerHTML = `${SVG_ICONS.alert} <span>Таймерът е офлайн</span>`;
-      btn.title = 'Сървърът на http://localhost:3000 не отговаря. Стартирайте го с npm run proxy';
+      if (btn.dataset.state !== 'offline') {
+        btn.dataset.state = 'offline';
+        btn.className = 'rtt-action-button rtt-button-offline';
+        btn.innerHTML = `${SVG_ICONS.alert} <span>Таймерът е офлайн</span>`;
+        btn.title = 'Сървърът на http://localhost:3000 не отговаря. Стартирайте го с npm run dev';
+      }
       return;
     }
 
@@ -438,26 +469,41 @@
       const totalSec = Math.floor(((timerState.elapsedMs || 0) + sessionMs) / 1000);
       const formatted = formatSeconds(totalSec);
 
+      if (btn.dataset.state === 'running') {
+        const timeEl = btn.querySelector('.rtt-time-text');
+        if (timeEl) {
+          timeEl.textContent = formatted;
+          return;
+        }
+      }
+
+      btn.dataset.state = 'running';
       btn.className = 'rtt-action-button rtt-button-running';
       btn.innerHTML = `<span class="rtt-pulse-dot rtt-pulse-dot-active"></span> <span class="rtt-time-text">${formatted}</span> <span class="rtt-divider">|</span> <span class="rtt-stop-text">Спри</span>`;
       btn.title = 'Кликнете, за да спрете отчитането на време за тази задача.';
     } else if (isRunning && !isThisIssue) {
-      btn.className = 'rtt-action-button rtt-button-switch';
-      btn.innerHTML = `${SVG_ICONS.switch} <span>Стартирай тук (#${timerState.issueId})</span>`;
-      btn.title = `В момента се отчита задача #${timerState.issueId}. Кликнете, за да превключите към тази задача.`;
+      const stateKey = `switch_${timerState.issueId}`;
+      if (btn.dataset.state !== stateKey) {
+        btn.dataset.state = stateKey;
+        btn.className = 'rtt-action-button rtt-button-switch';
+        btn.innerHTML = `${SVG_ICONS.switch} <span>Стартирай тук (#${timerState.issueId})</span>`;
+        btn.title = `В момента се отчита задача #${timerState.issueId}. Кликнете, за да превключите към тази задача.`;
+      }
     } else {
-      btn.className = 'rtt-action-button rtt-button-start';
-      btn.innerHTML = `${SVG_ICONS.play} <span>Стартирай таймер</span>`;
-      btn.title = 'Кликнете, за да стартирате таймера за тази задача.';
+      if (btn.dataset.state !== 'start') {
+        btn.dataset.state = 'start';
+        btn.className = 'rtt-action-button rtt-button-start';
+        btn.innerHTML = `${SVG_ICONS.play} <span>Стартирай таймер</span>`;
+        btn.title = 'Кликнете, за да стартирате таймера за тази задача.';
+      }
     }
   }
 
-  /**
-   * Injects or retrieves the tracking button on the Redmine issue page.
-   * 
-   * @param {string} issueId The current issue ID.
-   * @returns {HTMLElement|null} The button element.
-   */
+  /// <summary>
+  /// Injects or retrieves the tracking button positioned on a new row below the Redmine action buttons.
+  /// </summary>
+  /// <param name="issueId">The current issue ID.</param>
+  /// <returns>The button element.</returns>
   function ensureButton(issueId) {
     let btn = document.getElementById(BUTTON_CONTAINER_ID);
     if (btn) return btn;
@@ -465,11 +511,21 @@
     const toolbar = findActionToolbar();
     if (!toolbar) return null;
 
+    // Ensure flex-based Redmine toolbars allow our second row to wrap below the buttons
+    const computedDisplay = window.getComputedStyle(toolbar).display;
+    if (computedDisplay === 'flex' || computedDisplay === 'inline-flex') {
+      toolbar.style.flexWrap = 'wrap';
+    }
+
+    const row = document.createElement('div');
+    row.id = ROW_CONTAINER_ID;
+    row.className = 'rtt-toolbar-row';
+
     btn = document.createElement('a');
     btn.id = BUTTON_CONTAINER_ID;
     btn.className = 'rtt-action-button rtt-button-start';
     btn.innerHTML = `${SVG_ICONS.clock} <span>Таймер...</span>`;
-    btn.href = 'javascript:void(0)';
+    btn.href = '#';
 
     btn.addEventListener('click', async (e) => {
       e.preventDefault();
@@ -477,17 +533,14 @@
 
       try {
         const currentState = await apiRequest(TIMER_API_BASE);
-
         const isRunningThis = currentState?.isRunning && String(currentState?.issueId) === String(issueId);
 
         if (isRunningThis) {
-          // Trigger Stop Modal asking what was done
           const now = Date.now();
           const sessionMs = currentState.startTime ? Math.max(0, now - currentState.startTime) : 0;
           const totalSec = Math.floor(((currentState.elapsedMs || 0) + sessionMs) / 1000);
           showStopModal(issueId, getIssueSubject(), totalSec, btn);
         } else {
-          // Trigger Start Modal asking whether to change status
           showStartModal(issueId, getIssueSubject(), getProjectName(), btn);
         }
       } catch (err) {
@@ -496,20 +549,16 @@
       }
     });
 
-    if (toolbar.firstChild) {
-      toolbar.insertBefore(btn, toolbar.firstChild);
-    } else {
-      toolbar.appendChild(btn);
-    }
+    row.appendChild(btn);
+    toolbar.appendChild(row);
 
     return btn;
   }
 
-  /**
-   * Polls the timer proxy server to keep the button label and timer counter updated.
-   * 
-   * @param {string} issueId The current issue ID.
-   */
+  /// <summary>
+  /// Polls the timer proxy server to keep the button label and timer counter updated.
+  /// </summary>
+  /// <param name="issueId">The current issue ID.</param>
   async function pollTimer(issueId) {
     if (!isEnabled) {
       removeButton();
@@ -528,42 +577,49 @@
     }
   }
 
-  /**
-   * Initializes the content script, observing settings and starting polling.
-   */
-  function init() {
+  /// <summary>
+  /// Initializes the content script, observing settings and starting polling.
+  /// </summary>
+  async function init() {
     const issueId = getIssueId();
     if (!issueId) return;
 
-    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get({ extensionEnabled: true }, (items) => {
+    // Remove any stale button from previous script instance
+    removeButton();
+
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local && chrome.runtime?.id) {
+      try {
+        const items = await chrome.storage.local.get({ extensionEnabled: true });
         isEnabled = items.extensionEnabled !== false;
         if (isEnabled) {
-          pollTimer(issueId);
+          await pollTimer(issueId);
           pollIntervalId = setInterval(() => pollTimer(issueId), 1000);
         }
-      });
 
-      chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes.extensionEnabled) {
-          isEnabled = changes.extensionEnabled.newValue !== false;
-          if (isEnabled) {
-            pollTimer(issueId);
-            if (!pollIntervalId) {
-              pollIntervalId = setInterval(() => pollTimer(issueId), 1000);
-            }
-          } else {
-            removeButton();
-            closeModal();
-            if (pollIntervalId) {
-              clearInterval(pollIntervalId);
-              pollIntervalId = null;
+        chrome.storage.onChanged.addListener((changes, area) => {
+          if (area === 'local' && changes.extensionEnabled) {
+            isEnabled = changes.extensionEnabled.newValue !== false;
+            if (isEnabled) {
+              pollTimer(issueId);
+              if (!pollIntervalId) {
+                pollIntervalId = setInterval(() => pollTimer(issueId), 1000);
+              }
+            } else {
+              removeButton();
+              closeModal();
+              if (pollIntervalId) {
+                clearInterval(pollIntervalId);
+                pollIntervalId = null;
+              }
             }
           }
-        }
-      });
+        });
+      } catch {
+        await pollTimer(issueId);
+        pollIntervalId = setInterval(() => pollTimer(issueId), 1000);
+      }
     } else {
-      pollTimer(issueId);
+      await pollTimer(issueId);
       pollIntervalId = setInterval(() => pollTimer(issueId), 1000);
     }
   }

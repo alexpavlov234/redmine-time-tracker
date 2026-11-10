@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Select, TextInput, Group, Stack, Loader } from '@mantine/core';
 import { useProjects } from '../../contexts/ProjectsContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { useTasksForProject } from '../../hooks/useTasksForProject';
 import { useActivitiesForProject } from '../../hooks/useActivitiesForProject';
 import { getIssue } from '../../services/redmine';
@@ -39,7 +40,7 @@ export interface ProjectTaskActivityFieldsProps {
   additionalActivityOptions?: Array<{ value: string; label: string }>;
   /// <summary>Whether to hide the activity selection field completely.</summary>
   hideActivity?: boolean;
-  /// <summary>Layout arrangement of the fields: 'stacked' (vertical) or 'grid' (project/activity/task rows).</summary>
+  /// <summary>Layout arrangement of the fields: 'stacked' (vertical) or 'standard' (project/activity/task rows).</summary>
   layout?: 'stacked' | 'standard';
 }
 
@@ -65,6 +66,7 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
   layout = 'standard',
 }) => {
   const { getProjectSelectData, ensureProjectsLoaded, isLoadingProjects } = useProjects();
+  const { t } = useLanguage();
   const [loadedTask, setLoadedTask] = useState<RedmineIssue | null>(null);
   const [isLoadingIssue, setIsLoadingIssue] = useState(false);
   const lastSearchedIdRef = useRef<string>('');
@@ -109,7 +111,7 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
     const map = new Map<string, string>();
 
     // From project/my issues
-    projectTasks.forEach(t => map.set(t.id.toString(), `#${t.id} - ${t.subject}`));
+    projectTasks.forEach(item => map.set(item.id.toString(), `#${item.id} - ${item.subject}`));
 
     // From loaded task
     if (loadedTask) {
@@ -231,7 +233,7 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
     if (!selectedId) return;
 
     lastSearchedIdRef.current = selectedId;
-    const task = projectTasks.find(t => t.id.toString() === selectedId) || (loadedTask?.id.toString() === selectedId ? loadedTask : null);
+    const task = projectTasks.find(item => item.id.toString() === selectedId) || (loadedTask?.id.toString() === selectedId ? loadedTask : null);
 
     if (task?.project?.id) {
       onProjectChange(task.project.id.toString());
@@ -269,8 +271,8 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
 
   const projectField = (
     <Select
-      label="Project"
-      placeholder={isLoadingProjects ? 'Loading projects...' : 'Search projects...'}
+      label={t('projectLabel')}
+      placeholder={isLoadingProjects ? t('loadingProjects') : t('projectPlaceholder')}
       data={projectOptions}
       searchable
       clearable
@@ -279,7 +281,7 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
       onChange={handleProjectDropdownChange}
       onDropdownOpen={ensureProjectsLoaded}
       onClick={ensureProjectsLoaded}
-      nothingFoundMessage={isLoadingProjects ? 'Loading projects...' : 'No projects found'}
+      nothingFoundMessage={isLoadingProjects ? t('loadingProjects') : t('noProjectsFound')}
       rightSection={isLoadingProjects ? <Loader size="xs" /> : undefined}
       disabled={disabled}
     />
@@ -288,7 +290,7 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
   const taskFields = (
     <Group align="flex-start" wrap="nowrap">
       <TextInput
-        label="Task ID"
+        label={t('taskIdLabel')}
         placeholder="ID..."
         w={110}
         value={taskId}
@@ -306,8 +308,8 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
         rightSection={isLoadingIssue ? <Loader size="xs" /> : undefined}
       />
       <Select
-        label="Task Name"
-        placeholder={isLoadingTasks ? 'Loading tasks...' : 'Search tasks...'}
+        label={t('taskNameLabel')}
+        placeholder={isLoadingTasks ? t('loadingTasks') : t('searchTasksInputPlaceholder')}
         data={taskOptions}
         searchable
         clearable
@@ -322,8 +324,8 @@ export const ProjectTaskActivityFields: React.FC<ProjectTaskActivityFieldsProps>
 
   const activityField = (
     <Select
-      label="Activity"
-      placeholder={isLoadingActivities ? 'Loading activities...' : '-- Select activity --'}
+      label={t('activityLabel')}
+      placeholder={isLoadingActivities ? t('loadingActivities') : t('selectActivityPlaceholder')}
       data={activityOptions}
       withAsterisk={activityRequired}
       value={activityId || null}

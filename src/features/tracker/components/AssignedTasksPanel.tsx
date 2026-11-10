@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Select, Group, Text, Stack, ActionIcon, Loader, Badge, Paper } from '@mantine/core';
 import { useProjects } from '../../../contexts/ProjectsContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { redmineApiRequest } from '../../../services/redmine';
 import type { RedmineIssue } from '../../../types';
 import { IconListCheck, IconPlayerPlay } from '@tabler/icons-react';
@@ -9,9 +10,13 @@ import { TaskNoteButton } from '../../../components/common/TaskNoteButton';
 import { getTaskNote } from '../../../services/taskNotes';
 import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
 
+/// <summary>
+/// Panel displaying open Redmine issues assigned to the current user per project.
+/// </summary>
 export const AssignedTasksPanel: React.FC = () => {
   const { allProjects, getProjectSelectData, ensureProjectsLoaded, isLoadingProjects } = useProjects();
   const { addTodo } = useQueue();
+  const { t } = useLanguage();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<string | null>('none');
   const [tasks, setTasks] = useState<RedmineIssue[]>([]);
@@ -106,37 +111,37 @@ export const AssignedTasksPanel: React.FC = () => {
       <Card.Section withBorder inheritPadding py="xs">
         <Group gap="xs">
           <IconListCheck size={20} />
-          <Text fw={500}>My Assigned Tasks</Text>
+          <Text fw={500}>{t('myAssignedTasksTitle')}</Text>
         </Group>
       </Card.Section>
 
       <Stack mt="md">
         <Group grow align="flex-end">
           <Select
-            label="Project"
-            placeholder={isLoadingProjects ? 'Loading projects...' : '-- Select a Project --'}
+            label={t('projectLabel')}
+            placeholder={isLoadingProjects ? t('loadingProjects') : t('selectProjectPlaceholder')}
             value={selectedProjectId}
             onChange={setSelectedProjectId}
             onDropdownOpen={ensureProjectsLoaded}
             onClick={ensureProjectsLoaded}
             data={projectOptions}
             searchable
-            nothingFoundMessage={isLoadingProjects ? 'Loading projects...' : 'No projects found'}
+            nothingFoundMessage={isLoadingProjects ? t('loadingProjects') : t('noProjectsFound')}
             rightSection={isLoadingProjects ? <Loader size="xs" /> : undefined}
           />
           <Select
-            label="Group By"
+            label={t('groupByLabel')}
             value={groupBy}
             onChange={setGroupBy}
             disabled={!selectedProjectId || isLoading}
             data={[
-              { value: 'none', label: '-- Group By: None --' },
-              { value: 'status', label: 'Status' },
-              { value: 'tracker', label: 'Tracker' },
-              { value: 'priority', label: 'Priority' },
-              { value: 'author', label: 'Author' },
-              { value: 'category', label: 'Category' },
-              { value: 'fixed_version', label: 'Target Version' },
+              { value: 'none', label: t('groupByNone') },
+              { value: 'status', label: t('groupByStatus') },
+              { value: 'tracker', label: t('groupByTracker') },
+              { value: 'priority', label: t('groupByPriority') },
+              { value: 'author', label: t('groupByAuthor') },
+              { value: 'category', label: t('groupByCategory') },
+              { value: 'fixed_version', label: t('groupByTargetVersion') },
             ]}
           />
         </Group>
@@ -144,16 +149,16 @@ export const AssignedTasksPanel: React.FC = () => {
         {isLoading && (
           <Group justify="center" py="xl">
             <Loader size="sm" />
-            <Text c="dimmed">Loading tasks...</Text>
+            <Text c="dimmed">{t('loadingTasks')}</Text>
           </Group>
         )}
         
         {!isLoading && selectedProjectId && tasks.length === 0 && (
-          <Text c="dimmed" ta="center" py="xl">No tasks assigned to you in this project.</Text>
+          <Text c="dimmed" ta="center" py="xl">{t('noAssignedTasksInProject')}</Text>
         )}
         
         {!isLoading && !selectedProjectId && (
-          <Text c="dimmed" ta="center" py="xl">Please select a project to view tasks.</Text>
+          <Text c="dimmed" ta="center" py="xl">{t('selectProjectToViewTasks')}</Text>
         )}
         
         {!isLoading && tasks.length > 0 && (
@@ -181,7 +186,7 @@ export const AssignedTasksPanel: React.FC = () => {
                       
                       <Group gap={4} wrap="nowrap">
                         <TaskNoteButton taskId={task.id} taskSubject={task.subject} size="sm" />
-                        <ActionIcon variant="subtle" color="blue" onClick={() => handleAddToQueue(task)} title="Add to Timer Queue" aria-label="Add to Timer Queue">
+                        <ActionIcon variant="subtle" color="blue" onClick={() => handleAddToQueue(task)} title={t('addToTimerQueueTooltip')} aria-label={t('addToTimerQueueTooltip')}>
                           <IconPlayerPlay size={16} />
                         </ActionIcon>
                       </Group>

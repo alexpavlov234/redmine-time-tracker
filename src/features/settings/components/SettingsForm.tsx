@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import { Card, TextInput, PasswordInput, Button, Group, Stack, Alert, Title, Switch, Text } from '@mantine/core';
+import { Card, TextInput, PasswordInput, Button, Group, Stack, Alert, Title, Switch, Text, SegmentedControl } from '@mantine/core';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { IconSettings, IconDeviceFloppy, IconLink } from '@tabler/icons-react';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import type { AppLanguage } from '../../../i18n/translations';
+import { IconDeviceFloppy, IconLink, IconLanguage } from '@tabler/icons-react';
 import { getCurrentUser, detectBillableField } from '../../../services/redmine';
 
+/// <summary>
+/// Redmine configuration and application preferences form with bilingual language selector.
+/// </summary>
 export const SettingsForm: React.FC = () => {
   const { 
     apiKey, 
@@ -15,6 +20,7 @@ export const SettingsForm: React.FC = () => {
     setUsePerformedTasksList,
     setPromptStatusOnStart
   } = useSettings();
+  const { language, setLanguage, t } = useLanguage();
 
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localUrl, setLocalUrl] = useState(redmineUrl);
@@ -25,7 +31,7 @@ export const SettingsForm: React.FC = () => {
   const handleSave = () => {
     setApiKey(localApiKey.trim());
     setRedmineUrl(localUrl.trim().replace(/\/$/, ''));
-    setTestResult({ success: true, message: 'Settings saved. Projects will refresh automatically.' });
+    setTestResult({ success: true, message: t('settingsSavedMsg') });
   };
 
   const handleTest = async () => {
@@ -54,73 +60,88 @@ export const SettingsForm: React.FC = () => {
   };
 
   return (
-    <Card shadow="sm" padding="lg" radius="md" withBorder>
-      <Card.Section withBorder inheritPadding py="xs">
-        <Group gap="xs">
-          <IconSettings size={20} />
-          <Title order={4}>Redmine Configuration</Title>
-        </Group>
-      </Card.Section>
+    <Stack gap="lg">
+      {/* Consistent Top Page Header */}
+      <Group justify="space-between" align="center" wrap="wrap">
+        <Title order={2}>{t('navSettings')}</Title>
+      </Group>
 
-      <Stack mt="md">
-        <TextInput
-          label="Redmine URL"
-          placeholder="https://your-redmine-instance.com"
-          value={localUrl}
-          onChange={(e) => setLocalUrl(e.target.value)}
-          w="100%"
-        />
-        <PasswordInput
-          label="API Access Key"
-          placeholder="Your personal Redmine API Key"
-          value={localApiKey}
-          onChange={(e) => setLocalApiKey(e.target.value)}
-          w="100%"
-        />
+      <Card shadow="sm" padding="lg" radius="md" withBorder>
+        <Stack gap="md">
+          <Group justify="space-between" align="center">
+            <Group gap="xs">
+              <IconLanguage size={18} />
+              <Text size="sm" fw={600}>{t('languageLabel')}</Text>
+            </Group>
+            <SegmentedControl
+              value={language}
+              onChange={(val) => setLanguage(val as AppLanguage)}
+              data={[
+                { label: 'Български (БГ)', value: 'bg' },
+                { label: 'English (EN)', value: 'en' },
+              ]}
+            />
+          </Group>
 
-        <Group justify="space-between" align="center" mt="sm">
-          <Stack gap={2}>
-            <Text size="sm" fw={600}>Use Performed Tasks List</Text>
-            <Text size="xs" c="dimmed">
-              Enabled: Prompts for sub-tasks on timer start & populates comments. Disabled: Direct time logging.
-            </Text>
-          </Stack>
-          <Switch
-            checked={usePerformedTasksList}
-            onChange={(e) => setUsePerformedTasksList(e.currentTarget.checked)}
-            size="md"
+          <TextInput
+            label={t('redmineUrlLabel')}
+            placeholder="https://your-redmine-instance.com"
+            value={localUrl}
+            onChange={(e) => setLocalUrl(e.target.value)}
+            w="100%"
           />
-        </Group>
-
-        <Group justify="space-between" align="center" mt="xs">
-          <Stack gap={2}>
-            <Text size="sm" fw={600}>Prompt to update Status to "In Progress"</Text>
-            <Text size="xs" c="dimmed">
-              Ask to update task status in Redmine when starting a timer session.
-            </Text>
-          </Stack>
-          <Switch
-            checked={promptStatusOnStart}
-            onChange={(e) => setPromptStatusOnStart(e.currentTarget.checked)}
-            size="md"
+          <PasswordInput
+            label={t('apiKeyLabel')}
+            placeholder={t('apiKeyPlaceholder')}
+            value={localApiKey}
+            onChange={(e) => setLocalApiKey(e.target.value)}
+            w="100%"
           />
-        </Group>
 
-        {testResult && (
-          <Alert color={testResult.success ? 'green' : 'red'}>
-            {testResult.message}
-          </Alert>
-        )}
+          <Group justify="space-between" align="center" mt="xs">
+            <Stack gap={2}>
+              <Text size="sm" fw={600}>{t('usePerformedListLabel')}</Text>
+              <Text size="xs" c="dimmed">
+                {t('usePerformedListDesc')}
+              </Text>
+            </Stack>
+            <Switch
+              checked={usePerformedTasksList}
+              onChange={(e) => setUsePerformedTasksList(e.currentTarget.checked)}
+              size="md"
+            />
+          </Group>
 
-        <Group mt="md">
-          <Button leftSection={<IconDeviceFloppy size={16} />} onClick={handleSave}>
-            Save Settings
-          </Button>
-          <Button leftSection={<IconLink size={16} />} onClick={handleTest} variant="light" loading={isTesting}>
-            Test Connection
-          </Button>
-        </Group>
-      </Stack>
-    </Card>
+          <Group justify="space-between" align="center">
+            <Stack gap={2}>
+              <Text size="sm" fw={600}>{t('promptStatusLabel')}</Text>
+              <Text size="xs" c="dimmed">
+                {t('promptStatusDesc')}
+              </Text>
+            </Stack>
+            <Switch
+              checked={promptStatusOnStart}
+              onChange={(e) => setPromptStatusOnStart(e.currentTarget.checked)}
+              size="md"
+            />
+          </Group>
+
+          {testResult && (
+            <Alert color={testResult.success ? 'green' : 'red'}>
+              {testResult.message}
+            </Alert>
+          )}
+
+          <Group mt="sm">
+            <Button leftSection={<IconDeviceFloppy size={16} />} onClick={handleSave}>
+              {t('saveSettingsBtn')}
+            </Button>
+            <Button leftSection={<IconLink size={16} />} onClick={handleTest} variant="light" loading={isTesting}>
+              {t('testConnectionBtn')}
+            </Button>
+          </Group>
+        </Stack>
+      </Card>
+    </Stack>
   );
 };

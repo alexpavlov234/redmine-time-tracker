@@ -1,10 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Redmine Time Tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Start and stop Redmine Time Tracker directly from Redmine issue pages.",
   "permissions": [
-    "storage"
+    "storage",
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "http://localhost:3000/*",

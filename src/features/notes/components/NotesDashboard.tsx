@@ -21,6 +21,7 @@ import {
 } from '@tabler/icons-react';
 import { useTaskNotes } from '../../../hooks/useTaskNotes';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { NoteCard } from './NoteCard';
 import { NoteEditModal } from './NoteEditModal';
 import type { NoteItem } from '../../../types';
@@ -31,6 +32,7 @@ import type { NoteItem } from '../../../types';
 export const NotesDashboard: React.FC = () => {
   const { allNotes, allLabels, saveNoteItem, deleteNoteItem } = useTaskNotes();
   const confirm = useConfirm();
+  const { t } = useLanguage();
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,9 +114,9 @@ export const NotesDashboard: React.FC = () => {
   /// </summary>
   const handleDelete = async (noteId: string) => {
     const isConfirmed = await confirm({
-      message: 'Are you sure you want to permanently delete this note?',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      message: t('deleteNoteConfirmMsg'),
+      confirmText: t('deleteBtn'),
+      cancelText: t('cancelBtn'),
       variant: 'danger',
     });
 
@@ -127,18 +129,13 @@ export const NotesDashboard: React.FC = () => {
     <Stack gap="lg">
       {/* Header with Title and Add Button */}
       <Group justify="space-between" align="center" wrap="wrap">
-        <div>
-          <Title order={2}>Notes</Title>
-          <Text c="dimmed" size="sm">
-            Capture general notes and multiple notes linked to tasks with tags and rich formatting.
-          </Text>
-        </div>
+        <Title order={2}>{t('notesTitle')}</Title>
         <Button
           leftSection={<IconPlus size={18} />}
           onClick={handleCreateNew}
           color="blue"
         >
-          New Note
+          {t('newNoteBtn')}
         </Button>
       </Group>
 
@@ -150,14 +147,14 @@ export const NotesDashboard: React.FC = () => {
               value={activeTab}
               onChange={(val) => setActiveTab(val as 'all' | 'general' | 'tasks')}
               data={[
-                { label: `All Notes (${allNotes.length})`, value: 'all' },
-                { label: `General (${allNotes.filter((n) => !n.taskId).length})`, value: 'general' },
-                { label: `Task Notes (${allNotes.filter((n) => Boolean(n.taskId)).length})`, value: 'tasks' },
+                { label: `${t('allNotesTab')} (${allNotes.length})`, value: 'all' },
+                { label: `${t('generalNotesTab')} (${allNotes.filter((n) => !n.taskId).length})`, value: 'general' },
+                { label: `${t('taskNotesTab')} (${allNotes.filter((n) => Boolean(n.taskId)).length})`, value: 'tasks' },
               ]}
             />
 
             <TextInput
-              placeholder="Search notes, tags, task IDs..."
+              placeholder={t('searchNotesPlaceholder')}
               leftSection={<IconSearch size={16} />}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.currentTarget.value)}
@@ -176,7 +173,7 @@ export const NotesDashboard: React.FC = () => {
           {allLabels.length > 0 && (
             <Group gap="xs" wrap="wrap" align="center">
               <Text size="xs" fw={600} c="dimmed">
-                Filter by label:
+                {t('filterByLabelText')}
               </Text>
               {allLabels.map((lbl) => {
                 const isSelected = selectedLabel === lbl;
@@ -201,7 +198,7 @@ export const NotesDashboard: React.FC = () => {
                   color="gray"
                   onClick={() => setSelectedLabel(null)}
                 >
-                  Clear filter
+                  {t('clearFilterBtn')}
                 </Button>
               )}
             </Group>
@@ -214,11 +211,11 @@ export const NotesDashboard: React.FC = () => {
         <Paper p="xl" withBorder radius="md" ta="center" bg="var(--mantine-color-default)">
           <Stack align="center" gap="sm">
             <IconNotes size={40} color="var(--mantine-color-gray-5)" />
-            <Text fw={600}>No notes found</Text>
+            <Text fw={600}>{t('noNotesFound')}</Text>
             <Text size="sm" c="dimmed">
               {searchQuery || selectedLabel
-                ? 'Try adjusting your search criteria or label filters.'
-                : 'Create your first note using the button above!'}
+                ? t('noNotesFilterHint')
+                : t('noNotesEmptyHint')}
             </Text>
             {!searchQuery && !selectedLabel && (
               <Button
@@ -227,13 +224,13 @@ export const NotesDashboard: React.FC = () => {
                 onClick={handleCreateNew}
                 mt="xs"
               >
-                Create Note
+                {t('createNoteBtn')}
               </Button>
             )}
           </Stack>
         </Paper>
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
           {filteredNotes.map((note) => (
             <NoteCard
               key={note.id}

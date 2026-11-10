@@ -7,7 +7,8 @@ import { AssignedTasksPanel } from './AssignedTasksPanel';
 import { StandardLogPanel } from './StandardLogPanel';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useSettings } from '../../../contexts/SettingsContext';
-import { Card, Button, TextInput, Group, Stack, Badge, Text, ThemeIcon, Paper, Grid, SegmentedControl, Center, Timeline } from '@mantine/core';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { Card, Button, TextInput, Group, Stack, Badge, Text, ThemeIcon, Grid, SegmentedControl, Timeline, Title } from '@mantine/core';
 import { IconClipboardList, IconPlus, IconCheck, IconClock } from '@tabler/icons-react';
 
 /// <summary>
@@ -15,6 +16,7 @@ import { IconClipboardList, IconPlus, IconCheck, IconClock } from '@tabler/icons
 /// </summary>
 const PerformedTasks: React.FC = () => {
   const timer = useQueueTimer();
+  const { t } = useLanguage();
   const [newActivityText, setNewActivityText] = useState('');
 
   const handleAddActivity = () => {
@@ -45,7 +47,7 @@ const PerformedTasks: React.FC = () => {
         <Group justify="space-between">
           <Group gap="xs">
             <IconClipboardList size={20} />
-            <Text fw={500}>Ongoing Task Timeline</Text>
+            <Text fw={500}>{t('ongoingTimelineTitle')}</Text>
           </Group>
           <Badge size="lg" circle>{timer.activities.length}</Badge>
         </Group>
@@ -54,7 +56,7 @@ const PerformedTasks: React.FC = () => {
       <Stack mt="md" gap="md">
         {timer.activities.length === 0 ? (
           <Text c="dimmed" size="sm" ta="center" py="md">
-            No activities recorded in this session yet. Add what you are working on below.
+            {t('noActivitiesRecorded')}
           </Text>
         ) : (
           <Timeline active={timer.activities.length - 1} bulletSize={24} lineWidth={2}>
@@ -100,7 +102,7 @@ const PerformedTasks: React.FC = () => {
         {timer.isRunning && (
           <Group align="flex-end">
             <TextInput
-              placeholder="What are you working on now?"
+              placeholder={t('whatWorkingOnPlaceholder')}
               value={newActivityText}
               onChange={(e) => setNewActivityText(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -111,7 +113,7 @@ const PerformedTasks: React.FC = () => {
               onClick={handleAddActivity}
               disabled={!newActivityText.trim()}
             >
-              Add
+              {t('addBtn')}
             </Button>
           </Group>
         )}
@@ -120,13 +122,13 @@ const PerformedTasks: React.FC = () => {
   );
 };
 
-
 /// <summary>
 /// Main Tracker dashboard combining timer bar, queue management, assigned issues, and presets.
 /// </summary>
 export const TrackerDashboard: React.FC = () => {
   const timer = useQueueTimer();
   const { usePerformedTasksList, setUsePerformedTasksList } = useSettings();
+  const { t } = useLanguage();
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
 
   // When timer stops, open the summary modal
@@ -139,48 +141,28 @@ export const TrackerDashboard: React.FC = () => {
 
   return (
     <Stack gap="lg">
+      {/* Consistent Top Page Header */}
+      <Group justify="space-between" align="center" wrap="wrap">
+        <Title order={2}>{t('navTracker')}</Title>
+
+        <SegmentedControl
+          size="sm"
+          radius="md"
+          color="blue"
+          value={usePerformedTasksList ? 'performed' : 'direct'}
+          onChange={(val) => setUsePerformedTasksList(val === 'performed')}
+          data={[
+            { label: t('directLoggingTitle'), value: 'direct' },
+            { label: t('performedListTitle'), value: 'performed' },
+          ]}
+        />
+      </Group>
+
       <Grid>
-        {/* Left Column: Timer, Tracking Mode, Performed Tasks, Work Queue */}
+        {/* Left Column: Timer, Performed Tasks, Work Queue */}
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Stack gap="lg">
             <TimerBar onStop={handleStop} />
-            
-            <Paper p="xs" radius="md" withBorder bg="var(--mantine-color-default)">
-              <Stack gap="xs">
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase" ta="center" style={{ letterSpacing: '0.5px' }}>
-                  Tracking Mode
-                </Text>
-                <SegmentedControl
-                  fullWidth
-                  size="md"
-                  radius="md"
-                  color="blue"
-                  value={usePerformedTasksList ? 'performed' : 'direct'}
-                  onChange={(val) => setUsePerformedTasksList(val === 'performed')}
-                  data={[
-                    {
-                      label: (
-                        <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
-                          <Text fw={600} size="sm">Direct Time Logging</Text>
-                          <Text size="xs" c="dimmed">No Sub-tasks</Text>
-                        </Center>
-                      ),
-                      value: 'direct',
-                    },
-                    {
-                      label: (
-                        <Center style={{ flexDirection: 'column', gap: 2, padding: '4px 0' }}>
-                          <Text fw={600} size="sm">Performed Tasks List</Text>
-                          <Text size="xs" c="dimmed">With Sub-tasks</Text>
-                        </Center>
-                      ),
-                      value: 'performed',
-                    },
-                  ]}
-                />
-              </Stack>
-            </Paper>
-
             {usePerformedTasksList && <PerformedTasks />}
             <WorkQueue />
           </Stack>

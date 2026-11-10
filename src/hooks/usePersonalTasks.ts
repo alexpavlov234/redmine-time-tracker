@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { PersonalTask, PersonalTaskPriority } from '../types';
+import type { PersonalTask, PersonalTaskStickyNote, StickyNoteColor } from '../types';
 import {
   getLocalPersonalTasks,
   savePersonalTasks,
@@ -8,8 +8,7 @@ import {
 } from '../services/personalTasks';
 
 /// <summary>
-/// Custom React hook for managing the user's personal tasks and notes queue.
-/// Supports priorities, sub-task checklists, Redmine links, and reordering.
+/// Custom React hook for managing simplified personal tasks and their sticky notes.
 /// </summary>
 export function usePersonalTasks() {
   const [tasks, setTasks] = useState<PersonalTask[]>(getLocalPersonalTasks);
@@ -24,89 +23,43 @@ export function usePersonalTasks() {
   /// <summary>
   /// Adds a new personal task to the top of the queue.
   /// </summary>
-  const addTask = useCallback(
-    async (taskData: {
-      title: string;
-      notes?: string;
-      priority?: PersonalTaskPriority;
-      status?: import('../types').PersonalTaskStatus;
-      dueDate?: string;
-      redmineIssueId?: string;
-      redmineIssueSubject?: string;
-      redmineProjectId?: string;
-      redmineProjectName?: string;
-      checklist?: string[];
-    }) => {
-      const current = getLocalPersonalTasks();
-      const initialStatus = taskData.status || 'not_started';
-      const isCompleted = initialStatus === 'completed';
-      const newTask: PersonalTask = {
-        id: `pt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        title: taskData.title.trim(),
-        notes: taskData.notes?.trim() || '',
-        priority: taskData.priority || 'medium',
-        status: initialStatus,
-        dueDate: taskData.dueDate || undefined,
-        completed: isCompleted,
-        createdAt: Date.now(),
-        completedAt: isCompleted ? Date.now() : undefined,
-        redmineIssueId: taskData.redmineIssueId?.replace(/^#/, '').trim() || undefined,
-        redmineIssueSubject: taskData.redmineIssueSubject?.trim() || undefined,
-        redmineProjectId: taskData.redmineProjectId || undefined,
-        redmineProjectName: taskData.redmineProjectName || undefined,
-        checklist: (taskData.checklist || []).map((text, idx) => ({
-          id: `item_${Date.now()}_${idx}`,
-          text: text.trim(),
-          completed: false,
-        })),
-        order: 0,
-      };
+  /// <param name="title">The title of the personal task.</param>
+  /// <returns>The newly created PersonalTask.</returns>
+  const addTask = useCallback(async (title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return null;
 
-      const updated = [newTask, ...current.map((t, idx) => ({ ...t, order: idx + 1 }))];
-      setTasks(updated);
-      await savePersonalTasks(updated);
-      return newTask;
-    },
-    []
-  );
-
-  /// <summary>
-  /// Updates an existing personal task with partial fields.
-  /// </summary>
-  const updateTask = useCallback(async (id: string, updates: Partial<PersonalTask>) => {
     const current = getLocalPersonalTasks();
-    const updated = current.map((t) => {
-      if (t.id === id) {
-        const next = { ...t, ...updates };
-        if (updates.status) {
-          next.completed = updates.status === 'completed';
-          if (updates.status === 'completed' && !next.completedAt) {
-            next.completedAt = Date.now();
-          } else if (updates.status !== 'completed') {
-            next.completedAt = undefined;
-          }
-        }
-        return next;
-      }
-      return t;
-    });
+    const newTask: PersonalTask = {
+      id: `pt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title: trimmed,
+      completed: false,
+      createdAt: Date.now(),
+      order: 0,
+      stickyNotes: [],
+    };
+
+    const updated = [newTask, ...current.map((t, idx) => ({ ...t, order: idx + 1 }))];
     setTasks(updated);
     await savePersonalTasks(updated);
+    return newTask;
   }, []);
 
   /// <summary>
-  /// Changes status of a personal task directly.
+  /// Updates an existing personal task's title or completion state.
   /// </summary>
-  const setTaskStatus = useCallback(async (id: string, status: import('../types').PersonalTaskStatus) => {
+  /// <param name="id">The ID of the task to update.</param>
+  /// <param name="updates">Partial fields to update.</param>
+  const updateTask = useCallback(async (id: string, updates: Partial<Pick<PersonalTask, 'title' | 'completed'>>) => {
     const current = getLocalPersonalTasks();
-    const isCompleted = status === 'completed';
     const updated = current.map((t) => {
       if (t.id === id) {
+        const nextCompleted = updates.completed !== undefined ? updates.completed : t.completed;
         return {
           ...t,
-          status,
-          completed: isCompleted,
-          completedAt: isCompleted ? Date.now() : undefined,
+          ...updates,
+          completed: nextCompleted,
+          completedAt: nextCompleted ? t.completedAt || Date.now() : undefined,
         };
       }
       return t;
@@ -118,6 +71,7 @@ export function usePersonalTasks() {
   /// <summary>
   /// Deletes a personal task from the queue.
   /// </summary>
+  /// <param name="id">The ID of the task to delete.</param>
   const deleteTask = useCallback(async (id: string) => {
     const current = getLocalPersonalTasks();
     const updated = current.filter((t) => t.id !== id);
@@ -128,16 +82,15 @@ export function usePersonalTasks() {
   /// <summary>
   /// Toggles completion status of a personal task.
   /// </summary>
+  /// <param name="id">The ID of the task to toggle.</param>
   const toggleComplete = useCallback(async (id: string) => {
     const current = getLocalPersonalTasks();
     const updated = current.map((t) => {
       if (t.id === id) {
         const nextCompleted = !t.completed;
-        const nextStatus: import('../types').PersonalTaskStatus = nextCompleted ? 'completed' : 'not_started';
         return {
           ...t,
           completed: nextCompleted,
-          status: nextStatus,
           completedAt: nextCompleted ? Date.now() : undefined,
         };
       }
@@ -148,57 +101,93 @@ export function usePersonalTasks() {
   }, []);
 
   /// <summary>
-  /// Toggles completion status of a specific sub-task checklist item.
+  /// Adds a new sticky note to a personal task.
   /// </summary>
-  const toggleChecklistItem = useCallback(async (taskId: string, itemId: string) => {
-    const current = getLocalPersonalTasks();
-    const updated = current.map((t) => {
-      if (t.id === taskId) {
-        return {
-          ...t,
-          checklist: t.checklist.map((item) =>
-            item.id === itemId ? { ...item, completed: !item.completed } : item
-          ),
-        };
-      }
-      return t;
-    });
-    setTasks(updated);
-    await savePersonalTasks(updated);
-  }, []);
+  /// <param name="taskId">Target personal task ID.</param>
+  /// <param name="noteData">Sticky note content, optional title, and color.</param>
+  /// <returns>The created sticky note.</returns>
+  const addStickyNote = useCallback(
+    async (
+      taskId: string,
+      noteData: { title?: string; content: string; color?: StickyNoteColor }
+    ) => {
+      const now = Date.now();
+      const newNote: PersonalTaskStickyNote = {
+        id: `sn_${now}_${Math.random().toString(36).substring(2, 7)}`,
+        title: noteData.title?.trim() || undefined,
+        content: noteData.content,
+        color: noteData.color || 'yellow',
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const current = getLocalPersonalTasks();
+      const updated = current.map((t) => {
+        if (t.id === taskId) {
+          return {
+            ...t,
+            stickyNotes: [newNote, ...(t.stickyNotes || [])],
+          };
+        }
+        return t;
+      });
+      setTasks(updated);
+      await savePersonalTasks(updated);
+      return newNote;
+    },
+    []
+  );
 
   /// <summary>
-  /// Adds a new sub-task item to a task's checklist.
+  /// Updates an existing sticky note inside a personal task.
   /// </summary>
-  const addChecklistItem = useCallback(async (taskId: string, text: string) => {
-    if (!text.trim()) return;
-    const current = getLocalPersonalTasks();
-    const updated = current.map((t) => {
-      if (t.id === taskId) {
-        return {
-          ...t,
-          checklist: [
-            ...t.checklist,
-            { id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`, text: text.trim(), completed: false },
-          ],
-        };
-      }
-      return t;
-    });
-    setTasks(updated);
-    await savePersonalTasks(updated);
-  }, []);
+  /// <param name="taskId">Target personal task ID.</param>
+  /// <param name="noteId">Target sticky note ID.</param>
+  /// <param name="updates">Partial sticky note fields to update.</param>
+  const updateStickyNote = useCallback(
+    async (
+      taskId: string,
+      noteId: string,
+      updates: Partial<Pick<PersonalTaskStickyNote, 'title' | 'content' | 'color'>>
+    ) => {
+      const now = Date.now();
+      const current = getLocalPersonalTasks();
+      const updated = current.map((t) => {
+        if (t.id === taskId) {
+          return {
+            ...t,
+            stickyNotes: (t.stickyNotes || []).map((sn) =>
+              sn.id === noteId
+                ? {
+                    ...sn,
+                    ...updates,
+                    title: updates.title !== undefined ? updates.title.trim() || undefined : sn.title,
+                    updatedAt: now,
+                  }
+                : sn
+            ),
+          };
+        }
+        return t;
+      });
+      setTasks(updated);
+      await savePersonalTasks(updated);
+    },
+    []
+  );
 
   /// <summary>
-  /// Removes a sub-task item from a task's checklist.
+  /// Deletes a sticky note from a personal task.
   /// </summary>
-  const removeChecklistItem = useCallback(async (taskId: string, itemId: string) => {
+  /// <param name="taskId">Target personal task ID.</param>
+  /// <param name="noteId">Target sticky note ID.</param>
+  const deleteStickyNote = useCallback(async (taskId: string, noteId: string) => {
     const current = getLocalPersonalTasks();
     const updated = current.map((t) => {
       if (t.id === taskId) {
         return {
           ...t,
-          checklist: t.checklist.filter((item) => item.id !== itemId),
+          stickyNotes: (t.stickyNotes || []).filter((sn) => sn.id !== noteId),
         };
       }
       return t;
@@ -210,6 +199,8 @@ export function usePersonalTasks() {
   /// <summary>
   /// Reorders tasks in the queue after a drag-and-drop operation.
   /// </summary>
+  /// <param name="startIndex">Source index.</param>
+  /// <param name="endIndex">Destination index.</param>
   const reorderTasks = useCallback(async (startIndex: number, endIndex: number) => {
     const current = [...getLocalPersonalTasks()];
     const [moved] = current.splice(startIndex, 1);
@@ -224,11 +215,10 @@ export function usePersonalTasks() {
     addTask,
     updateTask,
     deleteTask,
-    setTaskStatus,
     toggleComplete,
-    toggleChecklistItem,
-    addChecklistItem,
-    removeChecklistItem,
+    addStickyNote,
+    updateStickyNote,
+    deleteStickyNote,
     reorderTasks,
   };
 }

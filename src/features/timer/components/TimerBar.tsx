@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle } from '@tabler/icons-react';
-import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Tooltip, Badge } from '@mantine/core';
+import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Tooltip } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { formatTime } from '../../../utils/formatters';
 import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
@@ -17,12 +18,13 @@ interface TimerBarProps {
 }
 
 /// <summary>
-/// Global floating/sticky top bar displaying active task status, running timer, and play/pause/stop actions.
+/// Global top bar displaying active task info, running timer, and play/pause/stop actions without redundant status labels.
 /// </summary>
 export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const { isConfigured } = useSettings();
   const { todos } = useQueue();
+  const { t } = useLanguage();
   const timer = useQueueTimer();
   const { isRunning, totalElapsedTime, activeTodo } = timer;
 
@@ -35,7 +37,7 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
       <Paper shadow="xs" p="md" radius="md" withBorder bg="var(--mantine-color-default)">
         <Group justify="center" c="dimmed">
           <IconAlertCircle size={18} />
-          <Text size="sm">Configure your Redmine connection in Settings to start tracking.</Text>
+          <Text size="sm">{t('timerConfigurePrompt')}</Text>
         </Group>
       </Paper>
     );
@@ -44,7 +46,7 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
   // Active task info
   const currentTaskId = activeTodo?.taskId || (todos.length > 0 ? todos[0].taskId : '');
   const currentSubject = activeTodo?.taskSubject || (todos.length > 0 ? todos[0].taskSubject : '');
-  const displayProject = activeTodo?.projectName || (todos.length > 0 ? todos[0].projectName : 'Time Tracker');
+  const displayProject = activeTodo?.projectName || (todos.length > 0 ? todos[0].projectName : '');
   const displayActivity = activeTodo?.activityName;
 
   /// <summary>
@@ -85,33 +87,33 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
     setPendingTodoId(null);
   };
 
-  const timerStatusColor = isRunning ? 'teal' : totalElapsedTime > 0 ? 'orange' : 'gray';
-  const timerStatusLabel = isRunning ? 'Running' : totalElapsedTime > 0 ? 'Paused' : 'Idle';
-
   return (
     <>
       <Paper shadow="sm" p="md" radius="md" withBorder bg="var(--mantine-color-default)">
         <Group justify="space-between" wrap={isMobile ? 'wrap' : 'nowrap'} gap="md">
           <Stack gap={4} style={{ minWidth: 0, flex: 1 }}>
-            <Group gap="xs" wrap="nowrap">
-              <Badge variant="dot" color={timerStatusColor} size="sm">
-                {timerStatusLabel}
-              </Badge>
-              <Text size="sm" fw={600} truncate>{displayProject}</Text>
-              {displayActivity && (
-                <Text
-                  size="xs"
-                  c="dimmed"
-                  fw={500}
-                  style={{
-                    borderLeft: '1px solid var(--mantine-color-default-border)',
-                    paddingLeft: '0.5rem',
-                  }}
-                >
-                  {displayActivity}
-                </Text>
-              )}
-            </Group>
+            {(displayProject || displayActivity) && (
+              <Group gap="xs" wrap="nowrap">
+                {displayProject && (
+                  <Text size="xs" fw={700} c="dimmed" tt="uppercase" truncate>
+                    {displayProject}
+                  </Text>
+                )}
+                {displayActivity && (
+                  <Text
+                    size="xs"
+                    c="dimmed"
+                    fw={500}
+                    style={{
+                      borderLeft: displayProject ? '1px solid var(--mantine-color-default-border)' : undefined,
+                      paddingLeft: displayProject ? '0.5rem' : undefined,
+                    }}
+                  >
+                    {displayActivity}
+                  </Text>
+                )}
+              </Group>
+            )}
 
             {currentTaskId ? (
               <RedmineIssueLink
@@ -121,7 +123,9 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
                 fw={700}
               />
             ) : (
-              <Text size="lg" fw={700} truncate>No active task selected</Text>
+              <Text size="md" fw={600} c="dimmed" truncate>
+                {t('noActiveTaskSelected')}
+              </Text>
             )}
           </Stack>
 
@@ -141,20 +145,20 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
 
             <Group gap="xs" wrap="nowrap">
               {!isRunning ? (
-                <Tooltip label={todos.length === 0 ? "Start tracking (General / No Task)" : "Start tracking"}>
-                  <ActionIcon variant="filled" color="blue" size="xl" radius="xl" onClick={handleStart} aria-label="Start timer">
+                <Tooltip label={todos.length === 0 ? t('startTrackingNoTaskTooltip') : t('startTrackingTooltip')}>
+                  <ActionIcon variant="filled" color="blue" size="xl" radius="xl" onClick={handleStart} aria-label={t('startTrackingTooltip')}>
                     <IconPlayerPlay size={22} fill="currentColor" />
                   </ActionIcon>
                 </Tooltip>
               ) : (
-                <Tooltip label="Pause timer">
-                  <ActionIcon variant="filled" color="orange" size="xl" radius="xl" onClick={timer.pauseTimer} aria-label="Pause timer">
+                <Tooltip label={t('pauseTimerTooltip')}>
+                  <ActionIcon variant="filled" color="orange" size="xl" radius="xl" onClick={timer.pauseTimer} aria-label={t('pauseTimerTooltip')}>
                     <IconPlayerPause size={22} fill="currentColor" />
                   </ActionIcon>
                 </Tooltip>
               )}
 
-              <Tooltip label="Stop and log timer">
+              <Tooltip label={t('stopAndLogTooltip')}>
                 <ActionIcon
                   variant="light"
                   color="red"
@@ -162,7 +166,7 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
                   radius="xl"
                   onClick={onStop || timer.stopTimer}
                   disabled={totalElapsedTime === 0 && !isRunning}
-                  aria-label="Stop timer"
+                  aria-label={t('stopAndLogTooltip')}
                 >
                   <IconPlayerStop size={22} fill="currentColor" />
                 </ActionIcon>
@@ -176,7 +180,7 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
       <Modal
         opened={showFirstActivityModal}
         onClose={handleFirstActivityCancel}
-        title={<Text fw={600}>What is your first performed task?</Text>}
+        title={<Text fw={600}>{t('firstPerformedTaskQuestion')}</Text>}
         size="md"
         fullScreen={isMobile}
         centered
@@ -184,8 +188,8 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
       >
         <Stack gap="md">
           <TextInput
-            label="Performed task description"
-            placeholder="e.g., Investigating bug #123"
+            label={t('performedTaskDescLabel')}
+            placeholder={t('performedTaskPlaceholder')}
             value={firstActivityText}
             onChange={e => setFirstActivityText(e.currentTarget.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleFirstActivitySubmit(); }}
@@ -197,7 +201,7 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
               onClick={handleFirstActivitySubmit}
               disabled={!firstActivityText.trim()}
             >
-              Start Tracking
+              {t('startTrackingBtn')}
             </Button>
           </Group>
         </Stack>

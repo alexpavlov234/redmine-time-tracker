@@ -3,6 +3,7 @@ import { Card, Group, Text, Button, Stack, Paper, Tooltip, ActionIcon, Divider }
 import { IconBolt, IconTrash, IconClock, IconPlayerPlay } from '@tabler/icons-react';
 import { usePresets } from '../../../hooks/usePresets';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { TimeEntryFormModal } from '../../calendar/components/TimeEntryFormModal';
 import type { TimeLogPreset } from '../../../types';
 
@@ -12,8 +13,12 @@ const DEFAULT_PRESETS: TimeLogPreset[] = [
   { id: 'default_sync', name: 'Team Sync (1h)', hours: 1.0, comments: 'Project planning & team sync', isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
 ];
 
+/// <summary>
+/// Panel offering quick timer start without task, direct time logging, and customizable presets.
+/// </summary>
 export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSuccess }) => {
   const { presets, deletePreset } = usePresets();
+  const { t } = useLanguage();
   const timer = useQueueTimer();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
@@ -31,12 +36,11 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
         <Card.Section withBorder inheritPadding py="xs">
           <Group gap="xs">
             <IconBolt size={20} color="var(--mantine-color-orange-filled)" />
-            <Text fw={600}>Quick Actions & Presets</Text>
+            <Text fw={600}>{t('quickActionsTitle')}</Text>
           </Group>
         </Card.Section>
 
         <Stack mt="md" gap="sm">
-          {/* Prominent Action Buttons in Card Body */}
           <Group grow>
             <Button
               size="sm"
@@ -45,7 +49,7 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
               leftSection={<IconPlayerPlay size={16} fill="currentColor" />}
               onClick={() => timer.startWithoutTask()}
             >
-              Start without Task
+              {t('startWithoutTaskBtn')}
             </Button>
             <Button
               size="sm"
@@ -54,15 +58,11 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
               leftSection={<IconClock size={16} />}
               onClick={() => handleOpenModal()}
             >
-              Log Time
+              {t('logTimeBtn')}
             </Button>
           </Group>
 
-          <Divider my="xs" label="Presets" labelPosition="center" />
-
-          <Text size="xs" c="dimmed">
-            Click any preset shortcut to open the standard time logging modal.
-          </Text>
+          <Divider my="xs" label={t('presetsDivider')} labelPosition="center" />
 
           <Group gap="xs" wrap="wrap">
             {displayPresets.map(preset => (
@@ -87,7 +87,7 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
                     </Text>
                   </Stack>
                   {presets.some(p => p.id === preset.id) && (
-                    <Tooltip label="Delete preset">
+                    <Tooltip label={t('deletePresetTooltip')}>
                       <ActionIcon
                         size="xs"
                         variant="subtle"

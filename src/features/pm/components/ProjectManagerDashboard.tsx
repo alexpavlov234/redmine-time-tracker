@@ -12,12 +12,12 @@ import {
   Alert,
 } from '@mantine/core';
 import {
-  IconBriefcase,
   IconRefresh,
   IconAlertCircle,
   IconFolder,
 } from '@tabler/icons-react';
 import { useProjectManagerData } from '../hooks/useProjectManagerData';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { ProjectBudgetCard } from './ProjectBudgetCard';
 import { ProjectTimeLogSection } from './ProjectTimeLogSection';
 import { ClientExportModal } from './ClientExportModal';
@@ -27,6 +27,7 @@ import { ClientExportModal } from './ClientExportModal';
 /// analyze team time entries, and export client-ready reports.
 /// </summary>
 export const ProjectManagerDashboard: React.FC = () => {
+  const { t } = useLanguage();
   const {
     displayedProjects,
     selectedProjectId,
@@ -86,21 +87,12 @@ export const ProjectManagerDashboard: React.FC = () => {
   const projectName = activeProject?.name || projectDetails?.name || 'Project';
 
   return (
-    <Stack gap="lg" style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-      {/* Top Header & Project Selector Bar */}
+    <Stack gap="lg">
+      {/* Consistent Top Page Header & Project Selector Bar */}
       <Group justify="space-between" align="center" wrap="wrap">
-        <Group gap="xs">
-          <IconBriefcase size={28} color="var(--mantine-color-blue-filled)" />
-          <div>
-            <Title order={2}>Project Management</Title>
-            <Text size="sm" c="dimmed">
-              Monitor budgets, track team time logs, and generate client reports.
-            </Text>
-          </div>
-        </Group>
+        <Title order={2}>{t('pmTitle')}</Title>
 
         <Group gap="sm" wrap="wrap">
-          {/* Managed vs All filter */}
           <SegmentedControl
             size="sm"
             value={filterMode}
@@ -111,19 +103,18 @@ export const ProjectManagerDashboard: React.FC = () => {
             data={[
               {
                 value: 'managed',
-                label: hasRequestedProjects ? `My Projects (${managedProjectIds.size})` : 'My Projects',
+                label: hasRequestedProjects ? `${t('myProjectsTab')} (${managedProjectIds.size})` : t('myProjectsTab'),
               },
               {
                 value: 'all',
-                label: 'All Projects',
+                label: t('allProjectsTab'),
               },
             ]}
           />
 
-          {/* Project Dropdown - loads projects on click/open */}
           <Select
             size="sm"
-            placeholder={isLoadingProjectsList ? 'Loading projects...' : 'Select a project...'}
+            placeholder={isLoadingProjectsList ? t('loadingProjects') : t('projectPlaceholder')}
             data={projectSelectData}
             value={selectedProjectId || null}
             onChange={val => setSelectedProjectId(val || '')}
@@ -131,7 +122,7 @@ export const ProjectManagerDashboard: React.FC = () => {
             onClick={loadProjectsForDropdown}
             searchable
             clearable
-            nothingFoundMessage={isLoadingProjectsList ? 'Loading projects...' : 'No projects found'}
+            nothingFoundMessage={isLoadingProjectsList ? t('loadingProjects') : t('noProjectsFound')}
             style={{ width: 280 }}
             leftSection={<IconFolder size={16} />}
             rightSection={isLoadingProjectsList ? <Loader size="xs" /> : undefined}
@@ -154,18 +145,17 @@ export const ProjectManagerDashboard: React.FC = () => {
         <Center py="xl">
           <Stack align="center" gap="sm">
             <Loader size="lg" />
-            <Text c="dimmed">Loading project data...</Text>
+            <Text c="dimmed">{t('loadingProjectData')}</Text>
           </Stack>
         </Center>
       ) : !selectedProjectId ? (
-        <Alert icon={<IconAlertCircle size={18} />} title="No Project Selected" color="blue">
+        <Alert icon={<IconAlertCircle size={18} />} title={t('noProjectSelectedTitle')} color="blue">
           {hasRequestedProjects && !isLoadingProjectsList && filterMode === 'managed' && managedProjectIds.size === 0
-            ? 'No projects are marked as managed by you in Redmine. You can switch to "All Projects" using the control above.'
-            : 'Click on the project dropdown above to load projects, then select a project to view its budget health and time logs.'}
+            ? t('noManagedProjectsHint')
+            : t('selectProjectHint')}
         </Alert>
       ) : (
         <Stack gap="lg">
-          {/* Section 1: Project Budget Movement & Health */}
           <ProjectBudgetCard
             projectName={projectName}
             metadata={budgetMetadata}
@@ -178,7 +168,6 @@ export const ProjectManagerDashboard: React.FC = () => {
             onCurrencyChange={updateCurrency}
           />
 
-          {/* Section 2: Detailed Time Logs & Breakdown */}
           <ProjectTimeLogSection
             allEntries={allTimeEntries}
             filteredEntries={filteredTimeEntries}
@@ -203,7 +192,6 @@ export const ProjectManagerDashboard: React.FC = () => {
         </Stack>
       )}
 
-      {/* Client Export Modal */}
       {isExportModalOpen && (
         <ClientExportModal
           isOpen={isExportModalOpen}

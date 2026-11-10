@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useQueue } from '../../../contexts/QueueContext';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { IconGripVertical, IconTrash, IconListCheck, IconPlayerPlay, IconPlayerPause } from '@tabler/icons-react';
 import { formatTime } from '../../../utils/formatters';
 import { Card, Button, Group, Text, ActionIcon, Stack, Badge, Paper, Modal, TextInput } from '@mantine/core';
@@ -10,7 +11,6 @@ import { useMediaQuery } from '@mantine/hooks';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { StatusPromptModal } from '../../tracker/components/StatusPromptModal';
 import { TaskNoteButton } from '../../../components/common/TaskNoteButton';
-import { getTaskNote } from '../../../services/taskNotes';
 import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
 
 /// <summary>
@@ -20,6 +20,7 @@ export const WorkQueue: React.FC = () => {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const { todos, removeTodo, reorderTodos, activeTodoId, updateTodo } = useQueue();
   const { promptStatusOnStart } = useSettings();
+  const { t } = useLanguage();
   const timer = useQueueTimer();
   const confirm = useConfirm();
 
@@ -39,7 +40,7 @@ export const WorkQueue: React.FC = () => {
   const [statusTaskSubject, setStatusTaskSubject] = useState<string>('');
 
   const handlePlayPause = async (todoId: number) => {
-    const todo = todos.find(t => t.id === todoId);
+    const todo = todos.find(item => item.id === todoId);
     if (!todo) return;
 
     if (activeTodoId === todoId && timer.isRunning) {
@@ -61,7 +62,7 @@ export const WorkQueue: React.FC = () => {
 
   const handlePromptSubmit = () => {
     if (!promptText.trim() || promptTodoId === null) return;
-    const todo = todos.find(t => t.id === promptTodoId);
+    const todo = todos.find(item => item.id === promptTodoId);
     timer.startAfterPrompt(promptTodoId, promptText.trim());
     setShowPrompt(false);
     setPromptText('');
@@ -78,10 +79,10 @@ export const WorkQueue: React.FC = () => {
     const isActive = activeTodoId === id;
     const confirmed = await confirm({
       message: isActive
-        ? 'This task is currently being tracked. Are you sure you want to remove it?'
-        : 'Are you sure you want to remove this task from the queue?',
+        ? t('removeActiveTaskConfirm')
+        : t('removeTaskConfirm'),
       variant: 'danger',
-      confirmText: 'Remove',
+      confirmText: t('removeBtn'),
     });
     if (confirmed) {
       if (isActive) {
@@ -124,17 +125,15 @@ export const WorkQueue: React.FC = () => {
           <Group justify="space-between">
             <Group gap="xs">
               <IconListCheck size={20} />
-              <Text fw={500}>Work Queue</Text>
+              <Text fw={500}>{t('workQueueTitle')}</Text>
             </Group>
-            <Badge size="lg" circle>{todos.length}</Badge>
+            {todos.length > 0 && <Badge size="sm" variant="light">{todos.length}</Badge>}
           </Group>
         </Card.Section>
 
         <Stack mt="md">
-          <Text size="sm" c="dimmed">Drag to reorder. First task is active when timer starts.</Text>
-
           {todos.length === 0 ? (
-            <Text c="dimmed" ta="center" py="xl">Your queue is empty. Add a task below to get started.</Text>
+            <Text c="dimmed" ta="center" py="xl">{t('emptyQueueText')}</Text>
           ) : (
             <Stack gap="xs">
               {todos.map((todo, index) => {
@@ -175,11 +174,6 @@ export const WorkQueue: React.FC = () => {
                           fw={600}
                         />
                         {todo.activityName && <Text size="xs" c="dimmed" truncate>{todo.activityName}</Text>}
-                        {(todo.note || getTaskNote(todo.taskId)) && (
-                          <Text size="xs" mt={4} c="dimmed" style={{ fontStyle: 'italic' }} truncate>
-                            Note: {todo.note || getTaskNote(todo.taskId)}
-                          </Text>
-                        )}
                       </Stack>
 
                       <Group gap="xs" wrap="nowrap" align="center">
@@ -199,7 +193,7 @@ export const WorkQueue: React.FC = () => {
                           variant={isThisRunning ? 'light' : 'filled'}
                           color={isThisRunning ? 'orange' : 'blue'}
                           onClick={() => handlePlayPause(todo.id)}
-                          aria-label={isThisRunning ? 'Pause' : 'Start'}
+                          aria-label={isThisRunning ? t('pauseTimerTooltip') : t('startTrackingTooltip')}
                         >
                           {isThisRunning ? <IconPlayerPause size={16} /> : <IconPlayerPlay size={16} />}
                         </ActionIcon>
@@ -207,7 +201,7 @@ export const WorkQueue: React.FC = () => {
                           variant="subtle"
                           color="red"
                           onClick={() => handleDelete(todo.id)}
-                          aria-label="Remove task"
+                          aria-label={t('removeBtn')}
                         >
                           <IconTrash size={16} />
                         </ActionIcon>
@@ -224,27 +218,27 @@ export const WorkQueue: React.FC = () => {
       <Modal
         opened={showPrompt}
         onClose={() => setShowPrompt(false)}
-        title={<Text fw={600}>What is your first performed task?</Text>}
+        title={<Text fw={600}>{t('firstPerformedTaskQuestion')}</Text>}
         size="80%"
         fullScreen={isMobile}
         centered
       >
         <Stack gap="md">
           <TextInput
-            placeholder="e.g., Investigating bug #123"
+            placeholder={t('performedTaskPlaceholder')}
             value={promptText}
             onChange={e => setPromptText(e.currentTarget.value)}
             onKeyDown={e => { if (e.key === 'Enter') handlePromptSubmit(); }}
             data-autofocus
           />
           <Group justify="flex-end">
-            <Button variant="default" onClick={() => setShowPrompt(false)}>Cancel</Button>
+            <Button variant="default" onClick={() => setShowPrompt(false)}>{t('cancelBtn')}</Button>
             <Button
               leftSection={<IconPlayerPlay size={16} />}
               onClick={handlePromptSubmit}
               disabled={!promptText.trim()}
             >
-              Start
+              {t('startTrackingBtn')}
             </Button>
           </Group>
         </Stack>

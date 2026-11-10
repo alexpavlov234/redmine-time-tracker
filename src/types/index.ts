@@ -149,43 +149,33 @@ export interface CustomField {
 }
 
 /// <summary>
-/// Status options for personal tasks.
+/// Available color themes for personal task sticky notes.
 /// </summary>
-export type PersonalTaskStatus = 'not_started' | 'in_progress' | 'awaiting' | 'completed';
+export type StickyNoteColor = 'yellow' | 'blue' | 'green' | 'pink' | 'purple' | 'orange';
 
 /// <summary>
-/// Priority level for personal queue tasks.
+/// Individual sticky note attached to a personal task.
 /// </summary>
-export type PersonalTaskPriority = 'high' | 'medium' | 'low';
-
-/// <summary>
-/// Checklist sub-item within a personal task.
-/// </summary>
-export interface PersonalTaskChecklistItem {
+export interface PersonalTaskStickyNote {
   id: string;
-  text: string;
-  completed: boolean;
+  title?: string;
+  content: string;
+  color: StickyNoteColor;
+  createdAt: number;
+  updatedAt: number;
 }
 
 /// <summary>
-/// Personal backlog task item with notes, priority, checklist, status, and optional Redmine linkage.
+/// Simplified personal task item with completion checkbox and multiple sticky notes.
 /// </summary>
 export interface PersonalTask {
   id: string;
   title: string;
-  notes?: string;
-  priority: PersonalTaskPriority;
-  status?: PersonalTaskStatus;
-  dueDate?: string;
   completed: boolean;
   createdAt: number;
   completedAt?: number;
-  redmineIssueId?: string;
-  redmineIssueSubject?: string;
-  redmineProjectId?: string;
-  redmineProjectName?: string;
-  checklist: PersonalTaskChecklistItem[];
   order: number;
+  stickyNotes: PersonalTaskStickyNote[];
 }
 /// <summary>
 /// Model for a note which can be connected to a Redmine task or exist as a general note with labels.
