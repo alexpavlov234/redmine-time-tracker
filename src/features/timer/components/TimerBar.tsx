@@ -4,7 +4,7 @@ import { useQueue } from '../../../contexts/QueueContext';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { IconPlayerPlay, IconPlayerPause, IconPlayerStop, IconAlertCircle } from '@tabler/icons-react';
-import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Tooltip } from '@mantine/core';
+import { Button, Modal, TextInput, Paper, Group, Text, ActionIcon, Stack, Tooltip, Divider, SegmentedControl } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { formatTime } from '../../../utils/formatters';
 import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
@@ -22,7 +22,7 @@ interface TimerBarProps {
 /// </summary>
 export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
   const isMobile = useMediaQuery('(max-width: 48em)');
-  const { isConfigured } = useSettings();
+  const { isConfigured, usePerformedTasksList, setUsePerformedTasksList } = useSettings();
   const { todos } = useQueue();
   const { t } = useLanguage();
   const timer = useQueueTimer();
@@ -122,6 +122,10 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
                 size="lg"
                 fw={700}
               />
+            ) : currentSubject ? (
+              <Text size="lg" fw={700} truncate>
+                {currentSubject}
+              </Text>
             ) : (
               <Text size="md" fw={600} c="dimmed" truncate>
                 {t('noActiveTaskSelected')}
@@ -173,6 +177,25 @@ export const TimerBar: React.FC<TimerBarProps> = ({ onStop }) => {
               </Tooltip>
             </Group>
           </Group>
+        </Group>
+
+        <Divider my="sm" />
+
+        <Group justify="space-between" align="center" wrap="wrap" gap="xs">
+          <Text size="xs" c="dimmed" fw={500}>
+            {t('trackingModeHeader')}
+          </Text>
+          <SegmentedControl
+            size="xs"
+            radius="md"
+            color="blue"
+            value={usePerformedTasksList ? 'performed' : 'direct'}
+            onChange={(val) => setUsePerformedTasksList(val === 'performed')}
+            data={[
+              { label: t('directLoggingTitle'), value: 'direct' },
+              { label: t('performedListTitle'), value: 'performed' },
+            ]}
+          />
         </Group>
       </Paper>
 

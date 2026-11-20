@@ -18,6 +18,7 @@ import {
   Alert,
   SimpleGrid,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import {
   IconSearch,
   IconRefresh,
@@ -31,10 +32,12 @@ import {
 } from '@tabler/icons-react';
 import { useUser } from '../../../contexts/UserContext';
 import { useQueue } from '../../../contexts/QueueContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { useTaskNotes } from '../../../hooks/useTaskNotes';
 import { getAllUserTimeEntries } from '../../../services/redmine';
 import { TaskNoteButton } from '../../../components/common/TaskNoteButton';
 import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
+import { formatDisplayDate } from '../../../utils/formatters';
 import type { TimeEntry } from '../../../types';
 
 /// <summary>
@@ -87,6 +90,7 @@ function formatDate(date: Date): string {
 export const TaskDaysSearch: React.FC = () => {
   const { user } = useUser();
   const { addTodo } = useQueue();
+  const { language } = useLanguage();
   const { getNote } = useTaskNotes();
 
   // Search and filter parameters
@@ -395,17 +399,21 @@ export const TaskDaysSearch: React.FC = () => {
           {/* Custom Date Inputs if custom range selected */}
           {datePreset === 'custom' && (
             <Group grow align="flex-end">
-              <TextInput
+              <DatePickerInput
                 label="From Date"
-                placeholder="YYYY-MM-DD"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.currentTarget.value)}
+                placeholder="From Date"
+                valueFormat="D MMMM YYYY"
+                clearable
+                value={customFrom || null}
+                onChange={(val) => setCustomFrom(val || '')}
               />
-              <TextInput
+              <DatePickerInput
                 label="To Date"
-                placeholder="YYYY-MM-DD"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.currentTarget.value)}
+                placeholder="To Date"
+                valueFormat="D MMMM YYYY"
+                clearable
+                value={customTo || null}
+                onChange={(val) => setCustomTo(val || '')}
               />
               <Button onClick={fetchData} variant="light">
                 Apply Custom Range
@@ -546,7 +554,7 @@ export const TaskDaysSearch: React.FC = () => {
                       </Text>
 
                       <Text size="xs" c="dimmed">
-                        Period: {task.firstDate} &rarr; {task.lastDate} ({task.distinctDates.size} dates logged)
+                        Period: {formatDisplayDate(task.firstDate, language)} &rarr; {formatDisplayDate(task.lastDate, language)} ({task.distinctDates.size} dates logged)
                       </Text>
                     </Stack>
 
@@ -620,7 +628,7 @@ export const TaskDaysSearch: React.FC = () => {
                       <Table striped highlightOnHover withTableBorder withColumnBorders>
                         <Table.Thead>
                           <Table.Tr>
-                            <Table.Th style={{ width: 120 }}>Date</Table.Th>
+                            <Table.Th style={{ width: 150 }}>Date</Table.Th>
                             <Table.Th style={{ width: 90 }}>Hours</Table.Th>
                             <Table.Th style={{ width: 90 }}>Days Equiv.</Table.Th>
                             <Table.Th style={{ width: 150 }}>Activity</Table.Th>
@@ -632,7 +640,7 @@ export const TaskDaysSearch: React.FC = () => {
                             const daysEquiv = parseFloat((entry.hours / (workdayHours || 8)).toFixed(2));
                             return (
                               <Table.Tr key={entry.id}>
-                                <Table.Td fw={500}>{entry.spent_on}</Table.Td>
+                                <Table.Td fw={500} style={{ whiteSpace: 'nowrap' }}>{formatDisplayDate(entry.spent_on, language)}</Table.Td>
                                 <Table.Td fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>
                                   {entry.hours}h
                                 </Table.Td>

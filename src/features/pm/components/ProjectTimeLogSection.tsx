@@ -17,6 +17,7 @@ import {
   Paper,
   ActionIcon,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import {
   IconCalendar,
   IconSearch,
@@ -31,6 +32,8 @@ import type { TimeEntry } from '../../../types';
 import type { DateRangePreset } from '../hooks/useProjectManagerData';
 import { groupEntriesByTask, groupEntriesByMember } from '../../../services/pmService';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { formatDisplayDate } from '../../../utils/formatters';
 
 /// <summary>
 /// Properties for ProjectTimeLogSection.
@@ -101,31 +104,32 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
   isLoading,
 }) => {
   const { redmineUrl } = useSettings();
+  const { language, t: tr } = useLanguage();
   const [activeTab, setActiveTab] = useState<string | null>('entries');
 
   // Extract unique members for filter dropdown
   const memberOptions = useMemo(() => {
     const map = new Map<string, string>();
-    map.set('all', 'All Team Members');
+    map.set('all', tr('pmAllMembersOption'));
     for (const e of allEntries) {
       if (e.user?.id) {
-        map.set(String(e.user.id), e.user.name || `User #${e.user.id}`);
+        map.set(String(e.user.id), e.user.name || `#${e.user.id}`);
       }
     }
     return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
-  }, [allEntries]);
+  }, [allEntries, tr]);
 
   // Extract unique activities for filter dropdown
   const activityOptions = useMemo(() => {
     const map = new Map<string, string>();
-    map.set('all', 'All Activities');
+    map.set('all', tr('pmAllActivitiesOption'));
     for (const e of allEntries) {
       if (e.activity?.id) {
-        map.set(String(e.activity.id), e.activity.name || `Activity #${e.activity.id}`);
+        map.set(String(e.activity.id), e.activity.name || `#${e.activity.id}`);
       }
     }
     return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
-  }, [allEntries]);
+  }, [allEntries, tr]);
 
   // Compute stats for current filtered view
   const viewStats = useMemo(() => {
@@ -208,9 +212,9 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
         {/* Header & Export Button */}
         <Group justify="space-between" align="center" wrap="wrap">
           <div>
-            <Title order={3}>Project Time Logs</Title>
+            <Title order={3}>{tr('pmTimeLogsHeading')}</Title>
             <Text size="sm" c="dimmed">
-              {dateLabel} • Total {filteredEntries.length} entries
+              {dateLabel} • {filteredEntries.length} {tr('pmEntriesCountWord')}
             </Text>
           </div>
 
@@ -222,7 +226,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
             disabled={filteredEntries.length === 0}
             loading={isLoading}
           >
-            Export for Client
+            {tr('pmExportForClientBtn')}
           </Button>
         </Group>
 
@@ -230,56 +234,56 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
         <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="md">
           <Paper withBorder p="md" radius="md">
             <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-              Logged in Period
+              {tr('pmLoggedInPeriodKpi')}
             </Text>
             <Group align="baseline" gap="xs" mt="xs">
               <Text fz={28} fw={700}>
                 {viewStats.totalHours}
               </Text>
               <Text size="sm" c="dimmed">
-                hours
+                {tr('hoursShort')}
               </Text>
             </Group>
           </Paper>
 
           <Paper withBorder p="md" radius="md">
             <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-              Billable Hours
+              {tr('pmBillableHoursKpi')}
             </Text>
             <Group align="baseline" gap="xs" mt="xs">
               <Text fz={28} fw={700} c="teal">
                 {viewStats.billableHours}
               </Text>
               <Text size="sm" c="dimmed">
-                hours
+                {tr('hoursShort')}
               </Text>
             </Group>
           </Paper>
 
           <Paper withBorder p="md" radius="md">
             <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-              Tasks Worked On
+              {tr('pmTasksWorkedOnKpi')}
             </Text>
             <Group align="baseline" gap="xs" mt="xs">
               <Text fz={28} fw={700}>
                 {viewStats.taskCount}
               </Text>
               <Text size="sm" c="dimmed">
-                tasks
+                {tr('pmTasksUnit')}
               </Text>
             </Group>
           </Paper>
 
           <Paper withBorder p="md" radius="md">
             <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-              Active Team Members
+              {tr('pmActiveMembersKpi')}
             </Text>
             <Group align="baseline" gap="xs" mt="xs">
               <Text fz={28} fw={700}>
                 {viewStats.userCount}
               </Text>
               <Text size="sm" c="dimmed">
-                members
+                {tr('pmMembersUnit')}
               </Text>
             </Group>
           </Paper>
@@ -296,33 +300,35 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                   value={dateRangePreset}
                   onChange={val => onDateRangeChange(val as DateRangePreset)}
                   data={[
-                    { value: 'this_month', label: 'This Month' },
-                    { value: 'last_month', label: 'Last Month' },
-                    { value: 'last_30_days', label: 'Last 30 Days' },
-                    { value: 'contract_period', label: 'Contract Period' },
-                    { value: 'all', label: 'All / Custom' },
+                    { value: 'this_month', label: tr('pmDateThisMonth') },
+                    { value: 'last_month', label: tr('pmDateLastMonth') },
+                    { value: 'last_30_days', label: tr('pmDateLast30Days') },
+                    { value: 'contract_period', label: tr('pmDateContractPeriod') },
+                    { value: 'all', label: tr('pmDateAllCustom') },
                   ]}
                 />
               </Group>
 
               {dateRangePreset === 'all' && (
                 <Group gap="xs">
-                  <TextInput
+                  <DatePickerInput
                     size="xs"
-                    type="date"
-                    placeholder="From"
-                    value={customFromDate}
-                    onChange={e => onCustomFromDateChange(e.target.value)}
-                    style={{ width: 135 }}
+                    valueFormat="D MMMM YYYY"
+                    clearable
+                    placeholder={tr('pmFromDatePlaceholder')}
+                    value={customFromDate || null}
+                    onChange={val => onCustomFromDateChange(val || '')}
+                    style={{ minWidth: 165 }}
                   />
                   <Text size="xs" c="dimmed">-</Text>
-                  <TextInput
+                  <DatePickerInput
                     size="xs"
-                    type="date"
-                    placeholder="To"
-                    value={customToDate}
-                    onChange={e => onCustomToDateChange(e.target.value)}
-                    style={{ width: 135 }}
+                    valueFormat="D MMMM YYYY"
+                    clearable
+                    placeholder={tr('pmToDatePlaceholder')}
+                    value={customToDate || null}
+                    onChange={val => onCustomToDateChange(val || '')}
+                    style={{ minWidth: 165 }}
                   />
                 </Group>
               )}
@@ -330,11 +336,11 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
               <Group gap="xs">
                 <Select
                   size="xs"
-                  placeholder="Billable status"
+                  placeholder={tr('pmColBillable')}
                   data={[
-                    { value: 'all', label: 'All Hours' },
-                    { value: 'billable', label: 'Billable Only' },
-                    { value: 'non_billable', label: 'Non-billable Only' },
+                    { value: 'all', label: tr('pmAllHoursOption') },
+                    { value: 'billable', label: tr('pmBillableOnlyOption') },
+                    { value: 'non_billable', label: tr('pmNonBillableOnlyOption') },
                   ]}
                   value={selectedBillableFilter}
                   onChange={val => onBillableFilterChange((val as 'all' | 'billable' | 'non_billable') || 'all')}
@@ -342,7 +348,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                 />
                 <Select
                   size="xs"
-                  placeholder="Team Member"
+                  placeholder={tr('pmColMember')}
                   data={memberOptions}
                   value={selectedMemberId}
                   onChange={val => onMemberChange(val || 'all')}
@@ -350,7 +356,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                 />
                 <Select
                   size="xs"
-                  placeholder="Activity"
+                  placeholder={tr('activityLabel')}
                   data={activityOptions}
                   value={selectedActivityId}
                   onChange={val => onActivityChange(val || 'all')}
@@ -362,7 +368,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
             {/* Search Input */}
             <TextInput
               size="xs"
-              placeholder="Search by task #ID, subject, team member, or comment..."
+              placeholder={tr('pmSearchLogsPlaceholder')}
               value={searchQuery}
               onChange={e => onSearchChange(e.target.value)}
               leftSection={<IconSearch size={14} />}
@@ -374,13 +380,13 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
         <Tabs value={activeTab} onChange={setActiveTab}>
           <Tabs.List>
             <Tabs.Tab value="entries" leftSection={<IconList size={16} />}>
-              All Entries ({filteredEntries.length})
+              {tr('pmTabAllEntries')} ({filteredEntries.length})
             </Tabs.Tab>
             <Tabs.Tab value="tasks" leftSection={<IconChecklist size={16} />}>
-              By Task ({taskSummaries.length})
+              {tr('pmTabByTask')} ({taskSummaries.length})
             </Tabs.Tab>
             <Tabs.Tab value="members" leftSection={<IconUsers size={16} />}>
-              By Team Member ({memberSummaries.length})
+              {tr('pmTabByMember')} ({memberSummaries.length})
             </Tabs.Tab>
           </Tabs.List>
 
@@ -388,20 +394,20 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
           <Tabs.Panel value="entries" pt="xs">
             {filteredEntries.length === 0 ? (
               <Text c="dimmed" size="sm" ta="center" py="xl">
-                No logged hours found for the selected period and filters.
+                {tr('pmNoEntriesForFilters')}
               </Text>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <Table striped highlightOnHover withTableBorder withColumnBorders fz="xs">
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th style={{ width: 95 }}>Date</Table.Th>
-                      <Table.Th style={{ width: 140 }}>Team Member</Table.Th>
-                      <Table.Th style={{ width: 220 }}>Task</Table.Th>
-                      <Table.Th style={{ width: 110 }}>Activity</Table.Th>
-                      <Table.Th style={{ width: 70, textAlign: 'right' }}>Hours</Table.Th>
-                      <Table.Th>Activity Description / Comment</Table.Th>
-                      <Table.Th style={{ width: 90, textAlign: 'center' }}>Billable</Table.Th>
+                      <Table.Th style={{ width: 145 }}>{tr('dateLabel')}</Table.Th>
+                      <Table.Th style={{ width: 140 }}>{tr('pmColMember')}</Table.Th>
+                      <Table.Th style={{ width: 220 }}>{tr('pmColTaskNum')}</Table.Th>
+                      <Table.Th style={{ width: 110 }}>{tr('activityLabel')}</Table.Th>
+                      <Table.Th style={{ width: 70, textAlign: 'right' }}>{tr('hoursLabel')}</Table.Th>
+                      <Table.Th>{tr('pmColDescription')}</Table.Th>
+                      <Table.Th style={{ width: 90, textAlign: 'center' }}>{tr('pmColBillable')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -416,7 +422,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
 
                       return (
                         <Table.Tr key={entry.id}>
-                          <Table.Td>{entry.spent_on}</Table.Td>
+                          <Table.Td style={{ whiteSpace: 'nowrap' }}>{formatDisplayDate(entry.spent_on, language)}</Table.Td>
                           <Table.Td fw={500}>{entry.user?.name || '-'}</Table.Td>
                           <Table.Td>
                             {issueId ? (
@@ -438,7 +444,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                                 {entry.issue?.parent && (
                                   <Group gap={4} wrap="nowrap">
                                     <Badge size="xs" variant="light" color="indigo" style={{ textTransform: 'none' }}>
-                                      ↳ Parent: #{entry.issue.parent.id}
+                                      ↳ {tr('pmParentShortBadge')}: #{entry.issue.parent.id}
                                     </Badge>
                                     {entry.issue.parent.subject && (
                                       <Text size="10px" c="dimmed" truncate style={{ maxWidth: 150 }} title={entry.issue.parent.subject}>
@@ -449,22 +455,22 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                                 )}
                               </Stack>
                             ) : (
-                              <Text c="dimmed">General Project</Text>
+                              <Text c="dimmed">{tr('pmGeneralProjectCell')}</Text>
                             )}
                           </Table.Td>
                           <Table.Td>{entry.activity?.name || '-'}</Table.Td>
                           <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
-                            {Number(entry.hours).toFixed(2)} h
+                            {Number(entry.hours).toFixed(2)} {tr('hoursShort')}
                           </Table.Td>
                           <Table.Td>{entry.comments || '-'}</Table.Td>
                           <Table.Td style={{ textAlign: 'center' }}>
                             {isBillable ? (
                               <Badge size="xs" color="teal" variant="light">
-                                Yes
+                                {tr('pmYes')}
                               </Badge>
                             ) : (
                               <Badge size="xs" color="gray" variant="subtle">
-                                No
+                                {tr('pmNo')}
                               </Badge>
                             )}
                           </Table.Td>
@@ -481,7 +487,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
           <Tabs.Panel value="tasks" pt="xs">
             {taskSummaries.length === 0 ? (
               <Text c="dimmed" size="sm" ta="center" py="xl">
-                No task entries found for the selected period.
+                {tr('pmNoTaskEntries')}
               </Text>
             ) : (
               <Stack gap="xs">
@@ -493,19 +499,19 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                       leftSection={isAllParentsExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
                       onClick={toggleExpandAll}
                     >
-                      {isAllParentsExpanded ? 'Collapse all parent tasks' : 'Expand all parent tasks'}
+                      {isAllParentsExpanded ? tr('pmCollapseAllParents') : tr('pmExpandAllParents')}
                     </Button>
                   </Group>
                 )}
                 <Table striped highlightOnHover withTableBorder fz="xs">
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th style={{ width: 110 }}>Task #</Table.Th>
-                      <Table.Th>Task Subject</Table.Th>
-                      <Table.Th style={{ width: 110, textAlign: 'right' }}>Total Hours</Table.Th>
-                      <Table.Th style={{ width: 100, textAlign: 'right' }}>Billable</Table.Th>
-                      <Table.Th style={{ width: 150 }}>Activities</Table.Th>
-                      <Table.Th style={{ width: 180 }}>Team Members</Table.Th>
+                      <Table.Th style={{ width: 110 }}>{tr('pmColTaskNum')}</Table.Th>
+                      <Table.Th>{tr('pmColTaskSubject')}</Table.Th>
+                      <Table.Th style={{ width: 110, textAlign: 'right' }}>{tr('pmColTotalHours')}</Table.Th>
+                      <Table.Th style={{ width: 100, textAlign: 'right' }}>{tr('pmColBillable')}</Table.Th>
+                      <Table.Th style={{ width: 150 }}>{tr('pmColActivities')}</Table.Th>
+                      <Table.Th style={{ width: 180 }}>{tr('pmColMembers')}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -526,7 +532,7 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                                     variant="subtle"
                                     color="blue"
                                     onClick={() => toggleParentExpand(t.issueId)}
-                                    title={isExpanded ? 'Collapse subtasks' : 'Expand subtasks'}
+                                    title={isExpanded ? tr('pmCollapseSubtasksTitle') : tr('pmExpandSubtasksTitle')}
                                   >
                                     {isExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
                                   </ActionIcon>
@@ -539,31 +545,31 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                                       <Text fw={700}>#{t.issueId}</Text>
                                     )
                                   ) : (
-                                    <Text c="dimmed">Total</Text>
+                                    <Text c="dimmed">{tr('totalLabelSuffix')}</Text>
                                   )}
                                 </Group>
                               </Table.Td>
                               <Table.Td>
                                 <Group gap="xs" wrap="wrap">
                                   <Badge size="xs" color="indigo" variant="filled">
-                                    Parent Task
+                                    {tr('pmParentTaskBadge')}
                                   </Badge>
                                   <Text fw={700}>{t.subject}</Text>
                                   <Badge size="xs" color="gray" variant="light">
-                                    {t.children?.length} {t.children?.length === 1 ? 'sub-task' : 'sub-tasks'}
+                                    {t.children?.length} {t.children?.length === 1 ? tr('pmSubtaskSingle') : tr('pmSubtaskPlural')}
                                   </Badge>
                                 </Group>
                               </Table.Td>
                               <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>
-                                <Text fw={700} span>{t.totalHours.toFixed(2)} h</Text>
+                                <Text fw={700} span>{t.totalHours.toFixed(2)} {tr('hoursShort')}</Text>
                                 {t.directHours && t.directHours > 0 ? (
                                   <Text size="10px" c="dimmed" display="block">
-                                    (direct: {t.directHours.toFixed(2)} h)
+                                    ({tr('pmDirectPrefix')} {t.directHours.toFixed(2)} {tr('hoursShort')})
                                   </Text>
                                 ) : null}
                               </Table.Td>
                               <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)', fontWeight: 700 }}>
-                                {t.billableHours.toFixed(2)} h
+                                {t.billableHours.toFixed(2)} {tr('hoursShort')}
                               </Table.Td>
                               <Table.Td>{t.activities.join(', ') || '-'}</Table.Td>
                               <Table.Td>{t.members.join(', ') || '-'}</Table.Td>
@@ -576,13 +582,13 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                                   <Text size="xs" c="dimmed">↳ #{t.issueId}</Text>
                                 </Table.Td>
                                 <Table.Td>
-                                  <Text size="xs" c="dimmed">Direct entries for task #{t.issueId}</Text>
+                                  <Text size="xs" c="dimmed">{tr('pmDirectEntriesForTask')} #{t.issueId}</Text>
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
-                                  {t.directHours.toFixed(2)} h
+                                  {t.directHours.toFixed(2)} {tr('hoursShort')}
                                 </Table.Td>
                                 <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
-                                  {(t.directBillableHours || 0).toFixed(2)} h
+                                  {(t.directBillableHours || 0).toFixed(2)} {tr('hoursShort')}
                                 </Table.Td>
                                 <Table.Td>-</Table.Td>
                                 <Table.Td>-</Table.Td>
@@ -609,10 +615,10 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                                     </Table.Td>
                                     <Table.Td fw={500}>{child.subject}</Table.Td>
                                     <Table.Td style={{ textAlign: 'right', fontWeight: 600 }}>
-                                      {child.totalHours.toFixed(2)} h
+                                      {child.totalHours.toFixed(2)} {tr('hoursShort')}
                                     </Table.Td>
                                     <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
-                                      {child.billableHours.toFixed(2)} h
+                                      {child.billableHours.toFixed(2)} {tr('hoursShort')}
                                     </Table.Td>
                                     <Table.Td>{child.activities.join(', ') || '-'}</Table.Td>
                                     <Table.Td>{child.members.join(', ') || '-'}</Table.Td>
@@ -636,15 +642,15 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                                 <Text fw={700}>#{t.issueId}</Text>
                               )
                             ) : (
-                              <Text c="dimmed">Total</Text>
+                              <Text c="dimmed">{tr('totalLabelSuffix')}</Text>
                             )}
                           </Table.Td>
                           <Table.Td fw={500}>{t.subject}</Table.Td>
                           <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>
-                            {t.totalHours.toFixed(2)} h
+                            {t.totalHours.toFixed(2)} {tr('hoursShort')}
                           </Table.Td>
                           <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
-                            {t.billableHours.toFixed(2)} h
+                            {t.billableHours.toFixed(2)} {tr('hoursShort')}
                           </Table.Td>
                           <Table.Td>{t.activities.join(', ') || '-'}</Table.Td>
                           <Table.Td>{t.members.join(', ') || '-'}</Table.Td>
@@ -661,17 +667,17 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
           <Tabs.Panel value="members" pt="xs">
             {memberSummaries.length === 0 ? (
               <Text c="dimmed" size="sm" ta="center" py="xl">
-                No team member data found for the selected period.
+                {tr('pmNoMemberData')}
               </Text>
             ) : (
               <Table striped highlightOnHover withTableBorder fz="xs">
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Team Member</Table.Th>
-                    <Table.Th style={{ width: 110, textAlign: 'right' }}>Total Hours</Table.Th>
-                    <Table.Th style={{ width: 120, textAlign: 'right' }}>Billable</Table.Th>
-                    <Table.Th style={{ width: 100, textAlign: 'center' }}>Task Count</Table.Th>
-                    <Table.Th style={{ width: 100, textAlign: 'right' }}>% of Time</Table.Th>
+                    <Table.Th>{tr('pmColMember')}</Table.Th>
+                    <Table.Th style={{ width: 110, textAlign: 'right' }}>{tr('pmColTotalHours')}</Table.Th>
+                    <Table.Th style={{ width: 120, textAlign: 'right' }}>{tr('pmColBillable')}</Table.Th>
+                    <Table.Th style={{ width: 100, textAlign: 'center' }}>{tr('pmColTaskCount')}</Table.Th>
+                    <Table.Th style={{ width: 100, textAlign: 'right' }}>{tr('pmColPercentOfTime')}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -684,10 +690,10 @@ export const ProjectTimeLogSection: React.FC<ProjectTimeLogSectionProps> = ({
                       <Table.Tr key={m.userId}>
                         <Table.Td fw={600}>{m.userName}</Table.Td>
                         <Table.Td style={{ textAlign: 'right', fontWeight: 700 }}>
-                          {m.totalHours.toFixed(2)} h
+                          {m.totalHours.toFixed(2)} {tr('hoursShort')}
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'right', color: 'var(--mantine-color-teal-filled)' }}>
-                          {m.billableHours.toFixed(2)} h
+                          {m.billableHours.toFixed(2)} {tr('hoursShort')}
                         </Table.Td>
                         <Table.Td style={{ textAlign: 'center' }}>{m.taskCount}</Table.Td>
                         <Table.Td style={{ textAlign: 'right' }}>{percent}%</Table.Td>

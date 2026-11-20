@@ -12,11 +12,47 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
+    :root {
+      --bg-body: #f8f9fa;
+      --bg-card: #ffffff;
+      --text-primary: #212529;
+      --text-secondary: #495057;
+      --text-muted: #868e96;
+      --border-color: #dee2e6;
+      --border-subtle: #e9ecef;
+      --accent-blue: #1971c2;
+      --accent-blue-light: #e7f5ff;
+      --accent-blue-border: #a5d8ff;
+      --accent-teal: #0ca678;
+      --accent-teal-hover: #099268;
+      --input-bg: #ffffff;
+      --input-border: #ced4da;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-body: #1a1b1e;
+        --bg-card: #25262b;
+        --text-primary: #e9ecef;
+        --text-secondary: #c1c2c5;
+        --text-muted: #909296;
+        --border-color: #373a40;
+        --border-subtle: #2c2e33;
+        --accent-blue: #4dabf7;
+        --accent-blue-light: rgba(25, 113, 194, 0.2);
+        --accent-blue-border: #1971c2;
+        --accent-teal: #12b886;
+        --accent-teal-hover: #0ca678;
+        --input-bg: #1a1b1e;
+        --input-border: #373a40;
+      }
+    }
+
     body {
-      width: 320px;
+      width: 330px;
       padding: 16px;
-      background: #f8f9fa;
-      color: #212529;
+      background: var(--bg-body);
+      color: var(--text-primary);
     }
 
     .header {
@@ -25,25 +61,18 @@
       justify-content: space-between;
       margin-bottom: 14px;
       padding-bottom: 10px;
-      border-bottom: 1px solid #dee2e6;
+      border-bottom: 1px solid var(--border-color);
     }
 
     .title {
       font-size: 15px;
       font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #1c7ed6;
-    }
-
-    .title svg {
-      flex-shrink: 0;
+      color: var(--accent-blue);
     }
 
     .badge {
       font-size: 11px;
-      padding: 2px 6px;
+      padding: 2px 8px;
       border-radius: 10px;
       font-weight: 600;
     }
@@ -58,22 +87,36 @@
       color: #e03131;
     }
 
+    @media (prefers-color-scheme: dark) {
+      .badge-online {
+        background: rgba(43, 138, 62, 0.25);
+        color: #69db7c;
+      }
+
+      .badge-offline {
+        background: rgba(224, 49, 49, 0.25);
+        color: #ff8787;
+      }
+    }
+
     /* Toggle switch row */
     .toggle-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: #ffffff;
+      gap: 10px;
+      background: var(--bg-card);
       padding: 10px 12px;
       border-radius: 8px;
-      border: 1px solid #e9ecef;
+      border: 1px solid var(--border-subtle);
       margin-bottom: 12px;
     }
 
     .toggle-label {
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 500;
-      color: #495057;
+      color: var(--text-secondary);
+      line-height: 1.3;
     }
 
     /* Switch CSS */
@@ -82,6 +125,7 @@
       display: inline-block;
       width: 40px;
       height: 22px;
+      flex-shrink: 0;
     }
 
     .switch input {
@@ -100,6 +144,12 @@
       background-color: #ced4da;
       transition: .3s;
       border-radius: 22px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .slider {
+        background-color: #495057;
+      }
     }
 
     .slider:before {
@@ -124,8 +174,8 @@
 
     /* Active Task Card */
     .timer-card {
-      background: #ffffff;
-      border: 1px solid #dee2e6;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 12px;
       margin-bottom: 12px;
@@ -136,14 +186,14 @@
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: #868e96;
+      color: var(--text-muted);
       margin-bottom: 4px;
     }
 
     .timer-task {
       font-size: 14px;
       font-weight: 600;
-      color: #1971c2;
+      color: var(--accent-blue);
       margin-bottom: 4px;
       white-space: nowrap;
       overflow: hidden;
@@ -152,7 +202,7 @@
 
     .timer-project {
       font-size: 12px;
-      color: #495057;
+      color: var(--text-secondary);
       margin-bottom: 8px;
     }
 
@@ -160,7 +210,7 @@
       font-size: 24px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
-      color: #212529;
+      color: var(--text-primary);
       text-align: center;
       margin: 8px 0;
     }
@@ -178,8 +228,13 @@
       text-align: center;
       cursor: pointer;
       border: none;
-      transition: background 0.2s;
+      transition: background 0.2s, opacity 0.2s;
       text-decoration: none;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .btn-stop {
@@ -187,32 +242,43 @@
       color: #ffffff;
     }
 
-    .btn-stop:hover {
+    .btn-stop:hover:not(:disabled) {
       background: #e03131;
     }
 
+    .btn-start-notask {
+      background: var(--accent-teal);
+      color: #ffffff;
+      margin-top: 6px;
+    }
+
+    .btn-start-notask:hover:not(:disabled) {
+      background: var(--accent-teal-hover);
+    }
+
     .btn-app {
-      background: #e7f5ff;
-      color: #1971c2;
-      border: 1px solid #a5d8ff;
+      background: var(--accent-blue-light);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue-border);
       margin-bottom: 8px;
     }
 
     .btn-app:hover {
-      background: #d0ebff;
+      opacity: 0.9;
     }
 
     .empty-state {
       text-align: center;
-      color: #868e96;
-      font-size: 13px;
-      padding: 10px 0;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      padding: 8px 0;
+      line-height: 1.4;
     }
 
     /* Collapsible Settings Section */
     .settings-details {
-      background: #ffffff;
-      border: 1px solid #dee2e6;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 10px 12px;
       font-size: 12px;
@@ -221,7 +287,7 @@
     .settings-details summary {
       cursor: pointer;
       font-weight: 600;
-      color: #495057;
+      color: var(--text-secondary);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -241,7 +307,7 @@
       display: block;
       font-size: 11px;
       font-weight: 600;
-      color: #495057;
+      color: var(--text-secondary);
       margin-bottom: 3px;
     }
 
@@ -250,7 +316,9 @@
       padding: 6px 8px;
       font-size: 12px;
       border-radius: 4px;
-      border: 1px solid #ced4da;
+      border: 1px solid var(--input-border);
+      background: var(--input-bg);
+      color: var(--text-primary);
       outline: none;
     }
 
@@ -277,23 +345,35 @@
     .save-status {
       font-size: 11px;
       color: #2b8a3e;
-      margin-top: 4px;
+      margin-top: 6px;
       display: none;
       text-align: center;
+      line-height: 1.35;
+    }
+
+    .save-status.is-warning {
+      color: #d9480f;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .save-status {
+        color: #69db7c;
+      }
+
+      .save-status.is-warning {
+        color: #ffa94d;
+      }
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="title">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <span>Redmine Tracker</span>
-    </div>
+    <div class="title">Redmine Time Tracker</div>
     <span id="server-status" class="badge badge-offline">Офлайн</span>
   </div>
 
   <div class="toggle-row">
-    <span class="toggle-label">Бутон в страниците на задачи</span>
+    <span class="toggle-label">Показвай бутона за таймера в страниците на задачите</span>
     <label class="switch">
       <input type="checkbox" id="toggle-enabled" checked>
       <span class="slider"></span>
@@ -303,31 +383,31 @@
   <div class="timer-card" id="timer-box">
     <div class="timer-status" id="timer-state-label">Статус</div>
     <div id="active-task-content">
-      <div class="empty-state">Няма активен таймер в момента.</div>
+      <div class="empty-state">В момента няма активен таймер.</div>
     </div>
   </div>
 
   <a href="http://localhost:5173" target="_blank" class="btn btn-app" id="open-app-btn">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-    <span>Отвори Web Приложението</span>
+    <span>Отвори уеб приложението</span>
   </a>
 
   <details class="settings-details">
     <summary>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      <span>Настройки за връзка (API Key)</span>
+      <span>Настройки за връзка</span>
     </summary>
     <div class="settings-content">
       <div class="field-group">
-        <label for="cfg-redmine-url">Redmine URL:</label>
+        <label for="cfg-redmine-url">Адрес на Redmine (URL):</label>
         <input type="text" id="cfg-redmine-url" placeholder="https://redmine.example.com">
       </div>
       <div class="field-group">
-        <label for="cfg-api-key">Redmine API Key:</label>
-        <input type="password" id="cfg-api-key" placeholder="API ключ от Redmine профила">
+        <label for="cfg-api-key">API ключ за достъп:</label>
+        <input type="password" id="cfg-api-key" placeholder="Въведете вашия API ключ от Redmine">
       </div>
       <button type="button" class="btn-save-settings" id="btn-save-config">Запази настройките</button>
-      <div class="save-status" id="cfg-save-status">Настройките са запазени успешно!</div>
+      <div class="save-status" id="cfg-save-status">Настройките бяха запазени успешно!</div>
     </div>
   </details>
 

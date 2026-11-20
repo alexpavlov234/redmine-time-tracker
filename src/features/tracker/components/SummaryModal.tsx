@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Modal, Button, Select, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Grid, Paper } from '@mantine/core';
+import { Modal, Button, Select, Textarea, Checkbox, NumberInput, Group, Stack, Text, Alert, Grid, Paper, Tooltip } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useProjects } from '../../../contexts/ProjectsContext';
-import { redmineApiRequest } from '../../../services/redmine';
+import { useStagedEntries } from '../../../contexts/StagedEntriesContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { useConfirm } from '../../../contexts/ConfirmContext';
+import { redmineApiRequest, getIssue } from '../../../services/redmine';
 import { formatTime, cleanTaskId, formatCustomFieldsPayload } from '../../../utils/formatters';
-import { IconSend, IconCheck } from '@tabler/icons-react';
+import { IconSend, IconCheck, IconGitCommit, IconTrash } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { useSettings } from '../../../contexts/SettingsContext';
@@ -30,18 +33,23 @@ interface SummaryModalProps {
 export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) => {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const { usePerformedTasksList } = useSettings();
+  const { t } = useLanguage();
+  const confirmDialog = useConfirm();
+  const { stageEntry } = useStagedEntries();
   const { totalElapsedTime, activities, resetTimer, activeTodo } = useQueueTimer();
-  const { allProjects, issueStatuses, ensureStatusesLoaded, refreshRecentProjects } = useProjects();
+  const { allProjects, issueStatuses, ensureStatusesLoaded, ensureProjectsLoaded, refreshRecentProjects } = useProjects();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
-  const { activities: projectActivities } = useActivitiesForProject(
+  const [selectedTaskSubject, setSelectedTaskSubject] = useState<string>('');
+  const { activities: projectActivities, defaultActivityId } = useActivitiesForProject(
     activeTodo?.projectId || selectedProjectId || null,
     isOpen
   );
 
   const [comments, setComments] = useState('');
   const [activityId, setActivityId] = useState<string | null>(null);
+  const [isResolvingLastActivity, setIsResolvingLastActivity] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
   const [changeStatus, setChangeStatus] = useState(false);
   const [statusId, setStatusId] = useState<string | null>(null);
@@ -72,12 +80,15 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
         prevIsOpenRef.current = false;
         setSelectedProjectId('');
         setSelectedTaskId('');
+        setSelectedTaskSubject('');
         setComments('');
         setManualHours(0.1);
         setActivityId(null);
+        setIsResolvingLastActivity(false);
         setSubmitResult(null);
         setChangeStatus(false);
         setStatusId(null);
+        setIsSubmitting(false);
         setCustomFieldValues({});
       }
       return;
@@ -86,8 +97,30 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
     if (!prevIsOpenRef.current) {
       prevIsOpenRef.current = true;
 
-      setSelectedProjectId(activeTodo?.projectId || (allProjects.length > 0 ? allProjects[0].id.toString() : ''));
+      if (activeTodo?.taskId) {
+        setSelectedProjectId(activeTodo.projectId || '');
+        if (!activeTodo.projectId) {
+          const parsedTaskNum = parseInt(cleanTaskId(activeTodo.taskId), 10);
+          if (!isNaN(parsedTaskNum) && parsedTaskNum > 0) {
+            getIssue(parsedTaskNum)
+              .then((issue) => {
+                if (!prevIsOpenRef.current || !issue) return;
+                if (issue.project?.id) {
+                  setSelectedProjectId(String(issue.project.id));
+                }
+                if (!activeTodo.taskSubject && issue.subject) {
+                  setSelectedTaskSubject(issue.subject);
+                }
+              })
+              .catch(() => {});
+          }
+        }
+      } else {
+        setSelectedProjectId(allProjects.length > 0 ? allProjects[0].id.toString() : '');
+        ensureProjectsLoaded();
+      }
       setSelectedTaskId(activeTodo?.taskId || '');
+      setSelectedTaskSubject(activeTodo?.taskSubject || '');
 
       // Build comments from activities or todo note
       if (usePerformedTasksList && activities.length > 0) {
@@ -116,13 +149,23 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
       // Set activity from todo, or check last used activity for task
       if (activeTodo?.activityId) {
+        setIsResolvingLastActivity(false);
         setActivityId(String(activeTodo.activityId));
       } else if (activeTodo?.taskId) {
-        getLastActivityForTask(activeTodo.taskId).then(actId => {
-          if (actId) {
-            setActivityId(actId);
-          }
-        });
+        setIsResolvingLastActivity(true);
+        getLastActivityForTask(activeTodo.taskId)
+          .then(actId => {
+            if (actId && prevIsOpenRef.current) {
+              setActivityId(actId);
+            }
+          })
+          .finally(() => {
+            if (prevIsOpenRef.current) {
+              setIsResolvingLastActivity(false);
+            }
+          });
+      } else {
+        setIsResolvingLastActivity(false);
       }
 
       // Initialize custom field values
@@ -166,7 +209,16 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
     });
   }, [isOpen, customFields]);
 
-  const handleSubmit = async () => {
+  /// <summary>
+  /// Auto-selects the project's default activity if no specific or last-used activity is set.
+  /// </summary>
+  useEffect(() => {
+    if (isOpen && !isResolvingLastActivity && !activityId && defaultActivityId && !activeTodo?.activityId) {
+      setActivityId(String(defaultActivityId));
+    }
+  }, [isOpen, isResolvingLastActivity, activityId, defaultActivityId, activeTodo?.activityId]);
+
+  const validateAndBuildCommon = () => {
     const rawIssueId = selectedTaskId || activeTodo?.taskId || '';
     const cleanIssueStr = cleanTaskId(rawIssueId);
     const parsedIssueId = cleanIssueStr ? parseInt(cleanIssueStr, 10) : undefined;
@@ -176,35 +228,88 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
     const cleanProjectId = (rawProjectId && rawProjectId !== 'my_issues') ? rawProjectId.trim() : '';
 
     if (!validIssueId && !cleanProjectId) {
-      setSubmitResult({ success: false, message: 'Please select a project or task.' });
-      return;
+      setSubmitResult({ success: false, message: t('validationProjectOrTaskRequired') });
+      return null;
     }
 
     if (!activityId) {
-      setSubmitResult({ success: false, message: 'Please select an activity.' });
-      return;
+      setSubmitResult({ success: false, message: t('validationActivityRequired') });
+      return null;
     }
 
     const hoursFormatted = typeof manualHours === 'string' ? parseFloat(manualHours) : manualHours;
     if (isNaN(hoursFormatted) || hoursFormatted <= 0) {
-      setSubmitResult({ success: false, message: 'Please enter a valid number of hours.' });
-      return;
+      setSubmitResult({ success: false, message: t('validationHoursRequired') });
+      return null;
     }
+
+    const now = new Date();
+    const spentOn = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    return {
+      validIssueId,
+      cleanProjectId,
+      hoursFormatted,
+      spentOn,
+      payloadCustomFields: formatCustomFieldsPayload(customFieldValues),
+    };
+  };
+
+  /// <summary>
+  /// Commits (stages) the time entry locally for batch pushing later from the calendar.
+  /// </summary>
+  const handleCommit = () => {
+    if (isSubmitting || submitResult?.success) return;
+    const validated = validateAndBuildCommon();
+    if (!validated) return;
+
+    setIsSubmitting(true);
+
+    const { validIssueId, cleanProjectId, hoursFormatted, spentOn, payloadCustomFields } = validated;
+    const matchedProject = allProjects.find(p => p.id.toString() === cleanProjectId);
+    const projectName = activeTodo?.projectName || matchedProject?.name || t('generalNoProject');
+    const matchedActivity = projectActivities.find(a => a.id.toString() === activityId);
+    const activityName = matchedActivity?.name || activeTodo?.activityName || `#${activityId}`;
+
+    stageEntry({
+      projectId: cleanProjectId,
+      projectName,
+      issueId: validIssueId,
+      issueSubject: selectedTaskSubject || activeTodo?.taskSubject || undefined,
+      activityId: parseInt(activityId!, 10),
+      activityName,
+      hours: hoursFormatted,
+      comments: comments.trim(),
+      spent_on: spentOn,
+      ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
+      ...(changeStatus && statusId && validIssueId ? { statusId } : {}),
+    });
+
+    setSubmitResult({ success: true, message: t('committedSuccessMsg') });
+
+    setTimeout(() => {
+      onClose();
+      resetTimer(true);
+    }, 700);
+  };
+
+  const handleSubmit = async () => {
+    const validated = validateAndBuildCommon();
+    if (!validated) return;
+
+    const { validIssueId, cleanProjectId, hoursFormatted, spentOn, payloadCustomFields } = validated;
 
     setIsSubmitting(true);
     setSubmitResult(null);
 
     try {
-      // Build payload
-      const payloadCustomFields = formatCustomFieldsPayload(customFieldValues);
-
       const timeEntryPayload: any = {
         time_entry: {
           ...(validIssueId ? { issue_id: validIssueId } : { project_id: cleanProjectId }),
           hours: hoursFormatted,
           comments: comments.trim(),
-          activity_id: parseInt(activityId, 10),
-          spent_on: new Date().toISOString().split('T')[0],
+          activity_id: parseInt(activityId!, 10),
+          spent_on: spentOn,
           ...(payloadCustomFields.length > 0 && { custom_fields: payloadCustomFields }),
         },
       };
@@ -223,7 +328,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
         }
       }
 
-      setSubmitResult({ success: true, message: 'Time entry submitted successfully!' });
+      setSubmitResult({ success: true, message: t('timeEntryCreatedSuccess') });
 
       if (validIssueId && activityId) {
         setLastActivityForTask(validIssueId, activityId);
@@ -236,17 +341,31 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
         resetTimer(true); // remove from queue + advance
       }, 800);
     } catch (err: any) {
-      setSubmitResult({ success: false, message: err.message || 'Failed to submit.' });
+      setSubmitResult({ success: false, message: err.message || t('timeEntrySubmitFailed') });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDiscard = async () => {
+    if (isSubmitting || submitResult?.success) return;
+    const confirmed = await confirmDialog({
+      message: t('discardTimerConfirm'),
+      subtitle: t('discardTimerSubtitle'),
+      variant: 'danger',
+      confirmText: t('deleteBtn'),
+      cancelText: t('cancelBtn'),
+    });
+    if (!confirmed) return;
+    resetTimer(true);
+    onClose();
   };
 
   return (
     <Modal
       opened={isOpen}
       onClose={onClose}
-      title={<Text fw={600} size="lg">Submit Time Entry</Text>}
+      title={<Text fw={600} size="lg">{t('submitTimeEntryModalTitle')}</Text>}
       size="80%"
       fullScreen={isMobile}
       centered
@@ -265,7 +384,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                     </Text>
                     <RedmineIssueLink
                       issueId={activeTodo.taskId}
-                      subject={activeTodo.taskSubject}
+                      subject={selectedTaskSubject || activeTodo.taskSubject}
                       size="md"
                       fw={700}
                     />
@@ -275,8 +394,8 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                 {/* Side-by-side: Hours & Activity */}
                 <Group align="flex-start" wrap="nowrap">
                   <NumberInput
-                    label="Hours"
-                    description={`Recorded: ${formatTime(totalElapsedTime)}`}
+                    label={t('hoursLabel')}
+                    description={`${t('recordedLabel')}: ${formatTime(totalElapsedTime)}`}
                     value={manualHours}
                     onChange={setManualHours}
                     decimalScale={2}
@@ -287,11 +406,11 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                   />
 
                   <Select
-                    label="Activity"
-                    placeholder="-- Select activity --"
+                    label={t('activityLabel')}
+                    placeholder={t('selectActivityPlaceholder')}
                     value={activityId}
                     onChange={setActivityId}
-                    data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ' (default)' : ''}` }))}
+                    data={projectActivities.map(a => ({ value: a.id.toString(), label: `${a.name}${a.is_default ? ` ${t('defaultTag')}` : ''}` }))}
                     required
                     style={{ flex: 1 }}
                   />
@@ -306,7 +425,14 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                     if (!val) setSelectedTaskId('');
                   }}
                   taskId={selectedTaskId}
-                  onTaskChange={(val) => setSelectedTaskId(val)}
+                  onTaskChange={(val, task) => {
+                    setSelectedTaskId(val);
+                    if (task?.subject) {
+                      setSelectedTaskSubject(task.subject);
+                    } else if (!val) {
+                      setSelectedTaskSubject('');
+                    }
+                  }}
                   activityId={activityId || ''}
                   onActivityChange={(val) => setActivityId(val)}
                   includeMyIssues={true}
@@ -317,8 +443,8 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
                 />
 
                 <NumberInput
-                  label="Hours"
-                  description={`Recorded: ${formatTime(totalElapsedTime)}`}
+                  label={t('hoursLabel')}
+                  description={`${t('recordedLabel')}: ${formatTime(totalElapsedTime)}`}
                   value={manualHours}
                   onChange={setManualHours}
                   decimalScale={2}
@@ -332,7 +458,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
             {/* Status Change row */}
             <Group align="flex-end" wrap="nowrap">
               <Checkbox
-                label="Update Status"
+                label={t('updateStatusLabel')}
                 checked={changeStatus}
                 onChange={e => {
                   const checked = e.currentTarget.checked;
@@ -346,7 +472,7 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
 
               {changeStatus && (
                 <Select
-                  placeholder="-- Select status --"
+                  placeholder={t('selectStatusPlaceholder')}
                   value={statusId}
                   onChange={setStatusId}
                   onDropdownOpen={ensureStatusesLoaded}
@@ -362,10 +488,10 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
         <Grid.Col span={{ base: 12, md: 6 }} style={{ display: 'flex', flexDirection: 'column' }}>
           <Stack gap="md" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <Textarea
-              label="Comments"
+              label={t('commentsLabel')}
               value={comments}
               onChange={(e) => setComments(e.currentTarget.value)}
-              placeholder="Detailed work summary..."
+              placeholder={t('detailedSummaryPlaceholder')}
               minRows={6}
               styles={{
                 root: { flex: 1, display: 'flex', flexDirection: 'column' },
@@ -390,20 +516,46 @@ export const SummaryModal: React.FC<SummaryModalProps> = ({ isOpen, onClose }) =
         </Alert>
       )}
 
-      <Group justify="flex-end" mt="lg">
-        <Button variant="default" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          leftSection={submitResult?.success ? <IconCheck size={16} /> : <IconSend size={16} />}
-          onClick={handleSubmit}
-          disabled={isSubmitting || submitResult?.success}
-          loading={isSubmitting}
-          color={submitResult?.success ? 'green' : 'blue'}
-          size="md"
-        >
-          {submitResult?.success ? 'Submitted!' : 'Submit to Redmine'}
-        </Button>
+      <Group justify="space-between" align="center" wrap="wrap" gap="sm" mt="lg">
+        <Tooltip label={t('discardTimerTooltip')}>
+          <Button
+            variant="light"
+            color="red"
+            leftSection={<IconTrash size={16} />}
+            onClick={handleDiscard}
+            disabled={isSubmitting || submitResult?.success}
+          >
+            {t('deleteBtn')}
+          </Button>
+        </Tooltip>
+
+        <Group gap="sm" wrap="wrap">
+          <Button variant="default" onClick={onClose}>
+            {t('cancelBtn')}
+          </Button>
+          <Tooltip label={t('commitForLaterTooltip')}>
+            <Button
+              leftSection={<IconGitCommit size={16} />}
+              onClick={handleCommit}
+              disabled={isSubmitting || submitResult?.success}
+              color="orange"
+              variant="light"
+              size="md"
+            >
+              {t('commitBtn')}
+            </Button>
+          </Tooltip>
+          <Button
+            leftSection={submitResult?.success ? <IconCheck size={16} /> : <IconSend size={16} />}
+            onClick={handleSubmit}
+            disabled={isSubmitting || submitResult?.success}
+            loading={isSubmitting}
+            color={submitResult?.success ? 'green' : 'blue'}
+            size="md"
+          >
+            {submitResult?.success ? t('submittedBtn') : t('pushToRedmineBtn')}
+          </Button>
+        </Group>
       </Group>
     </Modal>
   );

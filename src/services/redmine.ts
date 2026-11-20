@@ -132,8 +132,14 @@ export async function redmineApiRequest(endpoint: string, method: string = 'GET'
                 const errorText = await proxyResp.text();
                 throw mapHttpError(proxyResp.status, proxyResp.statusText, errorText);
             }
-            if (proxyResp.status === 204 || proxyResp.status === 201) return {};
-            return proxyResp.json();
+            if (proxyResp.status === 204) return {};
+            const responseText = await proxyResp.text();
+            if (!responseText || !responseText.trim()) return {};
+            try {
+                return JSON.parse(responseText);
+            } catch {
+                return {};
+            }
         } catch (e: any) {
             clearProxyTimeout();
 
@@ -170,8 +176,14 @@ export async function redmineApiRequest(endpoint: string, method: string = 'GET'
                     const errorText = await directResp.text();
                     throw mapHttpError(directResp.status, directResp.statusText, errorText);
                 }
-                if (directResp.status === 204 || directResp.status === 201) return {};
-                return directResp.json();
+                if (directResp.status === 204) return {};
+                const directResponseText = await directResp.text();
+                if (!directResponseText || !directResponseText.trim()) return {};
+                try {
+                    return JSON.parse(directResponseText);
+                } catch {
+                    return {};
+                }
             } catch (e2) {
                 clearDirectTimeout();
                 // Provide a combined error indicating proxy and direct both failed
@@ -206,10 +218,26 @@ export async function getCurrentUser() {
 export async function getTimeEntries(params: { from: string, to: string, user_id: number }): Promise<TimeEntry[]> {
     const { from, to, user_id } = params;
     // Note: Redmine API `to` and `from` are inclusive.
-    const endpoint = `/time_entries.json?user_id=${user_id}&from=${from}&to=${to}&limit=100&include=issue,custom_fields`;
+    const allEntries: TimeEntry[] = [];
+    let offset = 0;
+    let totalCount = Infinity;
+
     try {
-        const response = await redmineApiRequest(endpoint);
-        return response.time_entries || [];
+        while (allEntries.length < totalCount) {
+            const endpoint = `/time_entries.json?user_id=${user_id}&from=${from}&to=${to}&limit=100&offset=${offset}&include=issue,custom_fields`;
+            const response = await redmineApiRequest(endpoint);
+            const entries: TimeEntry[] = Array.isArray(response.time_entries) ? response.time_entries : [];
+
+            totalCount = typeof response.total_count === 'number' ? response.total_count : entries.length;
+            allEntries.push(...entries);
+
+            if (entries.length === 0 || allEntries.length >= totalCount) {
+                break;
+            }
+
+            offset += entries.length;
+        }
+        return allEntries;
     } catch (error) {
         console.error('Failed to fetch time entries:', error);
         throw error; // Re-throw to be handled by the caller
@@ -327,10 +355,14 @@ export async function getIssues(ids: number[], resolveParents: boolean = true): 
 /// Retrieves a single Redmine issue by ID, checking the in-memory cache first.
 /// </summary>
 /// <param name="id">Numeric issue ID.</param>
+/// <param name="forceRefresh">Whether to bypass cache or force full issue details (e.g. description).</param>
 /// <returns>The resolved RedmineIssue object.</returns>
-export async function getIssue(id: number) {
-    if (issueCache.has(id)) {
-        return issueCache.get(id)!;
+export async function getIssue(id: number, forceRefresh: boolean = false) {
+    if (!forceRefresh && issueCache.has(id)) {
+        const cached = issueCache.get(id)!;
+        if ((cached as any).description !== undefined) {
+            return cached;
+        }
     }
     try {
         const response = await redmineApiRequest(`/issues/${id}.json`);
@@ -518,6 +550,7 @@ export function sanitizeTimeEntryData(data: Record<string, any>): Record<string,
 
     if (data.comments !== undefined) clean.comments = data.comments;
     if (data.spent_on !== undefined) clean.spent_on = data.spent_on;
+    if (data.user_id !== undefined && data.user_id !== null && data.user_id !== '') clean.user_id = data.user_id;
     if (data.custom_fields !== undefined) clean.custom_fields = data.custom_fields;
 
     return clean;
@@ -535,6 +568,7 @@ export async function updateTimeEntry(id: number, data: {
     comments?: string;
     activity_id?: number;
     spent_on?: string;
+    user_id?: number | string;
     issue_id?: number | string;
     project_id?: number | string;
     custom_fields?: Array<{ id: number, value: any }>;
@@ -560,6 +594,7 @@ export async function createTimeEntry(data: {
     comments?: string;
     activity_id?: number;
     spent_on?: string;
+    user_id?: number | string;
     issue_id?: number | string;
     project_id?: number | string;
     custom_fields?: Array<{ id: number, value: any }>;
@@ -581,6 +616,68 @@ export async function deleteTimeEntry(id: number) {
     } catch (error) {
         console.error(`Failed to delete time entry #${id}:`, error);
         throw error;
+    }
+}
+
+export interface CreateIssuePayload {
+    project_id: number | string;
+    subject: string;
+    description?: string;
+    tracker_id?: number;
+    status_id?: number;
+    priority_id?: number;
+    assigned_to_id?: number;
+    category_id?: number;
+    fixed_version_id?: number;
+    parent_issue_id?: number;
+    custom_fields?: Array<{ id: number, value: any }>;
+}
+
+/// <summary>
+/// Creates a new issue in Redmine.
+/// </summary>
+/// <param name="data">Issue creation payload.</param>
+/// <returns>The newly created RedmineIssue object.</returns>
+export async function createIssue(data: CreateIssuePayload): Promise<RedmineIssue> {
+    try {
+        const payload: Record<string, any> = {
+            project_id: data.project_id,
+            subject: data.subject
+        };
+        if (data.description !== undefined) payload.description = data.description;
+        if (data.tracker_id !== undefined) payload.tracker_id = data.tracker_id;
+        if (data.status_id !== undefined) payload.status_id = data.status_id;
+        if (data.priority_id !== undefined) payload.priority_id = data.priority_id;
+        if (data.assigned_to_id !== undefined) payload.assigned_to_id = data.assigned_to_id;
+        if (data.category_id !== undefined) payload.category_id = data.category_id;
+        if (data.fixed_version_id !== undefined) payload.fixed_version_id = data.fixed_version_id;
+        if (data.parent_issue_id !== undefined) payload.parent_issue_id = data.parent_issue_id;
+        if (data.custom_fields !== undefined) payload.custom_fields = data.custom_fields;
+
+        const response = await redmineApiRequest('/issues.json', 'POST', { issue: payload });
+        const created: RedmineIssue = response.issue || response;
+        if (created && created.id) {
+            issueCache.set(created.id, created);
+        }
+        return created;
+    } catch (error) {
+        console.error('Failed to create issue:', error);
+        throw error;
+    }
+}
+
+/// <summary>
+/// Retrieves available trackers for a specific Redmine project.
+/// </summary>
+/// <param name="projectId">Numeric or string project ID.</param>
+/// <returns>Array of tracker objects with id and name.</returns>
+export async function getProjectTrackers(projectId: number | string): Promise<Array<{ id: number; name: string }>> {
+    try {
+        const response = await redmineApiRequest(`/projects/${projectId}.json?include=trackers`);
+        return response.project?.trackers || [];
+    } catch (error) {
+        console.error(`Failed to fetch trackers for project ${projectId}:`, error);
+        return [];
     }
 }
 
@@ -653,5 +750,37 @@ export async function detectBillableField() {
     } catch (error) {
         console.error('Failed to detect billable field:', error);
         return null;
+    }
+}
+
+export interface ProjectMemberUser {
+    id: number;
+    name: string;
+}
+
+export interface ProjectMembership {
+    id: number;
+    project: { id: number; name: string };
+    user?: ProjectMemberUser;
+    group?: { id: number; name: string };
+    roles: Array<{ id: number; name: string; inherited?: boolean }>;
+}
+
+/**
+ * Fetches project memberships from Redmine to obtain the list of project members and their roles.
+ * 
+ * @param projectId Numeric or slug identifier of the project.
+ * @returns Array of project memberships.
+ */
+export async function getProjectMemberships(projectId: number | string): Promise<ProjectMembership[]> {
+    try {
+        const response = await redmineApiRequest(`/projects/${projectId}/memberships.json?limit=100`);
+        if (Array.isArray(response.memberships)) {
+            return response.memberships;
+        }
+        return [];
+    } catch (error) {
+        console.warn(`Failed to fetch memberships for project ${projectId}:`, error);
+        return [];
     }
 }

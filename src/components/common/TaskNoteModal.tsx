@@ -15,7 +15,6 @@ import {
   Divider,
 } from '@mantine/core';
 import {
-  IconNotes,
   IconExternalLink,
   IconTrash,
   IconDeviceFloppy,
@@ -26,8 +25,10 @@ import {
 } from '@tabler/icons-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { useTaskNotes } from '../../hooks/useTaskNotes';
 import { RichTextNoteEditor, RichTextNoteViewer } from './RichTextNoteEditor';
+import { formatDisplayDateTime } from '../../utils/formatters';
 import type { NoteItem } from '../../types';
 
 /// <summary>
@@ -58,6 +59,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
 }) => {
   const { redmineUrl } = useSettings();
   const confirm = useConfirm();
+  const { language, t } = useLanguage();
   const { getNotes, saveNoteItem, deleteNoteItem, allLabels } = useTaskNotes();
 
   const cleanTaskId = taskId ? String(taskId).replace(/^#/, '').trim() : '';
@@ -127,9 +129,9 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
   /// </summary>
   const handleDeleteNote = async (noteId: string) => {
     const isConfirmed = await confirm({
-      message: 'Are you sure you want to delete this note?',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      message: t('deleteSingleNoteConfirm'),
+      confirmText: t('deleteBtn'),
+      cancelText: t('cancelBtn'),
       variant: 'danger',
     });
 
@@ -148,12 +150,9 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
       opened={isOpen}
       onClose={onClose}
       title={
-        <Group gap="xs">
-          <IconNotes size={20} color="var(--mantine-color-blue-filled)" />
-          <Text fw={600} size="md">
-            #{cleanTaskId} Notes ({notes.length})
-          </Text>
-        </Group>
+        <Text fw={600} size="md">
+          #{cleanTaskId} {t('taskNotesModalSuffix')} ({notes.length})
+        </Text>
       }
       size="calc(100vw - 32px)"
       centered
@@ -166,7 +165,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
         {/* Task Header & Redmine Link */}
         <Group justify="space-between" align="center" wrap="nowrap">
           <Text size="sm" fw={500} lineClamp={2} style={{ flex: 1 }}>
-            {taskSubject || `Redmine Task #${cleanTaskId}`}
+            {taskSubject || `#${cleanTaskId}`}
           </Text>
           {redmineUrl && (
             <Anchor
@@ -175,7 +174,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
               size="xs"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
-              Open in Redmine <IconExternalLink size={12} />
+              {t('openInRedmineLink')} <IconExternalLink size={12} />
             </Anchor>
           )}
         </Group>
@@ -189,7 +188,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
             size="sm"
             onClick={handleAddNew}
           >
-            Add New Note
+            {t('addNewNoteBtn')}
           </Button>
         )}
 
@@ -199,7 +198,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
             <Stack gap="sm">
               <Group justify="space-between" align="center">
                 <Text fw={600} size="sm">
-                  {editingNoteId ? 'Edit Note' : 'New Task Note'}
+                  {editingNoteId ? t('editNoteModalTitle') : t('newTaskNoteHeading')}
                 </Text>
                 <ActionIcon variant="subtle" color="gray" size="sm" onClick={handleCancelEditor}>
                   <IconX size={16} />
@@ -207,16 +206,16 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
               </Group>
 
               <TextInput
-                label="Note Title (Optional)"
-                placeholder="e.g. Investigation findings, Meeting remarks"
+                label={t('noteTitleOptionalLabel')}
+                placeholder={t('noteTitlePlaceholderExample')}
                 value={title}
                 onChange={(e) => setTitle(e.currentTarget.value)}
                 size="sm"
               />
 
               <TagsInput
-                label="Labels"
-                placeholder="Enter tags and press Enter"
+                label={t('labelsFieldLabel')}
+                placeholder={t('labelsPlaceholder')}
                 data={allLabels}
                 value={labels}
                 onChange={setLabels}
@@ -225,7 +224,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
               />
 
               <RichTextNoteEditor
-                label="Note Content"
+                label={t('noteContentLabel')}
                 value={content}
                 onChange={setContent}
                 minHeight={150}
@@ -233,7 +232,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
 
               <Group justify="flex-end" gap="xs" mt="xs">
                 <Button variant="default" size="sm" onClick={handleCancelEditor}>
-                  Cancel
+                  {t('cancelBtn')}
                 </Button>
                 <Button
                   variant="filled"
@@ -243,20 +242,20 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
                   onClick={handleSave}
                   disabled={!content.trim()}
                 >
-                  Save Note
+                  {t('saveNoteBtn')}
                 </Button>
               </Group>
             </Stack>
           </Paper>
         )}
 
-        <Divider label="Existing Notes" labelPosition="left" />
+        <Divider label={t('existingNotesDivider')} labelPosition="left" />
 
         {/* List of existing notes */}
         {notes.length === 0 ? (
           <Paper p="xl" withBorder radius="md" bg="var(--mantine-color-default)">
             <Text c="dimmed" size="sm" ta="center">
-              No notes for this task yet. Click &quot;Add New Note&quot; to write one.
+              {t('noTaskNotesYet')}
             </Text>
           </Paper>
         ) : (
@@ -284,7 +283,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
                           </Badge>
                         ))}
                         <Text size="xs" c="dimmed">
-                          {new Date(note.updatedAt).toLocaleString()}
+                          {formatDisplayDateTime(note.updatedAt, language)}
                         </Text>
                       </Group>
                     </Box>
@@ -295,7 +294,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
                         color="blue"
                         size="sm"
                         onClick={() => handleEditNote(note)}
-                        title="Edit note"
+                        title={t('editNoteTooltip')}
                       >
                         <IconEdit size={16} />
                       </ActionIcon>
@@ -304,7 +303,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
                         color="red"
                         size="sm"
                         onClick={() => handleDeleteNote(note.id)}
-                        title="Delete note"
+                        title={t('deleteNoteTooltip')}
                       >
                         <IconTrash size={16} />
                       </ActionIcon>
@@ -320,7 +319,7 @@ export const TaskNoteModal: React.FC<TaskNoteModalProps> = ({
 
         <Group justify="flex-end" mt="md">
           <Button variant="default" size="sm" onClick={onClose}>
-            Close
+            {t('closeBtn')}
           </Button>
         </Group>
       </Stack>

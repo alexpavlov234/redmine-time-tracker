@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import type { TimeLogPreset } from '../types';
 
 const STORAGE_KEY = 'timeLogPresets';
+const PRESETS_UPDATED_EVENT = 'timeLogPresetsUpdated';
 
 function loadFromStorage(): TimeLogPreset[] {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -16,6 +17,9 @@ function loadFromStorage(): TimeLogPreset[] {
 
 function persistToStorage(presets: TimeLogPreset[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(PRESETS_UPDATED_EVENT));
+  }
 }
 
 /**
@@ -25,15 +29,22 @@ function persistToStorage(presets: TimeLogPreset[]) {
 export const usePresets = () => {
   const [presets, setPresets] = useState<TimeLogPreset[]>(loadFromStorage);
 
-  // Sync if another tab changes storage
+  // Sync across tabs and same-tab hook instances
   useEffect(() => {
-    const handler = (e: StorageEvent) => {
+    const handleStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
         setPresets(loadFromStorage());
       }
     };
-    window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
+    const handleCustom = () => {
+      setPresets(loadFromStorage());
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener(PRESETS_UPDATED_EVENT, handleCustom);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener(PRESETS_UPDATED_EVENT, handleCustom);
+    };
   }, []);
 
   const savePreset = useCallback((preset: TimeLogPreset) => {

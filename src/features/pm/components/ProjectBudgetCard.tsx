@@ -31,6 +31,8 @@ import {
 } from '@tabler/icons-react';
 import type { ProjectBudgetMetadata, ProjectBudgetStats } from '../../../types/pm';
 import type { BudgetThresholdType } from '../hooks/useProjectManagerData';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { formatDisplayDate } from '../../../utils/formatters';
 
 /// <summary>
 /// Properties for ProjectBudgetCard.
@@ -70,6 +72,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
   currency,
   onCurrencyChange,
 }) => {
+  const { language, t } = useLanguage();
   const [showFinancialSettings, setShowFinancialSettings] = useState<boolean>(false);
 
   // Status color mapping
@@ -83,20 +86,20 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
     if (stats.healthStatus === 'over_budget') {
       return (
         <Badge color="red" size="lg" variant="light" leftSection={<IconAlertTriangle size={14} />}>
-          Critical / Over Budget ({stats.percentageUsed}%)
+          {t('pmStatusOverBudget')} ({stats.percentageUsed}%)
         </Badge>
       );
     }
     if (stats.healthStatus === 'warning') {
       return (
         <Badge color="orange" size="lg" variant="light" leftSection={<IconAlertTriangle size={14} />}>
-          Warning: Near Limit ({stats.percentageUsed}%)
+          {t('pmStatusWarning')} ({stats.percentageUsed}%)
         </Badge>
       );
     }
     return (
       <Badge color="teal" size="lg" variant="light" leftSection={<IconCheck size={14} />}>
-        On Track ({stats.percentageUsed}%)
+        {t('pmStatusOnTrack')} ({stats.percentageUsed}%)
       </Badge>
     );
   };
@@ -115,7 +118,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
               <Title order={3}>{projectName}</Title>
               {metadata.clientName && (
                 <Badge color="blue" size="md" variant="outline">
-                  Client: {metadata.clientName}
+                  {t('pmClientLabel')}: {metadata.clientName}
                 </Badge>
               )}
               {metadata.contractType && (
@@ -125,7 +128,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
               )}
               {metadata.isUmbrella && (
                 <Badge color="grape" size="sm" variant="light">
-                  Umbrella Project
+                  {t('pmUmbrellaProjectBadge')}
                 </Badge>
               )}
             </Group>
@@ -135,7 +138,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
                 <Group gap={4}>
                   <IconCalendar size={14} color="gray" />
                   <Text size="xs" c="dimmed">
-                    Start: <Text span fw={600}>{metadata.startDate}</Text>
+                    {t('pmStartLabel')}: <Text span fw={600}>{formatDisplayDate(metadata.startDate, language)}</Text>
                   </Text>
                 </Group>
               )}
@@ -143,7 +146,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
                 <Group gap={4}>
                   <IconCalendar size={14} color="gray" />
                   <Text size="xs" c="dimmed">
-                    Contract End: <Text span fw={600}>{metadata.contractEndDate}</Text>
+                    {t('pmContractEndLabel')}: <Text span fw={600}>{formatDisplayDate(metadata.contractEndDate, language)}</Text>
                   </Text>
                 </Group>
               )}
@@ -152,7 +155,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
 
           <Group gap="xs">
             {getStatusBadge()}
-            <Tooltip label="Configure billing hourly rate and currency">
+            <Tooltip label={t('pmFinancialsTooltip')}>
               <Button
                 variant={showFinancialSettings ? 'light' : 'subtle'}
                 color="gray"
@@ -160,7 +163,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
                 leftSection={<IconAdjustments size={14} />}
                 onClick={() => setShowFinancialSettings(prev => !prev)}
               >
-                Financials
+                {t('pmFinancialsBtn')}
               </Button>
             </Tooltip>
           </Group>
@@ -171,8 +174,8 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
           <Card withBorder padding="sm" radius="sm" bg="light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))">
             <Group gap="md" align="flex-end">
               <NumberInput
-                label="Hourly Billing Rate"
-                description="Used to compute financial value and burn rate"
+                label={t('pmHourlyRateLabel')}
+                description={t('pmHourlyRateDesc')}
                 placeholder="e.g. 60"
                 min={0}
                 value={hourlyRate}
@@ -181,7 +184,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
                 leftSection={<IconCurrencyEuro size={16} />}
               />
               <Select
-                label="Currency"
+                label={t('pmCurrencyLabel')}
                 data={[
                   { value: 'EUR', label: 'EUR (€)' },
                   { value: 'USD', label: 'USD ($)' },
@@ -196,8 +199,8 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
         </Collapse>
 
         {metadata.isUmbrella && (
-          <Alert icon={<IconAlertTriangle size={16} />} color="grape" title="Container (Umbrella) Project" radius="sm">
-            This project is designated in Redmine as an Umbrella folder. Contractual budgets and logged time are tracked inside individual subprojects. Please select a specific subproject from the dropdown above to inspect detailed hours.
+          <Alert icon={<IconAlertTriangle size={16} />} color="grape" title={t('pmUmbrellaAlertTitle')} radius="sm">
+            {t('pmUmbrellaAlertBody')}
           </Alert>
         )}
 
@@ -206,7 +209,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
         {/* Budget Threshold Switcher */}
         <Group justify="space-between" align="center" wrap="wrap">
           <Text size="sm" fw={600} c="dimmed">
-            Active Redmine Budget Threshold:
+            {t('pmActiveThresholdLabel')}
           </Text>
           <SegmentedControl
             size="xs"
@@ -215,17 +218,17 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             data={[
               {
                 value: 'contract',
-                label: `Contract: ${metadata.budget2Contract}h`,
+                label: `${t('pmThresholdContract')}: ${metadata.budget2Contract}h`,
                 disabled: metadata.budget2Contract <= 0,
               },
               {
                 value: 'estimate',
-                label: `Estimate: ${metadata.budget1Estimate}h`,
+                label: `${t('pmThresholdEstimate')}: ${metadata.budget1Estimate}h`,
                 disabled: metadata.budget1Estimate <= 0,
               },
               {
                 value: 'profitability',
-                label: `Profitability: ${metadata.budget3Profitability}h`,
+                label: `${t('pmThresholdProfitability')}: ${metadata.budget3Profitability}h`,
                 disabled: metadata.budget3Profitability <= 0,
               },
             ]}
@@ -236,7 +239,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
         <div>
           <Group justify="space-between" mb={6}>
             <Text size="sm" fw={600}>
-              Consumed Hours: <Text span fw={700} c={getStatusColor()}>{stats.totalSpentHours}h</Text> of {stats.targetHours}h
+              {t('pmConsumedHoursLabel')} <Text span fw={700} c={getStatusColor()}>{stats.totalSpentHours}h</Text> {t('pmOfWord')} {stats.targetHours}h
             </Text>
             <Text size="sm" fw={700} c={getStatusColor()}>
               {stats.percentageUsed}%
@@ -259,14 +262,14 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             <Group justify="space-between" align="flex-start">
               <div>
                 <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                  Target Budget
+                  {t('pmTargetBudgetKpi')}
                 </Text>
                 <Group align="baseline" gap="xs" mt="xs">
                   <Text fz={28} fw={700}>
                     {stats.targetHours}
                   </Text>
                   <Text size="sm" c="dimmed">
-                    hours
+                    {t('hoursShort')}
                   </Text>
                 </Group>
               </div>
@@ -276,7 +279,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             </Group>
             {hourlyRate > 0 && (
               <Text size="xs" c="dimmed" mt={4}>
-                Value: {targetCost.toLocaleString()} {currency}
+                {t('pmValueLabel')}: {targetCost.toLocaleString()} {currency}
               </Text>
             )}
           </Paper>
@@ -286,14 +289,14 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             <Group justify="space-between" align="flex-start">
               <div>
                 <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                  Total Logged
+                  {t('pmTotalLoggedKpi')}
                 </Text>
                 <Group align="baseline" gap="xs" mt="xs">
                   <Text fz={28} fw={700} c={getStatusColor()}>
                     {stats.totalSpentHours}
                   </Text>
                   <Text size="sm" c="dimmed">
-                    hours
+                    {t('hoursShort')}
                   </Text>
                 </Group>
               </div>
@@ -303,7 +306,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             </Group>
             {hourlyRate > 0 && (
               <Text size="xs" c="dimmed" mt={4}>
-                Cost: {spentCost.toLocaleString()} {currency}
+                {t('pmCostLabel')}: {spentCost.toLocaleString()} {currency}
               </Text>
             )}
           </Paper>
@@ -313,14 +316,14 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             <Group justify="space-between" align="flex-start">
               <div>
                 <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                  Remaining Budget
+                  {t('pmRemainingBudgetKpi')}
                 </Text>
                 <Group align="baseline" gap="xs" mt="xs">
                   <Text fz={28} fw={700} c={stats.remainingHours < 0 ? 'red' : 'teal'}>
                     {stats.remainingHours}
                   </Text>
                   <Text size="sm" c="dimmed">
-                    hours
+                    {t('hoursShort')}
                   </Text>
                 </Group>
               </div>
@@ -330,7 +333,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             </Group>
             {hourlyRate > 0 && (
               <Text size="xs" c="dimmed" mt={4}>
-                Balance: {remainingCost.toLocaleString()} {currency}
+                {t('pmBalanceLabel')}: {remainingCost.toLocaleString()} {currency}
               </Text>
             )}
           </Paper>
@@ -340,14 +343,14 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
             <Group justify="space-between" align="flex-start">
               <div>
                 <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                  Weekly Burn Rate
+                  {t('pmWeeklyBurnRateKpi')}
                 </Text>
                 <Group align="baseline" gap="xs" mt="xs">
                   <Text fz={28} fw={700} c="violet">
                     {stats.weeklyBurnRate}
                   </Text>
                   <Text size="sm" c="dimmed">
-                    h/week
+                    {t('pmHoursPerWeekUnit')}
                   </Text>
                 </Group>
               </div>
@@ -356,7 +359,7 @@ export const ProjectBudgetCard: React.FC<ProjectBudgetCardProps> = ({
               </ThemeIcon>
             </Group>
             <Text size="xs" c="dimmed" mt={4}>
-              This mo: {stats.spentThisMonth}h | Last mo: {stats.spentLastMonth}h
+              {t('pmThisMonthLabel')}: {stats.spentThisMonth}h | {t('pmLastMonthLabel')}: {stats.spentLastMonth}h
             </Text>
           </Paper>
         </SimpleGrid>

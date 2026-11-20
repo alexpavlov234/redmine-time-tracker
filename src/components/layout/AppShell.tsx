@@ -1,7 +1,9 @@
 import React from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useStagedEntries } from '../../contexts/StagedEntriesContext';
+import { FloatingSideTimer } from '../../features/timer/components/FloatingSideTimer';
 import type { AppLanguage, TranslationKey } from '../../i18n/translations';
 import {
   AppShell as MantineAppShell,
@@ -17,12 +19,15 @@ import {
   Container,
   Tooltip,
   SegmentedControl,
+  Badge,
+  Menu,
   NavLink as MantineNavLink,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconClock,
   IconCalendarEvent,
+  IconCalendarCheck,
   IconSettings,
   IconSun,
   IconMoon,
@@ -32,6 +37,9 @@ import {
   IconChecklist,
   IconNotes,
   IconLanguage,
+  IconArrowsExchange,
+  IconCheck,
+  IconChevronDown,
 } from '@tabler/icons-react';
 
 /// <summary>
@@ -46,13 +54,22 @@ interface NavItem {
   to: string;
 }
 
-const navLinks: NavItem[] = [
-  { labelKey: 'navTracker', icon: IconClock, to: '/' },
+const timeGroupLinks: NavItem[] = [
+  { labelKey: 'navLoggedTime', icon: IconCalendarEvent, to: '/logged-time' },
+  { labelKey: 'navValidation', icon: IconCalendarCheck, to: '/validation' },
+  { labelKey: 'navTimeTransfer', icon: IconArrowsExchange, to: '/transfer' },
+];
+
+const workspaceGroupLinks: NavItem[] = [
   { labelKey: 'navPersonalTasks', icon: IconChecklist, to: '/tasks' },
   { labelKey: 'navNotes', icon: IconNotes, to: '/notes' },
-  { labelKey: 'navLoggedTime', icon: IconCalendarEvent, to: '/logged-time' },
   { labelKey: 'navProjects', icon: IconBriefcase, to: '/projects' },
-  { labelKey: 'navSettings', icon: IconSettings, to: '/settings' },
+];
+
+const allMobileLinks: NavItem[] = [
+  { labelKey: 'navTracker', icon: IconClock, to: '/' },
+  ...timeGroupLinks,
+  ...workspaceGroupLinks,
 ];
 
 /// <summary>
@@ -62,9 +79,15 @@ const navLinks: NavItem[] = [
 export const AppShell: React.FC = () => {
   const { isConfigured } = useSettings();
   const { language, setLanguage, toggleLanguage, t } = useLanguage();
+  const { stagedEntries } = useStagedEntries();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [opened, { toggle, close }] = useDisclosure();
+  const isTrackerActive = location.pathname === '/';
+  const isTimeGroupActive = timeGroupLinks.some((l) => location.pathname.startsWith(l.to));
+  const isWorkspaceGroupActive = workspaceGroupLinks.some((l) => location.pathname.startsWith(l.to));
+  const isSettingsActive = location.pathname.startsWith('/settings');
 
   /// <summary>
   /// Toggles between light, dark, and auto system color schemes.
@@ -114,48 +137,166 @@ export const AppShell: React.FC = () => {
               </Title>
             </Group>
 
-            {/* Desktop Navigation Links */}
+            {/* Desktop Navigation: Tracker standalone + grouped dropdowns */}
             <Group gap="xs" visibleFrom="sm" wrap="nowrap">
-              {navLinks.map((link) => {
-                const isActive = link.to === '/' ? location.pathname === '/' : location.pathname.startsWith(link.to);
-                return (
+              <Button
+                component={NavLink}
+                to="/"
+                variant={isTrackerActive ? 'light' : 'subtle'}
+                color={isTrackerActive ? 'blue' : 'gray'}
+                size="sm"
+                leftSection={<IconClock size={17} stroke={1.5} />}
+              >
+                {t('navTracker')}
+              </Button>
+
+              {/* Time Dropdown: Logged Time, Validation, Time Transfer */}
+              <Menu shadow="md" width={230} position="bottom-start" withArrow>
+                <Menu.Target>
                   <Button
-                    key={link.to}
-                    component={NavLink}
-                    to={link.to}
-                    variant={isActive ? 'light' : 'subtle'}
-                    color={isActive ? 'blue' : 'gray'}
+                    variant={isTimeGroupActive ? 'light' : 'subtle'}
+                    color={isTimeGroupActive ? 'blue' : 'gray'}
                     size="sm"
-                    leftSection={<link.icon size={17} stroke={1.5} />}
+                    leftSection={<IconCalendarEvent size={17} stroke={1.5} />}
+                    rightSection={
+                      <Group gap={6} wrap="nowrap">
+                        {stagedEntries.length > 0 && (
+                          <Badge size="xs" circle color="orange" variant="filled">
+                            {stagedEntries.length}
+                          </Badge>
+                        )}
+                        <IconChevronDown size={14} />
+                      </Group>
+                    }
                   >
-                    {t(link.labelKey)}
+                    {t('navGroupTime')}
                   </Button>
-                );
-              })}
+                </Menu.Target>
+                <Menu.Dropdown>
+                  {timeGroupLinks.map((link) => {
+                    const isActive = location.pathname.startsWith(link.to);
+                    const showStagedBadge = link.to === '/logged-time' && stagedEntries.length > 0;
+                    return (
+                      <Menu.Item
+                        key={link.to}
+                        leftSection={<link.icon size={16} stroke={1.5} />}
+                        rightSection={
+                          showStagedBadge ? (
+                            <Badge size="xs" circle color="orange" variant="filled">
+                              {stagedEntries.length}
+                            </Badge>
+                          ) : undefined
+                        }
+                        color={isActive ? 'blue' : undefined}
+                        fw={isActive ? 600 : 400}
+                        onClick={() => navigate(link.to)}
+                      >
+                        {t(link.labelKey)}
+                      </Menu.Item>
+                    );
+                  })}
+                </Menu.Dropdown>
+              </Menu>
 
-              <Tooltip label={t('toggleLanguage')}>
-                <SegmentedControl
-                  size="xs"
-                  value={language}
-                  onChange={(val) => setLanguage(val as AppLanguage)}
-                  data={[
-                    { label: 'БГ', value: 'bg' },
-                    { label: 'EN', value: 'en' },
-                  ]}
-                  ml={4}
-                />
-              </Tooltip>
+              {/* Workspace Dropdown: Personal Tasks, Notes, Projects */}
+              <Menu shadow="md" width={210} position="bottom-start" withArrow>
+                <Menu.Target>
+                  <Button
+                    variant={isWorkspaceGroupActive ? 'light' : 'subtle'}
+                    color={isWorkspaceGroupActive ? 'blue' : 'gray'}
+                    size="sm"
+                    leftSection={<IconChecklist size={17} stroke={1.5} />}
+                    rightSection={<IconChevronDown size={14} />}
+                  >
+                    {t('navGroupWorkspace')}
+                  </Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  {workspaceGroupLinks.map((link) => {
+                    const isActive = location.pathname.startsWith(link.to);
+                    return (
+                      <Menu.Item
+                        key={link.to}
+                        leftSection={<link.icon size={16} stroke={1.5} />}
+                        color={isActive ? 'blue' : undefined}
+                        fw={isActive ? 600 : 400}
+                        onClick={() => navigate(link.to)}
+                      >
+                        {t(link.labelKey)}
+                      </Menu.Item>
+                    );
+                  })}
+                </Menu.Dropdown>
+              </Menu>
 
-              <Tooltip label={t('toggleColorScheme')}>
-                <ActionIcon
-                  onClick={toggleColorScheme}
-                  variant="subtle"
-                  size="lg"
-                  aria-label={t('toggleColorScheme')}
-                >
-                  {getThemeIcon()}
-                </ActionIcon>
-              </Tooltip>
+              {/* Settings, Language & Theme Dropdown */}
+              <Menu shadow="md" width={210} position="bottom-end" withArrow>
+                <Menu.Target>
+                  <Tooltip label={t('navSettings')}>
+                    <ActionIcon
+                      variant={isSettingsActive ? 'light' : 'subtle'}
+                      color={isSettingsActive ? 'blue' : 'gray'}
+                      size="lg"
+                      aria-label={t('navSettings')}
+                    >
+                      <IconSettings size={20} stroke={1.5} />
+                    </ActionIcon>
+                  </Tooltip>
+                </Menu.Target>
+
+                <Menu.Dropdown>
+                  <Menu.Item
+                    leftSection={<IconSettings size={16} />}
+                    onClick={() => navigate('/settings')}
+                    color={isSettingsActive ? 'blue' : undefined}
+                  >
+                    {t('navSettings')}
+                  </Menu.Item>
+
+                  <Menu.Divider />
+
+                  <Menu.Label>{t('languageLabel')}</Menu.Label>
+                  <Menu.Item
+                    leftSection={<IconLanguage size={16} />}
+                    rightSection={language === 'bg' ? <IconCheck size={14} /> : null}
+                    onClick={() => setLanguage('bg')}
+                  >
+                    Български (БГ)
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconLanguage size={16} />}
+                    rightSection={language === 'en' ? <IconCheck size={14} /> : null}
+                    onClick={() => setLanguage('en')}
+                  >
+                    English (EN)
+                  </Menu.Item>
+
+                  <Menu.Divider />
+
+                  <Menu.Label>{t('toggleColorScheme')}</Menu.Label>
+                  <Menu.Item
+                    leftSection={<IconSun size={16} />}
+                    rightSection={colorScheme === 'light' ? <IconCheck size={14} /> : null}
+                    onClick={() => setColorScheme('light')}
+                  >
+                    {t('themeLight')}
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconMoon size={16} />}
+                    rightSection={colorScheme === 'dark' ? <IconCheck size={14} /> : null}
+                    onClick={() => setColorScheme('dark')}
+                  >
+                    {t('themeDark')}
+                  </Menu.Item>
+                  <Menu.Item
+                    leftSection={<IconSunMoon size={16} />}
+                    rightSection={colorScheme === 'auto' ? <IconCheck size={14} /> : null}
+                    onClick={() => setColorScheme('auto')}
+                  >
+                    {t('themeAuto')}
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
             </Group>
 
             {/* Mobile Language & Theme Toggle */}
@@ -184,8 +325,9 @@ export const AppShell: React.FC = () => {
       {/* Mobile Drawer Navigation */}
       <MantineAppShell.Navbar p="md">
         <Stack gap="xs">
-          {navLinks.map((link) => {
+          {allMobileLinks.map((link) => {
             const isActive = link.to === '/' ? location.pathname === '/' : location.pathname.startsWith(link.to);
+            const showStagedBadge = link.to === '/logged-time' && stagedEntries.length > 0;
             return (
               <MantineNavLink
                 key={link.to}
@@ -193,11 +335,27 @@ export const AppShell: React.FC = () => {
                 to={link.to}
                 label={t(link.labelKey)}
                 leftSection={<link.icon size={20} stroke={1.5} />}
+                rightSection={
+                  showStagedBadge ? (
+                    <Badge size="xs" circle color="orange" variant="filled">
+                      {stagedEntries.length}
+                    </Badge>
+                  ) : undefined
+                }
                 active={isActive}
                 onClick={close}
               />
             );
           })}
+
+          <MantineNavLink
+            component={NavLink}
+            to="/settings"
+            label={t('navSettings')}
+            leftSection={<IconSettings size={20} stroke={1.5} />}
+            active={isSettingsActive}
+            onClick={close}
+          />
 
           <SegmentedControl
             mt="sm"
@@ -233,6 +391,8 @@ export const AppShell: React.FC = () => {
           <Outlet />
         </Container>
       </MantineAppShell.Main>
+
+      <FloatingSideTimer />
     </MantineAppShell>
   );
 };

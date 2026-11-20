@@ -13,6 +13,7 @@ import {
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { RichTextNoteEditor } from '../../../components/common/RichTextNoteEditor';
 import { useTaskNotes } from '../../../hooks/useTaskNotes';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import type { NoteItem } from '../../../types';
 
 /// <summary>
@@ -41,6 +42,7 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
   defaultTaskId,
   defaultTaskSubject,
 }) => {
+  const { t } = useLanguage();
   const { saveNoteItem, allLabels } = useTaskNotes();
 
   const [noteType, setNoteType] = useState<'general' | 'task'>('general');
@@ -101,7 +103,7 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
       onClose={onClose}
       title={
         <Text fw={600} size="md">
-          {note ? 'Edit Note' : 'Create Note'}
+          {note ? t('editNoteModalTitle') : t('createNoteModalTitle')}
         </Text>
       }
       size="calc(100vw - 32px)"
@@ -116,23 +118,23 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
           value={noteType}
           onChange={(val) => setNoteType(val as 'general' | 'task')}
           data={[
-            { label: 'General Note', value: 'general' },
-            { label: 'Task-Connected Note', value: 'task' },
+            { label: t('generalNoteType'), value: 'general' },
+            { label: t('taskConnectedNoteType'), value: 'task' },
           ]}
         />
 
         {noteType === 'task' && (
           <Group grow align="flex-start">
             <TextInput
-              label="Task ID / Issue #"
-              placeholder="e.g. 12345"
+              label={t('taskIdNumberLabel')}
+              placeholder={t('taskIdPlaceholderExample')}
               value={taskId}
               onChange={(e) => setTaskId(e.currentTarget.value)}
               required
             />
             <TextInput
-              label="Task Subject (Optional)"
-              placeholder="e.g. Bugfix for login form"
+              label={t('taskSubjectOptionalLabel')}
+              placeholder={t('taskSubjectPlaceholderExample')}
               value={taskSubject}
               onChange={(e) => setTaskSubject(e.currentTarget.value)}
             />
@@ -140,15 +142,15 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
         )}
 
         <TextInput
-          label="Title (Optional)"
-          placeholder="e.g. Daily Standup Ideas, Architecture Notes"
+          label={t('noteTitleOptionalLabel')}
+          placeholder={t('noteTitlePlaceholderExample')}
           value={title}
           onChange={(e) => setTitle(e.currentTarget.value)}
         />
 
         <TagsInput
-          label="Labels"
-          placeholder="Type label and press Enter"
+          label={t('labelsFieldLabel')}
+          placeholder={t('labelsPlaceholder')}
           data={allLabels}
           value={labels}
           onChange={setLabels}
@@ -156,13 +158,13 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
         />
 
         <Switch
-          label="Pin this note to the top"
+          label={t('pinNoteSwitchLabel')}
           checked={pinned}
           onChange={(e) => setPinned(e.currentTarget.checked)}
         />
 
         <RichTextNoteEditor
-          label="Note Content"
+          label={t('noteContentLabel')}
           value={content}
           onChange={setContent}
           minHeight={200}
@@ -170,14 +172,14 @@ export const NoteEditModal: React.FC<NoteEditModalProps> = ({
 
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={onClose}>
-            Cancel
+            {t('cancelBtn')}
           </Button>
           <Button
             leftSection={<IconDeviceFloppy size={16} />}
             onClick={handleSave}
             disabled={!content.trim()}
           >
-            Save Note
+            {t('saveNoteBtn')}
           </Button>
         </Group>
       </Stack>

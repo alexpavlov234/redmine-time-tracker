@@ -1,6 +1,7 @@
 import React from 'react';
 import { Stack, Group, Text, Checkbox, Select, Textarea, NumberInput, TextInput } from '@mantine/core';
 import { IconListCheck } from '@tabler/icons-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 import type { CustomField } from '../../types';
 
 /// <summary>
@@ -27,6 +28,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
   onChange,
   disabled = false,
 }) => {
+  const { t } = useLanguage();
   if (customFields.length === 0) return null;
 
   return (
@@ -34,7 +36,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
       <Group gap="xs">
         <IconListCheck size={14} color="var(--mantine-color-dimmed)" />
         <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-          Custom Fields
+          {t('customFieldsHeading')}
         </Text>
       </Group>
 
@@ -65,7 +67,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
               <Select
                 key={field.id}
                 label={field.name}
-                placeholder={`-- Select ${field.name} --`}
+                placeholder={`${t('selectOptionPrefix')} ${field.name} --`}
                 value={value}
                 onChange={v => onChange(field.id, v || '')}
                 data={field.possible_values?.map(v => ({ value: v, label: v })) || []}

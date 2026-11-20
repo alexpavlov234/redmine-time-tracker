@@ -23,6 +23,7 @@ import {
   Checkbox,
   Alert,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import {
   IconPrinter,
   IconFileSpreadsheet,
@@ -40,6 +41,8 @@ import type { ProjectBudgetMetadata, ClientExportConfig, TaskTimeSummary, Export
 import { exportToCsv, exportTranslations, getLocalizedPeriodLabel, groupEntriesByTask } from '../../../services/pmService';
 import { getIssues } from '../../../services/redmine';
 import { useUser } from '../../../contexts/UserContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { formatDisplayDate } from '../../../utils/formatters';
 import '../styles/clientReport.css';
 
 /// <summary>
@@ -94,12 +97,13 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
   defaultCurrency,
 }) => {
   const { user } = useUser();
+  const { language: appLanguage } = useLanguage();
   const defaultIssuer = user
     ? user.name || `${user.firstname || ''} ${user.lastname || ''}`.trim()
     : '';
 
-  // Export Language: 'bg' | 'en' (defaults to 'en')
-  const [language, setLanguage] = useState<ExportLanguage>('en');
+  // Export Language: 'bg' | 'en' (defaults to active app language)
+  const [language, setLanguage] = useState<ExportLanguage>(appLanguage);
 
   // Active translation dictionary
   const t = exportTranslations[language];
@@ -137,9 +141,9 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
 
   // Configuration options for client export
   const [clientName, setClientName] = useState<string>(metadata.clientName || 'Client');
-  const [reportTitle, setReportTitle] = useState<string>(exportTranslations.en.reportTitleDefault);
+  const [reportTitle, setReportTitle] = useState<string>(exportTranslations[appLanguage].reportTitleDefault);
   const [periodLabel, setPeriodLabel] = useState<string>(() =>
-    getLocalizedPeriodLabel('en', dateRangePreset, dateFrom, dateTo, metadata.startDate, metadata.contractEndDate, dateLabel)
+    getLocalizedPeriodLabel(appLanguage, dateRangePreset, dateFrom, dateTo, metadata.startDate, metadata.contractEndDate, dateLabel)
   );
   const [groupBy, setGroupBy] = useState<'task' | 'date'>('task');
 
@@ -260,6 +264,13 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
       )
     );
   };
+
+  useEffect(() => {
+    if (isOpen && language !== appLanguage) {
+      handleLanguageChange(appLanguage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, appLanguage]);
 
   // Revision state to re-evaluate grouped tables when issue subjects are fetched
   const [subjectsRevision, setSubjectsRevision] = useState<number>(0);
@@ -633,20 +644,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
   /// </summary>
   const formattedIssueDate = useMemo(() => {
     if (!issueDate) return '';
-    try {
-      const parts = issueDate.split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString(language === 'bg' ? 'bg-BG' : 'en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        });
-      }
-    } catch {
-      // fallback
-    }
-    return issueDate;
+    return formatDisplayDate(issueDate, language === 'en' ? 'en' : 'bg');
   }, [issueDate, language]);
 
   /// <summary>
@@ -913,12 +911,14 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                     }}
                   />
 
-                  <TextInput
+                  <DatePickerInput
                     size="xs"
-                    type="date"
                     label={t.issueDate}
-                    value={issueDate}
-                    onChange={e => setIssueDate(e.target.value)}
+                    valueFormat="D MMMM YYYY"
+                    locale={language === 'bg' ? 'bg' : 'en'}
+                    allowDeselect={false}
+                    value={issueDate || null}
+                    onChange={val => setIssueDate(val || '')}
                   />
                 </Group>
 
@@ -1368,7 +1368,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                               aria-label="Toggle select all"
                             />
                           </th>
-                          <th style={{ width: '85px' }}>{t.date}</th>
+                          <th style={{ width: '135px' }}>{t.date}</th>
                           {showActivities && <th style={{ width: '120px' }}>{t.activity}</th>}
                           {showTeamMembers && <th style={{ width: '120px' }}>{t.teamMember}</th>}
                           {showDescriptions && <th>{t.description}</th>}
@@ -1487,7 +1487,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                                             aria-label="Toggle entry"
                                           />
                                         </td>
-                                        <td className="client-report-sub-date" style={{ paddingLeft: '20px' }}>{entry.spent_on}</td>
+                                        <td className="client-report-sub-date" style={{ paddingLeft: '20px' }}>{formatDisplayDate(entry.spent_on, language === 'en' ? 'en' : 'bg')}</td>
                                         {showActivities && <td>{entry.activity?.name || '-'}</td>}
                                         {showTeamMembers && <td>{entry.user?.name || '-'}</td>}
                                         {showDescriptions && <td>{entry.comments || '-'}</td>}
@@ -1572,7 +1572,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                                                   aria-label="Toggle entry"
                                                 />
                                               </td>
-                                              <td className="client-report-sub-date" style={{ paddingLeft: '32px' }}>{entry.spent_on}</td>
+                                              <td className="client-report-sub-date" style={{ paddingLeft: '32px' }}>{formatDisplayDate(entry.spent_on, language === 'en' ? 'en' : 'bg')}</td>
                                               {showActivities && <td>{entry.activity?.name || '-'}</td>}
                                               {showTeamMembers && <td>{entry.user?.name || '-'}</td>}
                                               {showDescriptions && <td>{entry.comments || '-'}</td>}
@@ -1651,7 +1651,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                                           aria-label="Toggle entry"
                                         />
                                       </td>
-                                      <td className="client-report-sub-date">{entry.spent_on}</td>
+                                      <td className="client-report-sub-date">{formatDisplayDate(entry.spent_on, language === 'en' ? 'en' : 'bg')}</td>
                                       {showActivities && <td>{entry.activity?.name || '-'}</td>}
                                       {showTeamMembers && <td>{entry.user?.name || '-'}</td>}
                                       {showDescriptions && <td>{entry.comments || '-'}</td>}
@@ -1705,7 +1705,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                               aria-label="Toggle select all"
                             />
                           </th>
-                          <th style={{ width: '85px' }}>{t.date}</th>
+                          <th style={{ width: '135px' }}>{t.date}</th>
                           {showParentTask && <th style={{ width: '130px' }}>{t.parentTask}</th>}
                           {showTaskIds && <th style={{ width: '75px' }}>{t.taskNo}</th>}
                           <th>{t.task}</th>
@@ -1757,7 +1757,7 @@ export const ClientExportModal: React.FC<ClientExportModalProps> = ({
                                     aria-label="Toggle entry"
                                   />
                                 </td>
-                                <td>{e.spent_on}</td>
+                                <td style={{ whiteSpace: 'nowrap' }}>{formatDisplayDate(e.spent_on, language === 'en' ? 'en' : 'bg')}</td>
                                 {showParentTask && (
                                   <td style={{ fontSize: '11px', color: '#475569' }}>
                                     {e.issue?.parent?.id ? (

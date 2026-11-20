@@ -1,11 +1,15 @@
 import React, { useState, useMemo } from 'react';
-import { Card, TextInput, Button, Select, NumberInput, Group, Stack, Text, Progress, Badge, ActionIcon, Divider, Alert } from '@mantine/core';
+import { Card, TextInput, Button, Select, NumberInput, Group, Stack, Text, Progress, Badge, ActionIcon, Divider, Alert, Tooltip } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconSend, IconCheck, IconTrash, IconCirclePlus } from '@tabler/icons-react';
+import { IconSend, IconCheck, IconTrash, IconCirclePlus, IconGitCommit } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
+import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
 import { createTimeEntry } from '../../../services/redmine';
 import type { TimeLogPreset } from '../../../types';
 import { useProjects } from '../../../contexts/ProjectsContext';
+import { useStagedEntries } from '../../../contexts/StagedEntriesContext';
+import { useConfirm } from '../../../contexts/ConfirmContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { usePresets } from '../../../hooks/usePresets';
 import { SavePresetModal } from './SavePresetModal';
 import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
@@ -29,9 +33,13 @@ interface BulkLogFormProps {
 /// </summary>
 export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSuccess, onCancel }) => {
   const { allProjects, refreshRecentProjects } = useProjects();
+  const { stageEntries } = useStagedEntries();
+  const confirmDialog = useConfirm();
+  const { t } = useLanguage();
   const { presets, savePreset, deletePreset } = usePresets();
 
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>('');
+  const [selectedTaskSubject, setSelectedTaskSubject] = useState<string>('');
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
   /// <summary>
@@ -60,11 +68,13 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
       comments: '',
     },
     validate: {
-      taskId: (value) => (value ? null : 'Task is required'),
-      activityId: (value) => (value ? null : 'Activity is required'),
-      hours: (value) => (value && Number(value) > 0 ? null : 'Valid hours are required'),
+      taskId: (value) => (value ? null : t('validationTaskRequired')),
+      activityId: (value) => (value ? null : t('validationActivityRequired')),
+      hours: (value) => (value && Number(value) > 0 ? null : t('validationHoursRequired')),
     },
   });
+
+  const { activities: projectActivities } = useActivitiesForProject(form.values.projectId || null, true);
 
   /// <summary>
   /// Sets default values for newly loaded custom fields without overwriting user selections.
@@ -151,15 +161,69 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
 
     savePreset(newPreset);
     setSelectedPresetId(newPreset.id);
-    setStatusResult({ success: true, message: `Preset "${name.trim()}" saved!` });
+    setStatusResult({ success: true, message: `${t('presetSavedPrefix')} „${name.trim()}“` });
   };
 
-  const handleDeletePreset = () => {
+  const handleDeletePreset = async () => {
     const preset = presets.find(p => p.id === selectedPresetId);
-    if (preset && confirm(`Delete preset "${preset.name}"?`)) {
+    if (!preset) return;
+    const confirmed = await confirmDialog({
+      message: `${t('deletePresetConfirmPrefix')} „${preset.name}“?`,
+      variant: 'danger',
+      confirmText: t('deleteBtn'),
+    });
+    if (confirmed) {
       deletePreset(preset.id);
       setSelectedPresetId('');
+      setStatusResult({ success: true, message: t('presetDeletedMsg') });
     }
+  };
+
+  /// <summary>
+  /// Commits (stages) entries for all selected days locally without pushing to Redmine yet.
+  /// </summary>
+  const handleCommitBulk = () => {
+    if (selectedDays.size === 0) return;
+    const validation = form.validate();
+    if (validation.hasErrors) return;
+
+    const values = form.values;
+    const days = Array.from(selectedDays).sort();
+    const payloadCustomFields = formatCustomFieldsPayload(customFieldValues);
+    const hoursNum = typeof values.hours === 'string' ? parseFloat(values.hours) : values.hours;
+
+    const cleanId = cleanTaskId(values.taskId);
+    const parsedTaskId = cleanId ? parseInt(cleanId, 10) : undefined;
+    const validTaskId = (parsedTaskId && !isNaN(parsedTaskId)) ? parsedTaskId : undefined;
+    const cleanProjectId = values.projectId && values.projectId !== 'my_issues' ? values.projectId.toString().trim() : '';
+
+    const matchedProject = allProjects.find(p => p.id.toString() === cleanProjectId);
+    const projectName = matchedProject?.name || t('generalNoProject');
+    const matchedActivity = projectActivities.find(a => a.id.toString() === values.activityId);
+    const activityName = matchedActivity?.name || `Activity #${values.activityId}`;
+    const preset = presets.find(p => p.id === selectedPresetId);
+    const resolvedTaskSubject =
+      selectedTaskSubject ||
+      (validTaskId && preset?.taskId === String(validTaskId) ? preset.taskSubject : undefined) ||
+      undefined;
+
+    stageEntries(
+      days.map(dateStr => ({
+        projectId: cleanProjectId,
+        projectName,
+        issueId: validTaskId,
+        issueSubject: resolvedTaskSubject,
+        activityId: parseInt(values.activityId, 10),
+        activityName,
+        hours: hoursNum,
+        comments: values.comments.trim(),
+        spent_on: dateStr,
+        ...(payloadCustomFields.length > 0 ? { custom_fields: payloadCustomFields } : {}),
+      }))
+    );
+
+    setStatusResult({ success: true, message: t('committedSuccessMsg') });
+    onSuccess();
   };
 
   const handleSubmit = async (values: typeof form.values) => {
@@ -206,12 +270,17 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
     refreshRecentProjects().catch(() => {});
 
     if (failCount === 0) {
-      setStatusResult({ success: true, message: `Successfully logged time for ${successCount} day${successCount > 1 ? 's' : ''}.` });
+      const dayWord = successCount === 1 ? t('bulkDayWordSingle') : t('bulkDayWordPlural');
+      setStatusResult({ success: true, message: `${t('bulkSuccessPrefix')} ${successCount} ${dayWord}.` });
+      setTimeout(() => {
+        onSuccess();
+      }, 700);
     } else {
-      setStatusResult({ success: false, message: `${successCount} succeeded, ${failCount} failed.` });
+      setStatusResult({
+        success: false,
+        message: `${t('bulkPartialPrefix')} ${successCount}, ${t('bulkPartialFailed')} ${failCount}.`,
+      });
     }
-
-    onSuccess();
   };
 
   return (
@@ -220,9 +289,9 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
         <Group justify="space-between">
           <Group gap="xs">
             <IconCheck size={20} color="var(--mantine-color-blue-filled)" />
-            <Text fw={600}>Bulk Log Time</Text>
+            <Text fw={600}>{t('bulkLogCardTitle')}</Text>
           </Group>
-          <Badge size="lg" color="blue">{selectedDays.size} Days Selected</Badge>
+          <Badge size="lg" color="blue">{selectedDays.size} {t('daysSelectedBadge')}</Badge>
         </Group>
       </Card.Section>
 
@@ -234,8 +303,8 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
         )}
         <Group align="flex-end">
           <Select
-            label="Load Preset"
-            placeholder="-- Choose preset --"
+            label={t('loadPresetLabel')}
+            placeholder={t('choosePresetPlaceholder')}
             value={selectedPresetId}
             onChange={handleApplyPreset}
             data={presets.map(p => ({ value: p.id, label: p.name }))}
@@ -247,6 +316,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
             size="input-sm"
             onClick={handleDeletePreset}
             disabled={!selectedPresetId || isDeploying}
+            aria-label={t('deletePresetTooltip')}
           >
             <IconTrash size={16} />
           </ActionIcon>
@@ -266,7 +336,14 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
                 }
               }}
               taskId={form.values.taskId}
-              onTaskChange={(val) => form.setFieldValue('taskId', val)}
+              onTaskChange={(val, task) => {
+                form.setFieldValue('taskId', val);
+                if (task?.subject) {
+                  setSelectedTaskSubject(task.subject);
+                } else if (!val) {
+                  setSelectedTaskSubject('');
+                }
+              }}
               activityId={form.values.activityId}
               onActivityChange={(val) => form.setFieldValue('activityId', val)}
               includeMyIssues={true}
@@ -278,8 +355,8 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
             />
 
             <NumberInput
-              label="Hours per day"
-              placeholder="e.g. 8"
+              label={t('hoursPerDayLabel')}
+              placeholder={t('hoursPerDayPlaceholder')}
               min={0}
               decimalScale={2}
               step={0.5}
@@ -289,8 +366,8 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
             />
 
             <TextInput
-              label="Comments"
-              placeholder="What did you work on?"
+              label={t('commentsLabel')}
+              placeholder={t('bulkCommentsPlaceholder')}
               disabled={isDeploying}
               {...form.getInputProps('comments')}
             />
@@ -305,7 +382,7 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
             {isDeploying && (
               <Stack gap={4} mt="sm">
                 <Progress value={progress} size="xl" striped animated />
-                <Text size="sm" c="dimmed" ta="center">Logging {progress}%...</Text>
+                <Text size="sm" c="dimmed" ta="center">{t('loggingProgressLabel')} {progress}%...</Text>
               </Stack>
             )}
 
@@ -316,12 +393,25 @@ export const BulkLogForm: React.FC<BulkLogFormProps> = ({ selectedDays, onSucces
                 onClick={handleSavePreset}
                 disabled={isDeploying}
               >
-                Save Preset
+                {t('savePresetBtn')}
               </Button>
-              <Group>
-                <Button variant="default" onClick={onCancel} disabled={isDeploying}>Cancel</Button>
+              <Group gap="xs" wrap="wrap">
+                <Button variant="default" onClick={onCancel} disabled={isDeploying}>{t('cancelBtn')}</Button>
+                <Tooltip label={t('commitForLaterTooltip')}>
+                  <Button
+                    variant="light"
+                    color="orange"
+                    leftSection={<IconGitCommit size={16} />}
+                    onClick={handleCommitBulk}
+                    disabled={isDeploying}
+                  >
+                    {`${t('commitAcrossDaysBtn')} ${selectedDays.size} ${selectedDays.size === 1 ? t('bulkDayWordSingle') : t('bulkDayWordPlural')}`}
+                  </Button>
+                </Tooltip>
                 <Button type="submit" leftSection={<IconSend size={16} />} loading={isDeploying}>
-                  {isDeploying ? 'Deploying...' : `Submit across ${selectedDays.size} days`}
+                  {isDeploying
+                    ? t('deployingBtn')
+                    : `${t('submitAcrossDaysPrefix')} ${selectedDays.size} ${selectedDays.size === 1 ? t('bulkDayWordSingle') : t('bulkDayWordPlural')}`}
                 </Button>
               </Group>
             </Group>

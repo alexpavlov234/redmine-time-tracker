@@ -363,6 +363,7 @@
   padding-left: 18px !important;
   color: #334155;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Notes Section */

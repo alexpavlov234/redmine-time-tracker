@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import type { Activity, Todo } from '../types';
 import { useQueue } from '../contexts/QueueContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface QueueTimerState {
   isRunning: boolean;
@@ -25,6 +26,7 @@ interface QueueTimerActions {
  */
 export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
   const { usePerformedTasksList } = useSettings();
+  const { t } = useLanguage();
   const { 
     todos, 
     activeTodoId, 
@@ -56,23 +58,21 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
     }
 
     const now = Date.now();
-    const adHocTodo: Todo = {
-      id: now,
+    const createdTodo = addTodo({
       taskId: '',
-      taskSubject: 'General Work (No Task)',
+      taskSubject: t('generalWorkTaskSubject'),
       projectId: '',
-      projectName: 'General Work',
+      projectName: t('generalWorkProjectName'),
       note: initialNote || '',
       elapsedMs: 0,
       startTime: now,
       isRunning: true,
       activities: initialNote ? [{ text: initialNote, timestamp: new Date(now) }] : [],
-    };
+    });
 
-    addTodo(adHocTodo);
-    setActiveTodoId(adHocTodo.id);
-    document.title = '▶️ Tracking General...';
-  }, [getActiveTodo, updateTodo, addTodo, setActiveTodoId]);
+    setActiveTodoId(createdTodo.id);
+    document.title = t('docTitleTrackingGeneral');
+  }, [getActiveTodo, updateTodo, addTodo, setActiveTodoId, t]);
 
   const pauseTimer = useCallback(() => {
     if (activeTodoId == null) return;
@@ -90,8 +90,8 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
       isRunning: false,
     });
 
-    document.title = '⏸️ Paused | Time Tracker';
-  }, [activeTodoId, getActiveTodo, updateTodo]);
+    document.title = t('docTitlePaused');
+  }, [activeTodoId, getActiveTodo, updateTodo, t]);
 
   const startTimerForTodo = useCallback(async (todoId: number): Promise<string | null> => {
     const todo = todos.find(t => t.id === todoId);
@@ -128,9 +128,9 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
       startTime: now,
     });
 
-    document.title = '▶️ Tracking...';
+    document.title = t('docTitleTracking');
     return null;
-  }, [todos, setActiveTodoId, updateTodo, getActiveTodo, usePerformedTasksList]);
+  }, [todos, setActiveTodoId, updateTodo, getActiveTodo, usePerformedTasksList, t]);
 
   const startAfterPrompt = useCallback((todoId: number, firstActivityText: string) => {
     const now = Date.now();
@@ -142,8 +142,8 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
       activities: [initialActivity],
     });
 
-    document.title = '▶️ Tracking...';
-  }, [updateTodo]);
+    document.title = t('docTitleTracking');
+  }, [updateTodo, t]);
 
   const stopTimer = useCallback(() => {
     if (activeTodoId == null) return;
@@ -156,15 +156,19 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
     const newElapsedMs = (todo.elapsedMs || 0) + sessionMs;
     const currentTotalSec = newElapsedMs / 1000;
 
-    // Finalize activities
+    // Finalize activities without mutating existing state objects in place
     const updatedActivities = [...(todo.activities || [])];
     if (updatedActivities.length > 0) {
-      const lastActivity = updatedActivities[updatedActivities.length - 1];
+      const lastIdx = updatedActivities.length - 1;
+      const lastActivity = updatedActivities[lastIdx];
       if (!lastActivity.durationSeconds) {
         const previousDuration = updatedActivities
           .slice(0, -1)
           .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
-        lastActivity.durationSeconds = Math.max(0, currentTotalSec - previousDuration);
+        updatedActivities[lastIdx] = {
+          ...lastActivity,
+          durationSeconds: Math.max(0, currentTotalSec - previousDuration),
+        };
       }
     }
 
@@ -175,8 +179,8 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
       activities: updatedActivities,
     });
 
-    document.title = 'Redmine Time Tracker';
-  }, [activeTodoId, getActiveTodo, updateTodo]);
+    document.title = t('appTitle');
+  }, [activeTodoId, getActiveTodo, updateTodo, t]);
 
   const addActivity = useCallback((text: string) => {
     if (!text.trim() || activeTodoId == null) return;
@@ -190,12 +194,16 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
 
     const updatedActivities = [...(todo.activities || [])];
     if (updatedActivities.length > 0) {
-      const lastActivity = updatedActivities[updatedActivities.length - 1];
+      const lastIdx = updatedActivities.length - 1;
+      const lastActivity = updatedActivities[lastIdx];
       if (!lastActivity.durationSeconds) {
         const previousDuration = updatedActivities
           .slice(0, -1)
           .reduce((sum, act) => sum + (act.durationSeconds || 0), 0);
-        lastActivity.durationSeconds = Math.max(0, currentTotalSec - previousDuration);
+        updatedActivities[lastIdx] = {
+          ...lastActivity,
+          durationSeconds: Math.max(0, currentTotalSec - previousDuration),
+        };
       }
     }
 
@@ -210,8 +218,8 @@ export const useQueueTimer = (): QueueTimerState & QueueTimerActions => {
       removeTodo(activeTodoId);
     }
     setActiveTodoId(null);
-    document.title = 'Redmine Time Tracker';
-  }, [activeTodoId, setActiveTodoId, removeTodo]);
+    document.title = t('appTitle');
+  }, [activeTodoId, setActiveTodoId, removeTodo, t]);
 
   return {
     isRunning,

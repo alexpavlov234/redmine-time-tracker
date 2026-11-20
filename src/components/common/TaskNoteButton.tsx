@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActionIcon, Tooltip, Badge, Box } from '@mantine/core';
 import { IconNotes } from '@tabler/icons-react';
 import { useTaskNotes } from '../../hooks/useTaskNotes';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { TaskNoteModal } from './TaskNoteModal';
 
 /// <summary>
@@ -30,6 +31,7 @@ export const TaskNoteButton: React.FC<TaskNoteButtonProps> = ({
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { getNotes } = useTaskNotes();
+  const { t } = useLanguage();
 
   const cleanTaskId = taskId ? String(taskId).replace(/^#/, '').trim() : '';
   if (!cleanTaskId) return null;
@@ -38,9 +40,10 @@ export const TaskNoteButton: React.FC<TaskNoteButtonProps> = ({
   const count = taskNotes.length;
   const hasNote = count > 0;
 
+  const countLabel = count === 1 ? t('notesCountSingle') : `${count} ${t('notesCountPlural')}`;
   const tooltipLabel = hasNote
-    ? `${count} note${count > 1 ? 's' : ''}: "${taskNotes[0].title || taskNotes[0].content.slice(0, 40)}..."`
-    : 'Add note for this task';
+    ? `${countLabel}: "${taskNotes[0].title || taskNotes[0].content.replace(/<[^>]+>/g, ' ').trim().slice(0, 40)}..."`
+    : t('addTaskNoteTooltip');
 
   return (
     <>
@@ -54,7 +57,7 @@ export const TaskNoteButton: React.FC<TaskNoteButtonProps> = ({
               e.stopPropagation();
               setIsModalOpen(true);
             }}
-            aria-label={hasNote ? `View ${count} task note(s)` : 'Add task note'}
+            aria-label={hasNote ? countLabel : t('addTaskNoteTooltip')}
           >
             <IconNotes size={size === 'xs' ? 14 : size === 'sm' ? 16 : 18} />
           </ActionIcon>

@@ -138,3 +138,156 @@ html, body {
     border: 2px solid CanvasText !important;
   }
 }
+
+@keyframes floating-timer-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(34, 139, 230, 0.45);
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 0 5px rgba(34, 139, 230, 0);
+  }
+}
+
+.floating-timer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.floating-timer-dot-running {
+  animation: floating-timer-pulse 1.8s ease-in-out infinite;
+}
+
+@media print {
+  .floating-side-timer,
+  .floating-timer-anchors-overlay {
+    display: none !important;
+  }
+}
+
+.floating-side-timer {
+  position: fixed;
+  z-index: 180;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.floating-side-timer-surface {
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.18s ease;
+  cursor: grab;
+}
+
+.floating-side-timer-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0.65;
+  color: var(--mantine-color-dimmed);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.floating-side-timer-handle:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.floating-side-timer-handle:active {
+  cursor: grabbing;
+}
+
+.floating-side-timer.is-dragging {
+  cursor: grabbing !important;
+  transition: none !important;
+}
+
+.floating-side-timer.is-dragging .floating-side-timer-surface {
+  transform: scale(1.03);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28), 0 3px 8px rgba(0, 0, 0, 0.16);
+  opacity: 0.96;
+  cursor: grabbing !important;
+}
+
+.floating-side-timer.is-dragging .floating-side-timer-handle {
+  cursor: grabbing !important;
+}
+
+.floating-timer-anchors-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 175;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.2s ease;
+}
+
+.floating-timer-anchors-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.floating-timer-anchor-dot {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background-color 0.2s ease,
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
+  border: 2px dashed rgba(34, 139, 230, 0.5);
+  background-color: rgba(34, 139, 230, 0.08);
+}
+
+.floating-timer-anchor-dot .dot-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgba(34, 139, 230, 0.6);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.floating-timer-anchor-dot.active {
+  transform: translate(-50%, -50%) scale(1.35);
+  border: 2px solid var(--mantine-color-blue-filled);
+  background-color: rgba(34, 139, 230, 0.24);
+  box-shadow: 0 0 16px rgba(34, 139, 230, 0.5), inset 0 0 6px rgba(34, 139, 230, 0.25);
+}
+
+.floating-timer-anchor-dot.active .dot-inner {
+  transform: scale(1.4);
+  background-color: var(--mantine-color-blue-filled);
+}
+
+.calendar-draggable-entry {
+  cursor: grab;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.calendar-draggable-entry:active {
+  cursor: grabbing;
+}
+
+.calendar-draggable-entry.is-dragging {
+  opacity: 0.45;
+}
+
+.calendar-arrow-drag-hover {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 3px rgba(253, 126, 20, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}

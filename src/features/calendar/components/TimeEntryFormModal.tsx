@@ -1,17 +1,23 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Modal, Button, Select, TextInput, NumberInput, Textarea, Group, Stack, Text, Divider, ActionIcon, Grid, Alert } from '@mantine/core';
+import { Modal, Button, Select, NumberInput, Textarea, Group, Stack, Text, Divider, ActionIcon, Grid, Alert, Tooltip } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { useMediaQuery } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { useProjects } from '../../../contexts/ProjectsContext';
+import { useStagedEntries } from '../../../contexts/StagedEntriesContext';
+import { useConfirm } from '../../../contexts/ConfirmContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { usePresets } from '../../../hooks/usePresets';
-import { createTimeEntry, updateTimeEntry } from '../../../services/redmine';
-import type { TimeEntry, TimeLogPreset } from '../../../types';
-import { IconDeviceFloppy, IconSend, IconTrash } from '@tabler/icons-react';
+import { useActivitiesForProject } from '../../../hooks/useActivitiesForProject';
+import { createTimeEntry, updateTimeEntry, redmineApiRequest } from '../../../services/redmine';
+import { setLastActivityForTask } from '../../../services/taskActivity';
+import type { TimeEntry, TimeLogPreset, StagedTimeEntry } from '../../../types';
+import { IconDeviceFloppy, IconSend, IconTrash, IconGitCommit } from '@tabler/icons-react';
 import { useCustomFields } from '../../../hooks/useCustomFields';
 import { SavePresetModal } from './SavePresetModal';
 import { ProjectTaskActivityFields } from '../../../components/common/ProjectTaskActivityFields';
 import { CustomFieldsSection } from '../../../components/common/CustomFieldsSection';
-import { cleanTaskId, formatCustomFieldsPayload } from '../../../utils/formatters';
+import { cleanTaskId, formatCustomFieldsPayload, formatDisplayDateWithRelative } from '../../../utils/formatters';
 
 /// <summary>
 /// Properties for configuring the TimeEntryFormModal component.
@@ -25,12 +31,16 @@ interface TimeEntryFormModalProps {
   onSuccess: () => void;
   /// <summary>Existing time entry to be edited, if any.</summary>
   editEntry?: TimeEntry | null;
+  /// <summary>Existing locally staged time entry to be edited, if any.</summary>
+  editStagedEntry?: StagedTimeEntry | null;
   /// <summary>Existing time entry to copy data from, if any.</summary>
   copyEntry?: TimeEntry | null;
   /// <summary>Default date to populate when creating a new entry.</summary>
   defaultDate?: string;
   /// <summary>Identifier of initial preset to pre-fill.</summary>
   initialPresetId?: string | null;
+  /// <summary>Optional initial preset object to pre-fill (including built-in presets).</summary>
+  initialPreset?: TimeLogPreset | null;
 }
 
 /// <summary>
@@ -41,17 +51,24 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
   onClose,
   onSuccess,
   editEntry,
+  editStagedEntry,
   copyEntry,
   defaultDate,
   initialPresetId,
+  initialPreset,
 }) => {
   const isMobile = useMediaQuery('(max-width: 48em)');
   const { allProjects, refreshRecentProjects } = useProjects();
+  const { stageEntry, updateStagedEntry, removeStagedEntry } = useStagedEntries();
+  const confirmDialog = useConfirm();
+  const { language, t } = useLanguage();
   const { presets, savePreset, deletePreset } = usePresets();
 
   const isEditing = Boolean(editEntry);
+  const isEditingStaged = Boolean(editStagedEntry);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(initialPresetId || null);
+  const [selectedTaskSubject, setSelectedTaskSubject] = useState<string>('');
   const [formResult, setFormResult] = useState<{ success: boolean; message: string } | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<number, string>>({});
 
@@ -78,19 +95,21 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       comments: '',
     },
     validate: {
-      activityId: (value) => (value ? null : 'Activity is required'),
-      hours: (value) => (value && Number(value) > 0 ? null : 'Valid hours are required'),
-      spentOn: (value) => (value ? null : 'Date is required'),
+      activityId: (value) => (value ? null : t('validationActivityRequired')),
+      hours: (value) => (value && Number(value) > 0 ? null : t('validationHoursRequired')),
+      spentOn: (value) => (value ? null : t('validationDateRequired')),
       taskId: (value, values) => {
         const cleanTask = value ? String(value).replace(/^#/, '').trim() : '';
         const cleanProject = values.projectId && values.projectId !== 'my_issues' ? String(values.projectId).trim() : '';
         if (!cleanTask && !cleanProject) {
-          return 'Either Project or Task ID is required';
+          return t('validationProjectOrTaskRequired');
         }
         return null;
       },
     },
   });
+
+  const { activities: projectActivities } = useActivitiesForProject(form.values.projectId || null, isOpen);
 
   const additionalTaskOptions = useMemo(() => {
     const options: Array<{ value: string; label: string }> = [];
@@ -101,6 +120,12 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         label: `#${sourceEntry.issue.id} - ${sourceEntry.issue.subject || (sourceEntry.issue as any).name || ''}`,
       });
     }
+    if (editStagedEntry?.issueId) {
+      options.push({
+        value: editStagedEntry.issueId.toString(),
+        label: `#${editStagedEntry.issueId} - ${editStagedEntry.issueSubject || ''}`,
+      });
+    }
     const preset = presets.find(p => p.id === selectedPresetId);
     if (preset && preset.taskId && preset.taskSubject) {
       options.push({
@@ -109,7 +134,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       });
     }
     return options;
-  }, [editEntry, copyEntry, presets, selectedPresetId]);
+  }, [editEntry, editStagedEntry, copyEntry, presets, selectedPresetId]);
 
   const additionalActivityOptions = useMemo(() => {
     const sourceEntry = editEntry || copyEntry;
@@ -121,17 +146,26 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         },
       ];
     }
+    if (editStagedEntry?.activityId) {
+      return [
+        {
+          value: editStagedEntry.activityId.toString(),
+          label: editStagedEntry.activityName || `Activity #${editStagedEntry.activityId}`,
+        },
+      ];
+    }
     return [];
-  }, [editEntry, copyEntry]);
+  }, [editEntry, editStagedEntry, copyEntry]);
 
-  const handleApplyPreset = (presetId: string | null) => {
+  const handleApplyPreset = (presetId: string | null, presetOverride?: TimeLogPreset | null) => {
     setSelectedPresetId(presetId);
-    if (!presetId) return;
+    if (!presetId && !presetOverride) return;
 
-    const preset = presets.find(p => p.id === presetId);
+    const preset = presetOverride || presets.find(p => p.id === presetId);
     if (preset) {
       if (preset.projectId) form.setFieldValue('projectId', preset.projectId);
       if (preset.taskId) form.setFieldValue('taskId', preset.taskId);
+      setSelectedTaskSubject(preset.taskSubject || '');
       if (preset.activityId) form.setFieldValue('activityId', preset.activityId);
       if (preset.hours) form.setFieldValue('hours', preset.hours);
       if (preset.comments !== undefined) form.setFieldValue('comments', preset.comments);
@@ -161,7 +195,9 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         form.reset();
         form.clearErrors();
         setFormResult(null);
+        setIsSubmitting(false);
         setSelectedPresetId(null);
+        setSelectedTaskSubject('');
         setCustomFieldValues({});
       }
       return;
@@ -169,15 +205,18 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
     const currentTargetKey = editEntry
       ? `edit_${editEntry.id}`
+      : editStagedEntry
+      ? `edit_staged_${editStagedEntry.localId}`
       : copyEntry
       ? `copy_${copyEntry.id}_${defaultDate || ''}`
-      : `new_${defaultDate || ''}_${initialPresetId || ''}`;
+      : `new_${defaultDate || ''}_${initialPreset?.id || initialPresetId || ''}`;
 
     // Only populate if opening freshly or switching to a different entry/date/preset
     if (initializedTargetRef.current !== currentTargetKey) {
       initializedTargetRef.current = currentTargetKey;
       form.clearErrors();
       setFormResult(null);
+      setIsSubmitting(false);
 
       if (editEntry) {
         form.setValues({
@@ -188,11 +227,31 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
           spentOn: editEntry.spent_on,
           comments: editEntry.comments || '',
         });
+        setSelectedTaskSubject(editEntry.issue?.subject || '');
 
         const initialValues: Record<number, string> = {};
         if (editEntry.custom_fields) {
           editEntry.custom_fields.forEach(f => {
             initialValues[f.id] = f.value;
+          });
+        }
+        setCustomFieldValues(initialValues);
+        setSelectedPresetId(null);
+      } else if (editStagedEntry) {
+        form.setValues({
+          projectId: editStagedEntry.projectId || '',
+          taskId: editStagedEntry.issueId?.toString() || '',
+          activityId: editStagedEntry.activityId?.toString() || '',
+          hours: editStagedEntry.hours,
+          spentOn: editStagedEntry.spent_on,
+          comments: editStagedEntry.comments || '',
+        });
+        setSelectedTaskSubject(editStagedEntry.issueSubject || '');
+
+        const initialValues: Record<number, string> = {};
+        if (editStagedEntry.custom_fields) {
+          editStagedEntry.custom_fields.forEach(f => {
+            initialValues[f.id] = String(f.value);
           });
         }
         setCustomFieldValues(initialValues);
@@ -206,6 +265,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
           spentOn: defaultDate || '',
           comments: copyEntry.comments || '',
         });
+        setSelectedTaskSubject(copyEntry.issue?.subject || '');
 
         const initialValues: Record<number, string> = {};
         if (copyEntry.custom_fields) {
@@ -216,15 +276,18 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         setCustomFieldValues(initialValues);
         setSelectedPresetId(null);
       } else {
+        const now = new Date();
+        const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         form.setValues({
           projectId: '',
           taskId: '',
           activityId: '',
           hours: '',
-          spentOn: defaultDate || new Date().toISOString().split('T')[0],
+          spentOn: defaultDate || localToday,
           comments: '',
         });
-        setSelectedPresetId(initialPresetId || null);
+        setSelectedPresetId(initialPreset?.id || initialPresetId || null);
+        setSelectedTaskSubject('');
 
         const initialValues: Record<number, string> = {};
         const bId = localStorage.getItem('billableFieldId');
@@ -237,24 +300,24 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         });
         setCustomFieldValues(initialValues);
 
-        if (initialPresetId) {
-          handleApplyPreset(initialPresetId);
+        if (initialPreset || initialPresetId) {
+          handleApplyPreset(initialPreset?.id || initialPresetId || null, initialPreset || null);
         }
       }
 
-      const sourceActId = editEntry?.activity?.id || copyEntry?.activity?.id;
+      const sourceActId = editEntry?.activity?.id || editStagedEntry?.activityId || copyEntry?.activity?.id;
       if (sourceActId) {
         form.setFieldValue('activityId', sourceActId.toString());
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, editEntry, copyEntry, defaultDate, initialPresetId]);
+  }, [isOpen, editEntry, editStagedEntry, copyEntry, defaultDate, initialPresetId, initialPreset]);
 
   /// <summary>
   /// Sets default values for newly loaded custom fields without resetting any existing user input.
   /// </summary>
   useEffect(() => {
-    if (!isOpen || isEditing || customFields.length === 0) return;
+    if (!isOpen || isEditing || isEditingStaged || customFields.length === 0) return;
 
     setCustomFieldValues(prev => {
       const bId = localStorage.getItem('billableFieldId');
@@ -287,6 +350,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
     const project = allProjects.find(p => p.id.toString() === projectId);
     const taskOpt = additionalTaskOptions.find(t => t.value === taskId);
+    const matchedActivity = projectActivities.find(a => a.id.toString() === activityId);
 
     const newPreset: TimeLogPreset = {
       id: 'preset_' + Date.now(),
@@ -294,8 +358,9 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
       projectId,
       projectName: project?.name || '',
       taskId,
-      taskSubject: taskOpt ? taskOpt.label.replace(/^#\d+\s*-\s*/, '') : '',
+      taskSubject: selectedTaskSubject || (taskOpt ? taskOpt.label.replace(/^#\d+\s*-\s*/, '') : ''),
       activityId,
+      activityName: matchedActivity?.name || '',
       hours: typeof hours === 'string' ? parseFloat(hours) || 0 : hours,
       comments,
       isBillable: customFieldValues[Number(billableFieldId)] === '1',
@@ -303,16 +368,83 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
     savePreset(newPreset);
     setSelectedPresetId(newPreset.id);
-    setFormResult({ success: true, message: `Preset "${name.trim()}" saved!` });
+    setFormResult({ success: true, message: `${t('presetSavedPrefix')} „${name.trim()}“` });
   };
 
-  const handleDeletePreset = () => {
+  const handleDeletePreset = async () => {
     const preset = presets.find(p => p.id === selectedPresetId);
-    if (preset && confirm(`Delete preset "${preset.name}"?`)) {
+    if (!preset) return;
+    const confirmed = await confirmDialog({
+      message: `${t('deletePresetConfirmPrefix')} „${preset.name}“?`,
+      variant: 'danger',
+      confirmText: t('deleteBtn'),
+    });
+    if (confirmed) {
       deletePreset(preset.id);
       setSelectedPresetId('');
-      setFormResult({ success: true, message: 'Preset deleted.' });
+      setFormResult({ success: true, message: t('presetDeletedMsg') });
     }
+  };
+
+  /// <summary>
+  /// Commits (stages) or updates a staged time entry locally without pushing to Redmine yet.
+  /// </summary>
+  const handleCommitLocal = () => {
+    if (isSubmitting) return;
+    const validation = form.validate();
+    if (validation.hasErrors) return;
+
+    setIsSubmitting(true);
+
+    const values = form.values;
+    const payloadCustomFields = formatCustomFieldsPayload(customFieldValues);
+    const cleanId = cleanTaskId(values.taskId);
+    const parsedTaskId = cleanId ? parseInt(cleanId, 10) : undefined;
+    const validTaskId = (parsedTaskId && !isNaN(parsedTaskId)) ? parsedTaskId : undefined;
+    const cleanProjectId = values.projectId && values.projectId !== 'my_issues' ? values.projectId.toString().trim() : '';
+
+    const matchedProject = allProjects.find(p => p.id.toString() === cleanProjectId);
+    const projectName = matchedProject?.name || editStagedEntry?.projectName || copyEntry?.project?.name || t('generalNoProject');
+
+    const matchedActivity = projectActivities.find(a => a.id.toString() === values.activityId);
+    const activityName =
+      matchedActivity?.name ||
+      (editStagedEntry?.activityId?.toString() === values.activityId ? editStagedEntry.activityName : undefined) ||
+      (copyEntry?.activity?.id?.toString() === values.activityId ? copyEntry.activity.name : undefined) ||
+      `#${values.activityId}`;
+
+    const preset = presets.find(p => p.id === selectedPresetId);
+    const resolvedTaskSubject =
+      selectedTaskSubject ||
+      (validTaskId && preset?.taskId === String(validTaskId) ? preset.taskSubject : undefined) ||
+      (validTaskId && editStagedEntry?.issueId === validTaskId ? editStagedEntry.issueSubject : undefined) ||
+      undefined;
+
+    const stagedData = {
+      projectId: cleanProjectId,
+      projectName,
+      issueId: validTaskId,
+      issueSubject: resolvedTaskSubject,
+      activityId: parseInt(values.activityId, 10),
+      activityName,
+      hours: typeof values.hours === 'string' ? parseFloat(values.hours) : values.hours,
+      comments: values.comments.trim(),
+      spent_on: values.spentOn,
+      ...(payloadCustomFields.length > 0 ? { custom_fields: payloadCustomFields } : { custom_fields: undefined }),
+    };
+
+    if (isEditingStaged && editStagedEntry) {
+      updateStagedEntry(editStagedEntry.localId, stagedData);
+      setFormResult({ success: true, message: t('committedUpdatedMsg') });
+    } else {
+      stageEntry(stagedData);
+      setFormResult({ success: true, message: t('committedSuccessMsg') });
+    }
+
+    setTimeout(() => {
+      onSuccess();
+      onClose();
+    }, 500);
   };
 
   const handleSubmit = async (values: typeof form.values) => {
@@ -337,10 +469,25 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
 
       if (isEditing && editEntry) {
         await updateTimeEntry(editEntry.id, data);
-        setFormResult({ success: true, message: 'Time entry updated successfully!' });
+        setFormResult({ success: true, message: t('timeEntryUpdatedSuccess') });
       } else {
         await createTimeEntry(data);
-        setFormResult({ success: true, message: 'Time entry created successfully!' });
+        if (isEditingStaged && editStagedEntry) {
+          if (editStagedEntry.statusId && validTaskId) {
+            try {
+              await redmineApiRequest(`/issues/${validTaskId}.json`, 'PUT', {
+                issue: { status_id: editStagedEntry.statusId },
+              });
+            } catch {
+              // Status update failure should not revert created time entry
+            }
+          }
+          removeStagedEntry(editStagedEntry.localId);
+        }
+        if (validTaskId && values.activityId) {
+          setLastActivityForTask(validTaskId, values.activityId);
+        }
+        setFormResult({ success: true, message: t('timeEntryCreatedSuccess') });
       }
 
       // Update recently used projects
@@ -351,7 +498,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
         onClose();
       }, 600);
     } catch (err: any) {
-      setFormResult({ success: false, message: err.message || 'Failed to save time entry.' });
+      setFormResult({ success: false, message: err.message || t('timeEntrySubmitFailed') });
     } finally {
       setIsSubmitting(false);
     }
@@ -361,7 +508,17 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
     <Modal
       opened={isOpen}
       onClose={onClose}
-      title={<Text fw={600}>{copyEntry ? 'Copy Time Entry' : (isEditing ? 'Edit Time Entry' : 'Log Time')}</Text>}
+      title={
+        <Text fw={600}>
+          {isEditingStaged
+            ? t('editStagedTitle')
+            : copyEntry
+            ? t('copyTimeEntryModalTitle')
+            : isEditing
+            ? t('editTimeEntryModalTitle')
+            : t('logTimeModalTitle')}
+        </Text>
+      }
       size="80%"
       fullScreen={isMobile}
       centered
@@ -372,14 +529,14 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
             {formResult.message}
           </Alert>
         )}
-        {!isEditing && (
+        {!isEditing && !isEditingStaged && (
           <>
             <Group align="flex-end">
               <Select
-                label="Load Preset"
-                placeholder="-- Choose preset --"
+                label={t('loadPresetLabel')}
+                placeholder={t('choosePresetPlaceholder')}
                 value={selectedPresetId}
-                onChange={handleApplyPreset}
+                onChange={(val) => handleApplyPreset(val)}
                 data={presets.map(p => ({ value: p.id, label: p.name }))}
                 style={{ flex: 1 }}
               />
@@ -389,6 +546,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                 size="input-sm"
                 onClick={handleDeletePreset}
                 disabled={!selectedPresetId}
+                aria-label={t('deletePresetTooltip')}
               >
                 <IconTrash size={16} />
               </ActionIcon>
@@ -413,7 +571,14 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                       }
                     }}
                     taskId={form.values.taskId}
-                    onTaskChange={(val) => form.setFieldValue('taskId', val)}
+                    onTaskChange={(val, task) => {
+                      form.setFieldValue('taskId', val);
+                      if (task?.subject) {
+                        setSelectedTaskSubject(task.subject);
+                      } else if (!val) {
+                        setSelectedTaskSubject('');
+                      }
+                    }}
                     activityId={form.values.activityId}
                     onActivityChange={(val) => form.setFieldValue('activityId', val)}
                     includeMyIssues={true}
@@ -426,7 +591,7 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                   {/* Side-by-side: Hours & Date */}
                   <Group align="flex-start" wrap="nowrap">
                     <NumberInput
-                      label="Hours"
+                      label={t('hoursLabel')}
                       withAsterisk
                       min={0}
                       decimalScale={2}
@@ -434,12 +599,21 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
                       w={120}
                       {...form.getInputProps('hours')}
                     />
-                    <TextInput
-                      label="Date"
-                      type="date"
+                    <DatePickerInput
+                      label={t('dateLabel')}
+                      placeholder={t('dateLabel')}
+                      valueFormat="D MMMM YYYY"
+                      valueFormatter={({ date }) => {
+                        if (!date || Array.isArray(date)) return '';
+                        return formatDisplayDateWithRelative(date, language);
+                      }}
                       withAsterisk
+                      allowDeselect={false}
+                      disabled={isSubmitting}
                       style={{ flex: 1 }}
-                      {...form.getInputProps('spentOn')}
+                      value={form.values.spentOn || null}
+                      onChange={(val) => form.setFieldValue('spentOn', val || '')}
+                      error={form.errors.spentOn}
                     />
                   </Group>
                 </Stack>
@@ -449,8 +623,8 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
               <Grid.Col span={{ base: 12, md: 6 }} style={{ display: 'flex', flexDirection: 'column' }}>
                 <Stack gap="md" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <Textarea
-                    label="Comments"
-                    placeholder="Optional detailed description..."
+                    label={t('commentsLabel')}
+                    placeholder={t('commentsOptionalPlaceholder')}
                     minRows={5}
                     styles={{
                       root: { flex: 1, display: 'flex', flexDirection: 'column' },
@@ -470,21 +644,36 @@ export const TimeEntryFormModal: React.FC<TimeEntryFormModalProps> = ({
               </Grid.Col>
             </Grid>
 
-            <Group justify="space-between" mt="md">
+            <Group justify="space-between" mt="md" wrap="wrap">
               <Button
                 variant="outline"
                 onClick={handleSavePreset}
                 disabled={isSubmitting}
               >
-                Save Preset
+                {t('savePresetBtn')}
               </Button>
-              <Button
-                type="submit"
-                leftSection={isEditing ? <IconDeviceFloppy size={16} /> : <IconSend size={16} />}
-                loading={isSubmitting}
-              >
-                {isEditing ? 'Update' : 'Submit'}
-              </Button>
+              <Group gap="sm">
+                {!isEditing && (
+                  <Tooltip label={t('commitForLaterTooltip')}>
+                    <Button
+                      variant="light"
+                      color="orange"
+                      leftSection={isEditingStaged ? <IconDeviceFloppy size={16} /> : <IconGitCommit size={16} />}
+                      onClick={handleCommitLocal}
+                      disabled={isSubmitting}
+                    >
+                      {isEditingStaged ? t('saveStagedBtn') : t('commitBtn')}
+                    </Button>
+                  </Tooltip>
+                )}
+                <Button
+                  type="submit"
+                  leftSection={isEditing ? <IconDeviceFloppy size={16} /> : <IconSend size={16} />}
+                  loading={isSubmitting}
+                >
+                  {isEditing ? t('updateBtn') : t('pushToRedmineBtn')}
+                </Button>
+              </Group>
             </Group>
           </Stack>
         </form>

@@ -3,6 +3,7 @@ import type { ComboboxData, ComboboxItem, ComboboxItemGroup } from '@mantine/cor
 import type { RedmineProject, IssueStatus } from '../types';
 import { redmineApiRequest } from '../services/redmine';
 import { useSettings } from './SettingsContext';
+import { useLanguage } from './LanguageContext';
 
 /// <summary>
 /// Properties exposed by the ProjectsContext.
@@ -39,6 +40,7 @@ const ProjectsContext = createContext<ProjectsContextProps | undefined>(undefine
 /// </summary>
 export const ProjectsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isConfigured, settingsVersion } = useSettings();
+  const { t } = useLanguage();
   const [allProjects, setAllProjects] = useState<RedmineProject[]>([]);
   const [issueStatuses, setIssueStatuses] = useState<IssueStatus[]>([]);
   const [recentProjectIds, setRecentProjectIds] = useState<string[]>([]);
@@ -178,7 +180,7 @@ export const ProjectsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const items: (ComboboxItem | ComboboxItemGroup<ComboboxItem>)[] = [];
 
     if (includeMyIssues) {
-      items.push({ value: 'my_issues', label: '--- My Assigned Issues ---' });
+      items.push({ value: 'my_issues', label: t('myAssignedIssuesGroupOption') });
     }
 
     if (recentProjectIds.length > 0) {
@@ -191,13 +193,13 @@ export const ProjectsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       if (recentProjects.length > 0) {
         items.push({
-          group: 'Recently Used',
+          group: t('recentlyUsedProjectsGroup'),
           items: recentProjects.map(p => ({ value: p.id.toString(), label: p.name })),
         });
       }
 
       items.push({
-        group: 'All Projects',
+        group: t('allProjectsGroup'),
         items: otherProjects.map(p => ({ value: p.id.toString(), label: p.name })),
       });
     } else {
@@ -205,7 +207,7 @@ export const ProjectsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     return items;
-  }, [allProjects, recentProjectIds]);
+  }, [allProjects, recentProjectIds, t]);
 
   // Reset cached state when settings change; actual fetching happens lazily on user interaction
   useEffect(() => {

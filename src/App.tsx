@@ -5,6 +5,7 @@ import { UserProvider } from './contexts/UserContext';
 import { ProjectsProvider } from './contexts/ProjectsContext';
 import { QueueProvider } from './contexts/QueueContext';
 import { ConfirmProvider } from './contexts/ConfirmContext';
+import { StagedEntriesProvider } from './contexts/StagedEntriesContext';
 import { AppShell } from './components/layout/AppShell';
 import { SettingsForm } from './features/settings/components/SettingsForm';
 import '@mantine/core/styles.css';
@@ -18,6 +19,8 @@ import { ProjectManagerDashboard } from './features/pm/components/ProjectManager
 import { PersonalTasksDashboard } from './features/personal/components/PersonalTasksDashboard';
 import { PersonalTaskDetailView } from './features/personal/components/PersonalTaskDetailView';
 import { NotesDashboard } from './features/notes/components/NotesDashboard';
+import { TimeTransferDashboard } from './features/transfer/components/TimeTransferDashboard';
+import { TimeValidationDashboard } from './features/validation/components/TimeValidationDashboard';
 
 /// <summary>
 /// Global Mantine UI theme configuration.
@@ -40,23 +43,27 @@ function App() {
         <SettingsProvider>
           <UserProvider>
             <ProjectsProvider>
-              <QueueProvider>
-                <ConfirmProvider>
-                  <Router>
-                    <Routes>
-                      <Route path="/" element={<AppShell />}>
-                        <Route index element={<TrackerDashboard />} />
-                        <Route path="tasks" element={<PersonalTasksDashboard />} />
-                        <Route path="tasks/:taskId" element={<PersonalTaskDetailView />} />
-                        <Route path="notes" element={<NotesDashboard />} />
-                        <Route path="logged-time" element={<LoggedTimeDashboard />} />
-                        <Route path="projects" element={<ProjectManagerDashboard />} />
-                        <Route path="settings" element={<SettingsForm />} />
-                      </Route>
-                    </Routes>
-                  </Router>
-                </ConfirmProvider>
-              </QueueProvider>
+              <StagedEntriesProvider>
+                <QueueProvider>
+                  <ConfirmProvider>
+                    <Router>
+                      <Routes>
+                        <Route path="/" element={<AppShell />}>
+                          <Route index element={<TrackerDashboard />} />
+                          <Route path="tasks" element={<PersonalTasksDashboard />} />
+                          <Route path="tasks/:taskId" element={<PersonalTaskDetailView />} />
+                          <Route path="notes" element={<NotesDashboard />} />
+                          <Route path="logged-time" element={<LoggedTimeDashboard />} />
+                          <Route path="validation" element={<TimeValidationDashboard />} />
+                          <Route path="transfer" element={<TimeTransferDashboard />} />
+                          <Route path="projects" element={<ProjectManagerDashboard />} />
+                          <Route path="settings" element={<SettingsForm />} />
+                        </Route>
+                      </Routes>
+                    </Router>
+                  </ConfirmProvider>
+                </QueueProvider>
+              </StagedEntriesProvider>
             </ProjectsProvider>
           </UserProvider>
         </SettingsProvider>

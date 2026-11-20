@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import 'dayjs/locale/bg';
+import { DatesProvider } from '@mantine/dates';
 import { translations, type AppLanguage, type TranslationKey } from '../i18n/translations';
 
 /// <summary>
@@ -56,7 +58,9 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, toggleLanguage, t }}>
-      {children}
+      <DatesProvider settings={{ locale: language === 'bg' ? 'bg' : 'en', firstDayOfWeek: 1 }}>
+        {children}
+      </DatesProvider>
     </LanguageContext.Provider>
   );
 };

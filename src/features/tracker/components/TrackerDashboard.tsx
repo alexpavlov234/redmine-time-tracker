@@ -1,15 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { TimerBar } from '../../timer/components/TimerBar';
 import { WorkQueue } from '../../queue/components/WorkQueue';
-import { AddTaskForm } from '../../queue/components/AddTaskForm';
 import { SummaryModal } from './SummaryModal';
 import { AssignedTasksPanel } from './AssignedTasksPanel';
 import { StandardLogPanel } from './StandardLogPanel';
+import { TimeEntryFormModal } from '../../calendar/components/TimeEntryFormModal';
 import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { Card, Button, TextInput, Group, Stack, Badge, Text, ThemeIcon, Grid, SegmentedControl, Timeline, Title } from '@mantine/core';
-import { IconClipboardList, IconPlus, IconCheck, IconClock } from '@tabler/icons-react';
+import { Card, Button, TextInput, Group, Stack, Badge, Text, ThemeIcon, Grid, Timeline, Title } from '@mantine/core';
+import { IconClipboardList, IconPlus, IconCheck, IconClock, IconPlayerPlay } from '@tabler/icons-react';
 
 /// <summary>
 /// Sub-panel for viewing and recording incremental activities with an ongoing timeline during an active timer session.
@@ -127,9 +127,10 @@ const PerformedTasks: React.FC = () => {
 /// </summary>
 export const TrackerDashboard: React.FC = () => {
   const timer = useQueueTimer();
-  const { usePerformedTasksList, setUsePerformedTasksList } = useSettings();
+  const { usePerformedTasksList } = useSettings();
   const { t } = useLanguage();
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isQuickLogOpen, setIsQuickLogOpen] = useState(false);
 
   // When timer stops, open the summary modal
   const handleStop = useCallback(() => {
@@ -141,21 +142,30 @@ export const TrackerDashboard: React.FC = () => {
 
   return (
     <Stack gap="lg">
-      {/* Consistent Top Page Header */}
-      <Group justify="space-between" align="center" wrap="wrap">
+      {/* Top Page Header with prominent Quick Actions */}
+      <Group justify="space-between" align="center" wrap="wrap" gap="sm">
         <Title order={2}>{t('navTracker')}</Title>
 
-        <SegmentedControl
-          size="sm"
-          radius="md"
-          color="blue"
-          value={usePerformedTasksList ? 'performed' : 'direct'}
-          onChange={(val) => setUsePerformedTasksList(val === 'performed')}
-          data={[
-            { label: t('directLoggingTitle'), value: 'direct' },
-            { label: t('performedListTitle'), value: 'performed' },
-          ]}
-        />
+        <Group gap="sm" wrap="wrap">
+          <Button
+            size="md"
+            variant="filled"
+            color="teal"
+            leftSection={<IconPlayerPlay size={18} fill="currentColor" />}
+            onClick={() => timer.startWithoutTask()}
+          >
+            {t('startWithoutTaskBtn')}
+          </Button>
+          <Button
+            size="md"
+            variant="filled"
+            color="blue"
+            leftSection={<IconClock size={18} />}
+            onClick={() => setIsQuickLogOpen(true)}
+          >
+            {t('logTimeBtn')}
+          </Button>
+        </Group>
       </Group>
 
       <Grid>
@@ -168,18 +178,25 @@ export const TrackerDashboard: React.FC = () => {
           </Stack>
         </Grid.Col>
 
-        {/* Right Column: Task Selection (Assigned Tasks, Presets, Add Task) */}
+        {/* Right Column: Unified Tasks Panel & Presets */}
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Stack gap="lg">
             <AssignedTasksPanel />
             <StandardLogPanel />
-            <AddTaskForm />
           </Stack>
         </Grid.Col>
       </Grid>
 
       {isSummaryOpen && (
         <SummaryModal isOpen={isSummaryOpen} onClose={() => setIsSummaryOpen(false)} />
+      )}
+
+      {isQuickLogOpen && (
+        <TimeEntryFormModal
+          isOpen={isQuickLogOpen}
+          onClose={() => setIsQuickLogOpen(false)}
+          onSuccess={() => setIsQuickLogOpen(false)}
+        />
       )}
     </Stack>
   );

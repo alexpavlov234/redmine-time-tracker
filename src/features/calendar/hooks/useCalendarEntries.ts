@@ -29,7 +29,7 @@ export const useCalendarEntries = (currentMonth: Date) => {
 
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const monthKey = `${year}-${month}`;
+    const monthKey = `${user.id}-${year}-${month}`;
 
     if (!forceRefetch && monthCache.has(monthKey)) {
       setEntriesByDate(monthCache.get(monthKey)!);

@@ -1,32 +1,30 @@
 import React, { useState } from 'react';
-import { Card, Group, Text, Button, Stack, Paper, Tooltip, ActionIcon, Divider } from '@mantine/core';
-import { IconBolt, IconTrash, IconClock, IconPlayerPlay } from '@tabler/icons-react';
+import { Card, Group, Text, Stack, Paper, Tooltip, ActionIcon } from '@mantine/core';
+import { IconBolt, IconTrash } from '@tabler/icons-react';
 import { usePresets } from '../../../hooks/usePresets';
-import { useQueueTimer } from '../../../hooks/useQueueTimer';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { TimeEntryFormModal } from '../../calendar/components/TimeEntryFormModal';
 import type { TimeLogPreset } from '../../../types';
 
-const DEFAULT_PRESETS: TimeLogPreset[] = [
-  { id: 'default_standup', name: 'Daily Standup (15m)', hours: 0.25, comments: 'Daily team standup meeting', isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
-  { id: 'default_review', name: 'Code Review (30m)', hours: 0.5, comments: 'Code review & pull request verification', isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
-  { id: 'default_sync', name: 'Team Sync (1h)', hours: 1.0, comments: 'Project planning & team sync', isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
-];
-
 /// <summary>
-/// Panel offering quick timer start without task, direct time logging, and customizable presets.
+/// Panel offering customizable time-logging presets.
 /// </summary>
 export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLogSuccess }) => {
   const { presets, deletePreset } = usePresets();
   const { t } = useLanguage();
-  const timer = useQueueTimer();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<TimeLogPreset | null>(null);
 
-  const displayPresets = presets.length > 0 ? presets : DEFAULT_PRESETS;
+  const defaultPresets: TimeLogPreset[] = [
+    { id: 'default_standup', name: t('presetStandupName'), hours: 0.25, comments: t('presetStandupComment'), isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
+    { id: 'default_review', name: t('presetReviewName'), hours: 0.5, comments: t('presetReviewComment'), isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
+    { id: 'default_sync', name: t('presetSyncName'), hours: 1.0, comments: t('presetSyncComment'), isBillable: true, projectId: '', projectName: '', taskId: '', taskSubject: '', activityId: '' },
+  ];
 
-  const handleOpenModal = (presetId?: string) => {
-    setSelectedPresetId(presetId || null);
+  const displayPresets = presets.length > 0 ? presets : defaultPresets;
+
+  const handleOpenModal = (preset?: TimeLogPreset) => {
+    setSelectedPreset(preset || null);
     setIsModalOpen(true);
   };
 
@@ -36,34 +34,11 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
         <Card.Section withBorder inheritPadding py="xs">
           <Group gap="xs">
             <IconBolt size={20} color="var(--mantine-color-orange-filled)" />
-            <Text fw={600}>{t('quickActionsTitle')}</Text>
+            <Text fw={600}>{t('presetsDivider')}</Text>
           </Group>
         </Card.Section>
 
         <Stack mt="md" gap="sm">
-          <Group grow>
-            <Button
-              size="sm"
-              variant="light"
-              color="teal"
-              leftSection={<IconPlayerPlay size={16} fill="currentColor" />}
-              onClick={() => timer.startWithoutTask()}
-            >
-              {t('startWithoutTaskBtn')}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              color="blue"
-              leftSection={<IconClock size={16} />}
-              onClick={() => handleOpenModal()}
-            >
-              {t('logTimeBtn')}
-            </Button>
-          </Group>
-
-          <Divider my="xs" label={t('presetsDivider')} labelPosition="center" />
-
           <Group gap="xs" wrap="wrap">
             {displayPresets.map(preset => (
               <Paper
@@ -76,7 +51,7 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
                   transition: 'all 0.2s ease',
                   backgroundColor: 'var(--mantine-color-default)',
                 }}
-                onClick={() => handleOpenModal(preset.id)}
+                onClick={() => handleOpenModal(preset)}
               >
                 <Group gap="xs" wrap="nowrap">
                   <IconBolt size={14} color="var(--mantine-color-orange-filled)" />
@@ -113,14 +88,15 @@ export const StandardLogPanel: React.FC<{ onLogSuccess?: () => void }> = ({ onLo
           isOpen={isModalOpen}
           onClose={() => {
             setIsModalOpen(false);
-            setSelectedPresetId(null);
+            setSelectedPreset(null);
           }}
           onSuccess={() => {
             setIsModalOpen(false);
-            setSelectedPresetId(null);
+            setSelectedPreset(null);
             if (onLogSuccess) onLogSuccess();
           }}
-          initialPresetId={selectedPresetId}
+          initialPresetId={selectedPreset?.id || null}
+          initialPreset={selectedPreset}
         />
       )}
     </>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useUser } from '../../../contexts/UserContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import {
   getUserMemberships,
   isUserProjectManager,
@@ -8,6 +9,7 @@ import {
   extractBudgetMetadata,
   getAllProjectTimeEntries,
   calculateBudgetStats,
+  getLocalizedPeriodLabel,
 } from '../../../services/pmService';
 import type { TimeEntry } from '../../../types';
 import type {
@@ -33,6 +35,7 @@ export type BudgetThresholdType = 'contract' | 'estimate' | 'profitability';
 export function useProjectManagerData() {
   const { allProjects, isLoadingProjects, ensureProjectsLoaded, refetchProjects } = useProjects();
   const { user } = useUser();
+  const { language } = useLanguage();
 
   // Mode: Show only projects managed by current user or all projects
   const [filterMode, setFilterMode] = useState<'managed' | 'all'>('managed');
@@ -201,26 +204,51 @@ export function useProjectManagerData() {
     if (dateRangePreset === 'this_month') {
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      return { from: toYMD(start), to: toYMD(end), label: `This Month (${toYMD(start)} - ${toYMD(end)})` };
+      const from = toYMD(start);
+      const to = toYMD(end);
+      return {
+        from,
+        to,
+        label: getLocalizedPeriodLabel(language, 'this_month', from, to),
+      };
     }
 
     if (dateRangePreset === 'last_month') {
       const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const end = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { from: toYMD(start), to: toYMD(end), label: `Last Month (${toYMD(start)} - ${toYMD(end)})` };
+      const from = toYMD(start);
+      const to = toYMD(end);
+      return {
+        from,
+        to,
+        label: getLocalizedPeriodLabel(language, 'last_month', from, to),
+      };
     }
 
     if (dateRangePreset === 'last_30_days') {
       const start = new Date();
       start.setDate(start.getDate() - 30);
-      return { from: toYMD(start), to: toYMD(now), label: `Last 30 Days (${toYMD(start)} - ${toYMD(now)})` };
+      const from = toYMD(start);
+      const to = toYMD(now);
+      return {
+        from,
+        to,
+        label: getLocalizedPeriodLabel(language, 'last_30_days', from, to),
+      };
     }
 
     if (dateRangePreset === 'contract_period' && budgetMetadata.startDate && budgetMetadata.contractEndDate) {
       return {
         from: budgetMetadata.startDate,
         to: budgetMetadata.contractEndDate,
-        label: `Contract Period (${budgetMetadata.startDate} - ${budgetMetadata.contractEndDate})`,
+        label: getLocalizedPeriodLabel(
+          language,
+          'contract_period',
+          budgetMetadata.startDate,
+          budgetMetadata.contractEndDate,
+          budgetMetadata.startDate,
+          budgetMetadata.contractEndDate
+        ),
       };
     }
 
@@ -228,12 +256,16 @@ export function useProjectManagerData() {
       return {
         from: customFromDate,
         to: customToDate,
-        label: `Custom Period (${customFromDate || '...'} - ${customToDate || '...'})`,
+        label: getLocalizedPeriodLabel(language, 'all', customFromDate, customToDate),
       };
     }
 
-    return { from: '', to: '', label: 'All Logged Entries' };
-  }, [dateRangePreset, customFromDate, customToDate, budgetMetadata]);
+    return {
+      from: '',
+      to: '',
+      label: getLocalizedPeriodLabel(language, 'all'),
+    };
+  }, [dateRangePreset, customFromDate, customToDate, budgetMetadata, language]);
 
   // Filter time entries for the table & client export
   const filteredTimeEntries = useMemo(() => {

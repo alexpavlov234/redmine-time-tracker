@@ -47,12 +47,12 @@ export const SettingsForm: React.FC = () => {
       const bf = await detectBillableField();
       setTestResult({
         success: true,
-        message: `Connection successful! Logged in as: ${user.firstname} ${user.lastname}${bf ? ` (Billable field: "${bf.name}")` : ''}`,
+        message: `${t('connectionSuccessPrefix')} ${user.firstname} ${user.lastname}${bf ? ` (${t('connectionBillablePrefix')} „${bf.name}“)` : ''}`,
       });
     } catch (err: any) {
       setTestResult({
         success: false,
-        message: err.message || 'Failed to connect.',
+        message: err.message || t('connectionFailedMsg'),
       });
     } finally {
       setIsTesting(false);

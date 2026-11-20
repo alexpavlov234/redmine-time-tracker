@@ -31,6 +31,7 @@ import {
   RichTextNoteEditor,
   RichTextNoteViewer,
 } from '../../../components/common/RichTextNoteEditor';
+import { formatDisplayDateTime } from '../../../utils/formatters';
 import type { PersonalTaskStickyNote } from '../../../types';
 
 /// <summary>
@@ -165,8 +166,6 @@ export const PersonalTaskDetailView: React.FC = () => {
       deleteStickyNote(task.id, noteId);
     }
   };
-
-  const locale = language === 'bg' ? 'bg-BG' : 'en-US';
 
   return (
     <Stack gap="lg">
@@ -451,12 +450,7 @@ export const PersonalTaskDetailView: React.FC = () => {
                       style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}
                     >
                       <Text size="xs" c="dimmed">
-                        {new Date(note.updatedAt).toLocaleString(locale, {
-                          day: '2-digit',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatDisplayDateTime(note.updatedAt, language)}
                       </Text>
                     </Group>
                   </>

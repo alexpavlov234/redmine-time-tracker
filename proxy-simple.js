@@ -146,10 +146,10 @@ app.get('/timer', (req, res) => {
  * POST /timer/start - Starts or resumes timer for a task.
  */
 app.post('/timer/start', (req, res) => {
-  const { issueId, issueSubject, projectName, activityId, activityName } = req.body;
+  const { issueId, issueSubject, projectName, activityId, activityName } = req.body || {};
   const now = Date.now();
 
-  const isSameTask = String(currentTimer.issueId) === String(issueId);
+  const isSameTask = Boolean(issueId) && String(currentTimer.issueId) === String(issueId);
 
   if (currentTimer.isRunning && isSameTask) {
     // Already running this task
@@ -239,7 +239,8 @@ app.post('/timer/sync', (req, res) => {
 app.get('/config', (req, res) => {
   res.json({
     redmineUrl: serverConfig.redmineUrl || '',
-    isConfigured: Boolean(serverConfig.apiKey && serverConfig.redmineUrl)
+    isConfigured: Boolean(serverConfig.apiKey && serverConfig.redmineUrl),
+    hasApiKey: Boolean(serverConfig.apiKey)
   });
 });
 
@@ -297,8 +298,23 @@ app.use('/api', async (req, res) => {
   try {
     console.log(`🔄 Proxying ${req.method} ${req.url} to Redmine...`);
 
+    // Reload server config if not loaded in memory
+    if (!serverConfig.redmineUrl || !serverConfig.apiKey) {
+      loadServerConfig();
+    }
+
     // Get the Redmine URL from headers or stored configuration
     let redmineBaseUrl = req.headers['x-redmine-url'] || serverConfig.redmineUrl || process.env.REDMINE_URL;
+
+    // Fallback to origin / referer header if from browser extension or page
+    if (!redmineBaseUrl && (req.headers.origin || req.headers.referer)) {
+      try {
+        const u = new URL(req.headers.origin || req.headers.referer);
+        if (u.protocol.startsWith('http') && !u.hostname.includes('localhost') && !u.hostname.includes('127.0.0.1')) {
+          redmineBaseUrl = u.origin;
+        }
+      } catch {}
+    }
 
     if (!redmineBaseUrl) {
       return res.status(400).json({
@@ -312,7 +328,7 @@ app.use('/api', async (req, res) => {
     redmineBaseUrl = redmineBaseUrl.replace(/\/$/, '');
 
     // Build the target URL
-    const targetPath = req.url.replace('/api', '');
+    const targetPath = req.url.replace(/^\/api/, '');
     const targetUrl = `${redmineBaseUrl}${targetPath}${req.url.includes('?') ? '' : ''}`;
 
     console.log(`🎯 Redmine Base URL: ${redmineBaseUrl}`);
@@ -366,6 +382,11 @@ app.use('/api', async (req, res) => {
     // Get the response body
     const responseText = await response.text();
     console.log(`📄 Response body length: ${responseText.length} chars`);
+
+    // Redmine returns HTTP 200 or 204 with an empty body on successful PUT
+    if (response.status === 204 || (!responseText.trim() && response.ok)) {
+      return res.status(200).json({ ok: true, status: response.status });
+    }
 
     // Try to parse as JSON, fallback to text
     try {

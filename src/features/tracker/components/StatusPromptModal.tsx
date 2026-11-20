@@ -3,6 +3,7 @@ import { Modal, Button, Group, Stack, Text, Select, Anchor, Alert } from '@manti
 import { useMediaQuery } from '@mantine/hooks';
 import { useProjects } from '../../../contexts/ProjectsContext';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import { redmineApiRequest } from '../../../services/redmine';
 import { IconPlayerPlay, IconArrowRight, IconExternalLink } from '@tabler/icons-react';
 
@@ -24,15 +25,18 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
   const isMobile = useMediaQuery('(max-width: 48em)');
   const { issueStatuses, ensureStatusesLoaded } = useProjects();
   const { redmineUrl } = useSettings();
+  const { t } = useLanguage();
   const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusResult, setStatusResult] = useState<{ success: boolean; message: string } | null>(null);
 
   React.useEffect(() => {
+    setStatusResult(null);
+    setSelectedStatusId(null);
     if (isOpen) {
       ensureStatusesLoaded();
     }
-  }, [isOpen, ensureStatusesLoaded]);
+  }, [isOpen, taskId, ensureStatusesLoaded]);
 
   React.useEffect(() => {
     if (issueStatuses.length > 0 && !selectedStatusId) {
@@ -55,13 +59,13 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
         await redmineApiRequest(`/issues/${taskId}.json`, 'PUT', {
           issue: { status_id: parseInt(selectedStatusId, 10) },
         });
-        setStatusResult({ success: true, message: `Task #${taskId} status updated in Redmine.` });
+        setStatusResult({ success: true, message: `${t('statusUpdatedMsgPrefix')} #${taskId} ${t('statusUpdatedMsgSuffix')}` });
         setTimeout(() => {
           onConfirmStart();
           onClose();
         }, 600);
       } catch (err: any) {
-        setStatusResult({ success: false, message: err.message || 'Could not update task status in Redmine.' });
+        setStatusResult({ success: false, message: err.message || t('statusUpdateFailedMsg') });
       } finally {
         setIsUpdating(false);
       }
@@ -80,7 +84,7 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
     <Modal
       opened={isOpen}
       onClose={onClose}
-      title={<Text fw={600}>Update Task Status to "In Progress"?</Text>}
+      title={<Text fw={600}>{t('statusPromptTitle')}</Text>}
       size="80%"
       fullScreen={isMobile}
       centered
@@ -92,20 +96,20 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
           </Alert>
         )}
         <Text size="sm">
-          You are starting tracking on{' '}
+          {t('statusPromptBodyStart')}{' '}
           {taskId ? (
             <Anchor href={`${redmineUrl}/issues/${taskId}`} target="_blank" fw={700} underline="hover">
               #{taskId} {taskSubject ? `- ${taskSubject}` : ''} <IconExternalLink size={12} />
             </Anchor>
           ) : (
-            <Text component="span" fw={700}>Task #{taskId}</Text>
-          )}.
-          Would you like to update its status in Redmine?
+            <Text component="span" fw={700}>#{taskId}</Text>
+          )}{' '}
+          — {t('statusPromptBodyQuestion')}
         </Text>
 
         {issueStatuses.length > 0 && (
           <Select
-            label="Target Status"
+            label={t('targetStatusLabel')}
             value={selectedStatusId}
             onChange={setSelectedStatusId}
             data={issueStatuses.map(s => ({ value: String(s.id), label: s.name }))}
@@ -114,7 +118,7 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
 
         <Group justify="flex-end" mt="md">
           <Button variant="outline" onClick={handleSkipAndStart}>
-            Skip Status Change
+            {t('skipStatusChangeBtn')}
           </Button>
           <Button
             leftSection={<IconPlayerPlay size={16} />}
@@ -123,7 +127,7 @@ export const StatusPromptModal: React.FC<StatusPromptModalProps> = ({
             loading={isUpdating}
             color="blue"
           >
-            Update & Start
+            {t('updateAndStartBtn')}
           </Button>
         </Group>
       </Stack>

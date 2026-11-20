@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, TextInput, Button, Group, Stack, Text } from '@mantine/core';
-import { IconBookmark } from '@tabler/icons-react';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface SavePresetModalProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ export const SavePresetModal: React.FC<SavePresetModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
 
   const handleConfirm = () => {
@@ -29,19 +30,14 @@ export const SavePresetModal: React.FC<SavePresetModalProps> = ({
         setName('');
         onClose();
       }}
-      title={
-        <Group gap="xs">
-          <IconBookmark size={20} color="var(--mantine-color-blue-filled)" />
-          <Text fw={600}>Save Preset</Text>
-        </Group>
-      }
+      title={<Text fw={600}>{t('savePresetBtn')}</Text>}
       size="sm"
       centered
     >
       <Stack gap="md">
         <TextInput
-          label="Preset Name"
-          placeholder="e.g. Standard Day, Daily Standup..."
+          label={t('presetNameLabel')}
+          placeholder={t('presetNamePlaceholder')}
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
           onKeyDown={(e) => {
@@ -53,10 +49,10 @@ export const SavePresetModal: React.FC<SavePresetModalProps> = ({
 
         <Group justify="flex-end" mt="xs">
           <Button variant="default" onClick={onClose}>
-            Cancel
+            {t('cancelBtn')}
           </Button>
           <Button onClick={handleConfirm} disabled={!name.trim()}>
-            Save Preset
+            {t('savePresetBtn')}
           </Button>
         </Group>
       </Stack>

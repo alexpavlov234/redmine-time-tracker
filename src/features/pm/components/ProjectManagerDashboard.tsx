@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Stack,
   Group,
@@ -6,6 +7,7 @@ import {
   Select,
   SegmentedControl,
   ActionIcon,
+  Button,
   Text,
   Loader,
   Center,
@@ -15,6 +17,7 @@ import {
   IconRefresh,
   IconAlertCircle,
   IconFolder,
+  IconArrowsExchange,
 } from '@tabler/icons-react';
 import { useProjectManagerData } from '../hooks/useProjectManagerData';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -137,6 +140,17 @@ export const ProjectManagerDashboard: React.FC = () => {
           >
             <IconRefresh size={18} />
           </ActionIcon>
+
+          <Button
+            component={Link}
+            to="/transfer"
+            size="sm"
+            variant="outline"
+            color="blue"
+            leftSection={<IconArrowsExchange size={16} />}
+          >
+            {t('quickTransferBtn')}
+          </Button>
         </Group>
       </Group>
 

@@ -1,4 +1,5 @@
 import { redmineApiRequest, getIssues } from './redmine';
+import { formatDisplayDate } from '../utils/formatters';
 import type { TimeEntry } from '../types';
 import type {
   RedmineProjectFull,
@@ -748,26 +749,37 @@ export function getLocalizedPeriodLabel(
   fallbackLabel?: string
 ): string {
   const t = exportTranslations[language || 'bg'];
+  const lang = language === 'en' ? 'en' : 'bg';
 
   if (preset === 'this_month') {
-    return fromDate && toDate ? `${t.periodThisMonth} (${fromDate} - ${toDate})` : t.periodThisMonth;
+    return fromDate && toDate
+      ? `${t.periodThisMonth} (${formatDisplayDate(fromDate, lang)} – ${formatDisplayDate(toDate, lang)})`
+      : t.periodThisMonth;
   }
   if (preset === 'last_month') {
-    return fromDate && toDate ? `${t.periodLastMonth} (${fromDate} - ${toDate})` : t.periodLastMonth;
+    return fromDate && toDate
+      ? `${t.periodLastMonth} (${formatDisplayDate(fromDate, lang)} – ${formatDisplayDate(toDate, lang)})`
+      : t.periodLastMonth;
   }
   if (preset === 'last_30_days') {
-    return fromDate && toDate ? `${t.periodLast30Days} (${fromDate} - ${toDate})` : t.periodLast30Days;
+    return fromDate && toDate
+      ? `${t.periodLast30Days} (${formatDisplayDate(fromDate, lang)} – ${formatDisplayDate(toDate, lang)})`
+      : t.periodLast30Days;
   }
   if (preset === 'contract_period') {
     const s = contractStart || fromDate;
     const e = contractEnd || toDate;
-    return s && e ? `${t.periodContract} (${s} - ${e})` : t.periodContract;
+    return s && e
+      ? `${t.periodContract} (${formatDisplayDate(s, lang)} – ${formatDisplayDate(e, lang)})`
+      : t.periodContract;
   }
   if (preset === 'all' && !fromDate && !toDate) {
     return t.periodAll;
   }
   if (fromDate || toDate) {
-    return `${t.periodCustom} (${fromDate || '...'} - ${toDate || '...'})`;
+    const fromFormatted = fromDate ? formatDisplayDate(fromDate, lang) : '...';
+    const toFormatted = toDate ? formatDisplayDate(toDate, lang) : '...';
+    return `${t.periodCustom} (${fromFormatted} – ${toFormatted})`;
   }
 
   // Handle fallback label string

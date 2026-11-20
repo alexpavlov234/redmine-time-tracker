@@ -27,7 +27,7 @@ async function fetchWithFallback(url, options = {}) {
 /// </summary>
 chrome.runtime.onInstalled.addListener(async () => {
   try {
-    const tabs = await chrome.tabs.query({ url: '*://*/*issues/*' });
+    const tabs = await chrome.tabs.query({ url: ['*://*/*issues/*', '*://*/*time_entries*', '*://*/*projects/*'] });
     for (const tab of tabs) {
       if (!tab.id) continue;
       try {

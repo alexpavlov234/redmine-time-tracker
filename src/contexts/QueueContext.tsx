@@ -7,7 +7,7 @@ import type { Todo } from '../types';
 interface QueueContextProps {
   todos: Todo[];
   activeTodoId: number | null;
-  addTodo: (todo: Omit<Todo, 'id'>) => void;
+  addTodo: (todo: Omit<Todo, 'id'>) => Todo;
   removeTodo: (id: number) => void;
   reorderTodos: (startIndex: number, endIndex: number) => void;
   setActiveTodoId: (id: number | null) => void;
@@ -94,6 +94,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const isSyncingFromServerRef = useRef(false);
   const hasInitialSyncCompletedRef = useRef(false);
   const lastServerUpdatedRef = useRef<number>(0);
+  const lastLocalMutationAtRef = useRef<number>(0);
   const lastBroadcastRef = useRef<string>('');
   const stateRef = useRef({ todos, activeTodoId });
 
@@ -113,6 +114,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     /// Keeps polling even when the tab is in the background so extension actions are never missed.
     /// </summary>
     const pollServerTimer = async () => {
+      const pollStartedAt = Date.now();
       try {
         const response = await fetch(PROXY_TIMER_ENDPOINT);
         if (!response.ok) {
@@ -122,6 +124,9 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const serverTimer = await response.json();
         if (!serverTimer || typeof serverTimer !== 'object') {
           hasInitialSyncCompletedRef.current = true;
+          return;
+        }
+        if (pollStartedAt < lastLocalMutationAtRef.current) {
           return;
         }
 
@@ -278,6 +283,30 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setTimeout(() => {
             isSyncingFromServerRef.current = false;
           }, 500);
+        } else if (
+          !serverTimer.isRunning &&
+          !serverTimer.issueId &&
+          currentActive &&
+          !currentActive.taskId &&
+          currentActive.isRunning &&
+          serverLastUpdated > lastServerUpdatedRef.current
+        ) {
+          isSyncingFromServerRef.current = true;
+          lastServerUpdatedRef.current = serverLastUpdated;
+
+          const syncedTodo: Todo = {
+            ...currentActive,
+            isRunning: false,
+            startTime: null,
+            elapsedMs: typeof serverTimer.elapsedMs === 'number' ? serverTimer.elapsedMs : currentActive.elapsedMs,
+          };
+          lastBroadcastRef.current = buildSyncPayload(syncedTodo);
+
+          setTodos((prev) => prev.map((t) => (t.id === currentActive.id ? syncedTodo : t)));
+
+          setTimeout(() => {
+            isSyncingFromServerRef.current = false;
+          }, 500);
         } else if (!hasInitialSyncCompletedRef.current) {
           // Initialize lastBroadcastRef to current local state if server is idle so we only broadcast real changes
           lastServerUpdatedRef.current = serverLastUpdated;
@@ -344,6 +373,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [todos, activeTodoId]);
 
   const setActiveTodoId = useCallback((id: number | null) => {
+    lastLocalMutationAtRef.current = Date.now();
     setActiveTodoIdState(id);
     if (id === null) {
       localStorage.removeItem(ACTIVE_TODO_KEY);
@@ -352,19 +382,22 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  const addTodo = useCallback((todo: Omit<Todo, 'id'>) => {
+  const addTodo = useCallback((todo: Omit<Todo, 'id'>): Todo => {
+    lastLocalMutationAtRef.current = Date.now();
     const newTodo: Todo = {
       ...todo,
       id: Date.now(),
-      elapsedMs: 0,
-      startTime: null,
-      isRunning: false,
-      activities: [],
+      elapsedMs: typeof todo.elapsedMs === 'number' ? todo.elapsedMs : 0,
+      startTime: todo.startTime !== undefined ? todo.startTime : null,
+      isRunning: typeof todo.isRunning === 'boolean' ? todo.isRunning : false,
+      activities: Array.isArray(todo.activities) ? todo.activities : [],
     };
     setTodos((prev) => [...prev, newTodo]);
+    return newTodo;
   }, []);
 
   const removeTodo = useCallback((id: number) => {
+    lastLocalMutationAtRef.current = Date.now();
     setTodos((prev) => prev.filter((t) => t.id !== id));
     setActiveTodoIdState((prevActive) => {
       if (prevActive === id) {
@@ -376,6 +409,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const reorderTodos = useCallback((startIndex: number, endIndex: number) => {
+    lastLocalMutationAtRef.current = Date.now();
     setTodos((prev) => {
       const result = Array.from(prev);
       const [removed] = result.splice(startIndex, 1);
@@ -385,6 +419,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const updateTodo = useCallback((id: number, updates: Partial<Todo>) => {
+    lastLocalMutationAtRef.current = Date.now();
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
   }, []);
 

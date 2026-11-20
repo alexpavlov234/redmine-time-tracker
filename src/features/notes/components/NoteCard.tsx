@@ -20,6 +20,7 @@ import {
 import { RichTextNoteViewer } from '../../../components/common/RichTextNoteEditor';
 import { RedmineIssueLink } from '../../../components/common/RedmineIssueLink';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { formatDisplayDateTime } from '../../../utils/formatters';
 import type { NoteItem } from '../../../types';
 
 /// <summary>
@@ -50,7 +51,6 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onSelectLabel,
 }) => {
   const { language, t } = useLanguage();
-  const locale = language === 'bg' ? 'bg-BG' : 'en-US';
 
   return (
     <Paper
@@ -100,13 +100,13 @@ export const NoteCard: React.FC<NoteCardProps> = ({
 
           <Group gap={4} wrap="nowrap" onClick={(e) => e.stopPropagation()}>
             {onTogglePin && (
-              <Tooltip label={note.pinned ? 'Unpin' : 'Pin'}>
+              <Tooltip label={note.pinned ? t('unpinNoteTooltip') : t('pinNoteTooltip')}>
                 <ActionIcon
                   variant="subtle"
                   color={note.pinned ? 'blue' : 'gray'}
                   size="sm"
                   onClick={() => onTogglePin(note)}
-                  aria-label={note.pinned ? 'Unpin note' : 'Pin note'}
+                  aria-label={note.pinned ? t('unpinNoteTooltip') : t('pinNoteTooltip')}
                 >
                   {note.pinned ? <IconPinFilled size={16} /> : <IconPin size={16} />}
                 </ActionIcon>
@@ -166,12 +166,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
         )}
 
         <Text size="xs" c="dimmed" ta="right">
-          {new Date(note.updatedAt).toLocaleString(locale, {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {formatDisplayDateTime(note.updatedAt, language)}
         </Text>
       </Stack>
     </Paper>

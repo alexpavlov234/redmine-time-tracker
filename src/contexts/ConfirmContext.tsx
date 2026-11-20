@@ -65,6 +65,7 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
         size="md"
         centered
         radius="md"
+        zIndex={400}
       >
         <Text size="sm" style={{ lineHeight: 1.6 }}>{options?.message}</Text>
         {options?.subtitle && (
