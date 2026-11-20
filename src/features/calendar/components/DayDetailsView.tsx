@@ -251,7 +251,7 @@ export const DayDetailsView: React.FC<DayDetailsViewProps> = ({
                             color="green"
                             onClick={() => onPushStagedEntry(entry.localId)}
                             disabled={isPushing}
-                            aria-label="Push entry to Redmine"
+                            aria-label={t('pushEntryTooltip')}
                           >
                             <IconSend size={13} />
                           </ActionIcon>

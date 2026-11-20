@@ -114,7 +114,7 @@ export const StagedEntriesProvider: React.FC<{ children: React.ReactNode }> = ({
           await pushSingleStagedEntryToRedmine(entry);
           succeededIds.add(entry.localId);
         } catch (err: any) {
-          const message = err?.message || 'Failed to push entry to Redmine';
+          const message = err?.message || 'Failed to send entry to Redmine';
           errorMap.set(entry.localId, message);
           errors.push({ localId: entry.localId, message });
         }
@@ -153,7 +153,7 @@ export const StagedEntriesProvider: React.FC<{ children: React.ReactNode }> = ({
       if (res.pushedCount > 0) {
         return { success: true };
       }
-      return { success: false, error: res.errors[0]?.message || 'Push failed' };
+      return { success: false, error: res.errors[0]?.message || 'Submission failed' };
     },
     [stagedEntries, executeBatchPush]
   );
